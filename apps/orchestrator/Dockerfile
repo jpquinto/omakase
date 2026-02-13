@@ -19,6 +19,9 @@ RUN bun install --frozen-lockfile
 # Copy application source (Bun runs TypeScript directly, no build step)
 COPY . .
 
+# Ensure agent scripts are executable (Windows hosts may strip execute bits)
+RUN chmod +x src/agent-entrypoint.sh src/agent-setup.sh
+
 EXPOSE 8080
 
 CMD ["bun", "src/index.ts"]

@@ -280,6 +280,8 @@ export class AgentPipeline {
         role,
         projectId: this.projectId,
         repoUrl: this.config.repoUrl,
+        featureName: this.config.featureName,
+        featureDescription: this.config.featureDescription,
         ecsCluster: this.ecsConfig.cluster,
         taskDefinition: this.ecsConfig.taskDefinition,
         subnets: this.ecsConfig.subnets,

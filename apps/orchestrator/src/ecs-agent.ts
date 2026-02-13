@@ -39,6 +39,10 @@ export interface StartAgentOptions {
   projectId: string;
   /** The git clone URL for the target repository. */
   repoUrl: string;
+  /** Human-readable feature name (used in agent prompts). */
+  featureName: string;
+  /** Feature description and acceptance criteria (used in agent prompts). */
+  featureDescription: string;
   /** The ECS cluster name or ARN to run the task on. */
   ecsCluster: string;
   /** The ECS task definition family or full ARN. */
@@ -102,6 +106,8 @@ export async function startAgent(options: StartAgentOptions): Promise<StartAgent
     role,
     projectId,
     repoUrl,
+    featureName,
+    featureDescription,
     ecsCluster,
     taskDefinition,
     subnets,
@@ -128,6 +134,9 @@ export async function startAgent(options: StartAgentOptions): Promise<StartAgent
       containerOverrides: [
         {
           name: containerName,
+          // Override the default CMD (which starts the orchestrator) to run
+          // the agent entrypoint script instead.
+          command: ["/bin/bash", "/app/src/agent-entrypoint.sh"],
           environment: [
             { name: "REPO_URL", value: repoUrl },
             { name: "FEATURE_ID", value: featureId },
@@ -135,6 +144,8 @@ export async function startAgent(options: StartAgentOptions): Promise<StartAgent
             { name: "PROJECT_ID", value: projectId },
             { name: "CONVEX_URL", value: convexUrl },
             { name: "BASE_BRANCH", value: baseBranch },
+            { name: "FEATURE_NAME", value: featureName },
+            { name: "FEATURE_DESCRIPTION", value: featureDescription },
           ],
         },
       ],
