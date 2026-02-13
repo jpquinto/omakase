@@ -1,0 +1,186 @@
+@import "tailwindcss";
+
+/* ============================================================================
+   AutoForge Neobrutalism Design System
+   Ported from the existing UI with Tailwind CSS v4 @theme tokens
+   ============================================================================ */
+
+@theme {
+  /* --- Status Colors --- */
+  --color-neo-pending: #fbbf24;
+  --color-neo-progress: #22d3ee;
+  --color-neo-done: #4ade80;
+  --color-neo-fail: #f87171;
+
+  /* --- Surface Colors --- */
+  --color-neo-bg: #fffef5;
+  --color-neo-card: #ffffff;
+  --color-neo-border: #000000;
+  --color-neo-muted: #f5f5f4;
+
+  /* --- Brand Colors --- */
+  --color-neo-primary: #6366f1;
+  --color-neo-primary-foreground: #ffffff;
+  --color-neo-accent: #f59e0b;
+  --color-neo-destructive: #ef4444;
+
+  /* --- Text Colors --- */
+  --color-neo-foreground: #0a0a0a;
+  --color-neo-muted-foreground: #737373;
+
+  /* --- Shadow Offsets (neobrutalism hard shadows) --- */
+  --shadow-neo-sm: 2px 2px 0px #000000;
+  --shadow-neo: 4px 4px 0px #000000;
+  --shadow-neo-lg: 6px 6px 0px #000000;
+
+  /* --- Border Width --- */
+  --border-neo: 2px;
+
+  /* --- Animations --- */
+  --animate-slide-in: slide-in 0.2s ease-out;
+  --animate-pulse-neo: pulse-neo 2s ease-in-out infinite;
+  --animate-shimmer: shimmer 2s ease-in-out infinite;
+}
+
+/* ============================================================================
+   Keyframes
+   ============================================================================ */
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse-neo {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 4px 4px 0px #000000;
+  }
+  50% {
+    opacity: 0.85;
+    box-shadow: 2px 2px 0px #000000;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% center;
+  }
+  100% {
+    background-position: -200% center;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ============================================================================
+   Base Styles
+   ============================================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-neo-bg);
+  color: var(--color-neo-foreground);
+  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ============================================================================
+   Neobrutalism Utility Classes
+   ============================================================================ */
+
+@layer utilities {
+  .neo-border {
+    border: 2px solid #000000;
+  }
+
+  .neo-shadow {
+    box-shadow: 4px 4px 0px #000000;
+  }
+
+  .neo-shadow-sm {
+    box-shadow: 2px 2px 0px #000000;
+  }
+
+  .neo-shadow-lg {
+    box-shadow: 6px 6px 0px #000000;
+  }
+
+  .neo-card {
+    border: 2px solid #000000;
+    box-shadow: 4px 4px 0px #000000;
+    background-color: #ffffff;
+  }
+
+  .neo-btn {
+    border: 2px solid #000000;
+    box-shadow: 4px 4px 0px #000000;
+    font-weight: 700;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+  }
+
+  .neo-btn:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 5px 5px 0px #000000;
+  }
+
+  .neo-btn:active {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0px #000000;
+  }
+}
+
+/* ============================================================================
+   Scrollbar Styling
+   ============================================================================ */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d4d4d4;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a3a3a3;
+}

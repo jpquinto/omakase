@@ -1,24 +1,43 @@
 # AutoForge
 
-[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/leonvanzyl)
+An autonomous development platform powered by Claude Code. AutoForge uses a team of specialized AI agents -- architect, coder, reviewer, and tester -- to implement features from Linear tickets, running on AWS ECS Fargate with a real-time Next.js dashboard.
 
-A long-running autonomous coding agent powered by the Claude Agent SDK. This tool can build complete applications over multiple sessions using a two-agent pattern (initializer + coding agent). Includes a React-based UI for monitoring progress in real-time.
+## How It Works
 
-## Video Tutorial
+1. Connect a project to Linear and configure a GitHub repo
+2. Create or sync tickets as features in the dashboard
+3. The orchestrator picks up ready features (dependencies met, within concurrency limits)
+4. A 4-step agent pipeline runs on ECS Fargate:
+   - **Architect** -- designs the implementation plan
+   - **Coder** -- implements the feature
+   - **Reviewer** -- reviews the code (may request changes)
+   - **Tester** -- runs tests to verify
+5. On success, a pull request is created on GitHub
+6. The dashboard updates in real-time via Convex subscriptions
 
-[![Watch the tutorial](https://img.youtube.com/vi/nKiPOxDpcJY/hqdefault.jpg)](https://youtu.be/nKiPOxDpcJY)
+## Tech Stack
 
-> **[Watch the setup and usage guide →](https://youtu.be/nKiPOxDpcJY)**
+| Layer | Technology | Deployed To |
+|---|---|---|
+| Runtime | Bun 1.2+ | Everywhere |
+| Frontend | Next.js 15, React 19, Tailwind CSS v4 | Vercel |
+| Auth | Auth0 v4 SDK | Managed SaaS |
+| Database | Convex (real-time serverless) | Convex Cloud |
+| Backend | Elysia (Bun-native) | AWS ECS Fargate |
+| Agents | Claude Code in Docker containers | AWS ECS Fargate (on-demand) |
+| Infrastructure | AWS CDK (VPC, ECS, ALB, ECR, IAM) | AWS |
+| Ticket Management | Linear (bidirectional sync) | Managed SaaS |
+| Types | Drizzle ORM schemas | Build-time only |
 
----
+For detailed architecture, see [TECH_STACK.md](TECH_STACK.md).
 
 ## Prerequisites
 
-- **Node.js 20+** - Required for the CLI
-- **Python 3.11+** - Auto-detected on first run ([download](https://www.python.org/downloads/))
-- **Claude Code CLI** - Install and authenticate (see below)
+- **Bun 1.2+** -- [Install Bun](https://bun.sh)
+- **Node.js 20+** -- Required for AWS CDK only
+- **Claude Code CLI** -- For running agents
 
-### Claude Code CLI (Required)
+### Claude Code CLI
 
 **macOS / Linux:**
 ```bash
@@ -30,370 +49,150 @@ curl -fsSL https://claude.ai/install.sh | bash
 irm https://claude.ai/install.ps1 | iex
 ```
 
-### Authentication
-
-You need one of the following:
-
-- **Claude Pro/Max Subscription** - Use `claude login` to authenticate (recommended)
-- **Anthropic API Key** - Pay-per-use from https://console.anthropic.com/
-
----
-
 ## Quick Start
 
-### Option 1: npm Install (Recommended)
-
 ```bash
-npm install -g autoforge-ai
-autoforge
-```
-
-On first run, AutoForge automatically:
-1. Checks for Python 3.11+
-2. Creates a virtual environment at `~/.autoforge/venv/`
-3. Installs Python dependencies
-4. Copies a default config file to `~/.autoforge/.env`
-5. Starts the server and opens your browser
-
-### CLI Commands
-
-```
-autoforge                       Start the server (default)
-autoforge config                Open ~/.autoforge/.env in $EDITOR
-autoforge config --path         Print config file path
-autoforge config --show         Show active configuration values
-autoforge --port PORT           Custom port (default: auto from 8888)
-autoforge --host HOST           Custom host (default: 127.0.0.1)
-autoforge --no-browser          Don't auto-open browser
-autoforge --repair              Delete and recreate virtual environment
-autoforge --version             Print version
-autoforge --help                Show help
-```
-
-### Option 2: From Source (Development)
-
-Clone the repository and use the start scripts directly. This is the recommended path if you want to contribute or modify AutoForge itself.
-
-```bash
-git clone https://github.com/leonvanzyl/autoforge.git
+# Clone the repo
+git clone https://github.com/your-org/autoforge.git
 cd autoforge
+
+# Install dependencies
+bun install
+
+# Copy environment config
+cp .env.example .env
+# Fill in Auth0, Convex, AWS, Linear, and Claude credentials
+
+# Start the frontend
+bun --filter @autoforge/web run dev
+
+# Start the orchestrator (in another terminal)
+bun --filter @autoforge/orchestrator run dev
+
+# Start Convex dev server (in another terminal)
+bun --filter @autoforge/convex run dev
 ```
-
-**Web UI:**
-
-| Platform | Command |
-|---|---|
-| Windows | `start_ui.bat` |
-| macOS / Linux | `./start_ui.sh` |
-
-This launches the React-based web UI at `http://localhost:5173` with:
-- Project selection and creation
-- Kanban board view of features
-- Real-time agent output streaming
-- Start/pause/stop controls
-
-**CLI Mode:**
-
-| Platform | Command |
-|---|---|
-| Windows | `start.bat` |
-| macOS / Linux | `./start.sh` |
-
-The start script will:
-1. Check if Claude CLI is installed
-2. Check if you're authenticated (prompt to run `claude login` if not)
-3. Create a Python virtual environment
-4. Install dependencies
-5. Launch the main menu
-
-### Creating or Continuing a Project
-
-You'll see options to:
-- **Create new project** - Start a fresh project with AI-assisted spec generation
-- **Continue existing project** - Resume work on a previous project
-
-For new projects, you can use the built-in `/create-spec` command to interactively create your app specification with Claude's help.
-
----
-
-## How It Works
-
-### Two-Agent Pattern
-
-1. **Initializer Agent (First Session):** Reads your app specification, creates features in a SQLite database (`features.db`), sets up the project structure, and initializes git.
-
-2. **Coding Agent (Subsequent Sessions):** Picks up where the previous session left off, implements features one by one, and marks them as passing in the database.
-
-### Feature Management
-
-Features are stored in SQLite via SQLAlchemy and managed through an MCP server that exposes tools to the agent:
-- `feature_get_stats` - Progress statistics
-- `feature_get_next` - Get highest-priority pending feature
-- `feature_get_for_regression` - Random passing features for regression testing
-- `feature_mark_passing` - Mark feature complete
-- `feature_skip` - Move feature to end of queue
-- `feature_create_bulk` - Initialize all features (used by initializer)
-
-### Session Management
-
-- Each session runs with a fresh context window
-- Progress is persisted via SQLite database and git commits
-- The agent auto-continues between sessions (3 second delay)
-- Press `Ctrl+C` to pause; run the start script again to resume
-
----
-
-## Important Timing Expectations
-
-> **Note: Building complete applications takes time!**
-
-- **First session (initialization):** The agent generates feature test cases. This takes several minutes and may appear to hang - this is normal.
-
-- **Subsequent sessions:** Each coding iteration can take **5-15 minutes** depending on complexity.
-
-- **Full app:** Building all features typically requires **many hours** of total runtime across multiple sessions.
-
-**Tip:** The feature count in the prompts determines scope. For faster demos, you can modify your app spec to target fewer features (e.g., 20-50 features for a quick demo).
-
----
 
 ## Project Structure
 
 ```
 autoforge/
-├── bin/                         # npm CLI entry point
-├── lib/                         # CLI bootstrap and setup logic
-├── start.py                     # CLI menu and project management
-├── start_ui.py                  # Web UI backend (FastAPI server launcher)
-├── autonomous_agent_demo.py     # Agent entry point
-├── agent.py                     # Agent session logic
-├── client.py                    # Claude SDK client configuration
-├── security.py                  # Bash command allowlist and validation
-├── progress.py                  # Progress tracking utilities
-├── prompts.py                   # Prompt loading utilities
-├── api/
-│   └── database.py              # SQLAlchemy models (Feature table)
-├── mcp_server/
-│   └── feature_mcp.py           # MCP server for feature management tools
-├── server/
-│   ├── main.py                  # FastAPI REST API server
-│   ├── websocket.py             # WebSocket handler for real-time updates
-│   ├── schemas.py               # Pydantic schemas
-│   ├── routers/                 # API route handlers
-│   └── services/                # Business logic services
-├── ui/                          # React frontend
-│   ├── src/
-│   │   ├── App.tsx              # Main app component
-│   │   ├── hooks/               # React Query and WebSocket hooks
-│   │   └── lib/                 # API client and types
-│   ├── package.json
-│   └── vite.config.ts
-├── .claude/
-│   ├── commands/
-│   │   └── create-spec.md       # /create-spec slash command
-│   ├── skills/                  # Claude Code skills
-│   └── templates/               # Prompt templates
-├── requirements.txt             # Python dependencies (development)
-├── requirements-prod.txt        # Python dependencies (npm install)
-├── package.json                 # npm package definition
-└── .env                         # Optional configuration
+├── apps/
+│   ├── web/                    # Next.js 15 frontend
+│   │   ├── src/
+│   │   │   ├── app/            # App Router pages
+│   │   │   │   ├── (public)/   # Landing page (unauthenticated)
+│   │   │   │   ├── (app)/      # Dashboard (authenticated)
+│   │   │   │   └── api/        # Auth0, Linear webhooks
+│   │   │   ├── components/     # Kanban, dependency graph, agent dashboard
+│   │   │   ├── lib/            # Auth0, Linear client, utilities
+│   │   │   ├── providers/      # Auth0 + Convex React providers
+│   │   │   └── hooks/          # Keyboard shortcuts
+│   │   └── vercel.json         # Vercel deployment config
+│   └── orchestrator/           # Elysia backend
+│       ├── src/
+│       │   ├── index.ts        # Elysia server entry point
+│       │   ├── feature-watcher.ts  # Polls Convex for ready features
+│       │   ├── pipeline.ts     # 4-step agent pipeline
+│       │   ├── ecs-agent.ts    # ECS Fargate task management
+│       │   ├── agent-monitor.ts    # Task completion monitoring
+│       │   ├── concurrency.ts  # Per-project concurrency limits
+│       │   ├── pr-creator.ts   # GitHub PR creation
+│       │   └── agent-roles/    # CLAUDE.md files per agent role
+│       └── Dockerfile          # oven/bun:1 based image
+├── packages/
+│   ├── convex/                 # Convex database
+│   │   └── convex/
+│   │       ├── schema.ts       # 6-table schema definition
+│   │       ├── projects.ts     # Project CRUD
+│   │       ├── features.ts     # Feature management + dependency checks
+│   │       ├── dependencies.ts # BFS cycle detection
+│   │       ├── agentRuns.ts    # Agent execution records
+│   │       ├── tickets.ts      # Linear ticket sync
+│   │       └── __tests__/      # Unit tests
+│   ├── db/                     # Drizzle ORM type schemas
+│   │   └── src/schema/         # TypeScript type exports
+│   └── shared/                 # Shared utilities
+├── infra/                      # AWS CDK
+│   └── lib/
+│       └── autoforge-stack.ts  # VPC, ECS, ALB, ECR, IAM, Secrets Manager
+├── .github/workflows/          # CI/CD pipelines
+│   ├── ci.yml                  # Typecheck, lint, test
+│   ├── deploy-web.yml          # Vercel deployment
+│   ├── deploy-agent-image.yml  # ECR Docker push
+│   └── deploy-infra.yml        # CDK deploy
+├── .claude/                    # Claude Code customization
+│   ├── commands/               # Slash commands
+│   ├── agents/                 # Custom agent definitions
+│   └── skills/                 # Specialized skills
+├── openspec/                   # Change management specs
+├── CLAUDE.md                   # Claude Code project guidance
+├── TECH_STACK.md               # Detailed tech stack documentation
+└── package.json                # Bun workspace root
 ```
 
----
+## Development
 
-## Generated Project Structure
-
-After the agent runs, your project directory will contain:
-
-```
-generations/my_project/
-├── features.db               # SQLite database (feature test cases)
-├── prompts/
-│   ├── app_spec.txt          # Your app specification
-│   ├── initializer_prompt.md # First session prompt
-│   └── coding_prompt.md      # Continuation session prompt
-├── init.sh                   # Environment setup script
-├── claude-progress.txt       # Session progress notes
-└── [application files]       # Generated application code
-```
-
----
-
-## Running the Generated Application
-
-After the agent completes (or pauses), you can run the generated application:
+### Frontend
 
 ```bash
-cd generations/my_project
-
-# Run the setup script created by the agent
-./init.sh
-
-# Or manually (typical for Node.js apps):
-npm install
-npm run dev
+bun --filter @autoforge/web run dev        # localhost:3000
+bun --filter @autoforge/web run build      # Production build
+bun --filter @autoforge/web run lint       # ESLint
+bun --filter @autoforge/web run test:e2e   # Playwright E2E tests
 ```
 
-The application will typically be available at `http://localhost:3000` or similar.
-
----
-
-## Security Model
-
-This project uses a defense-in-depth security approach (see `security.py` and `client.py`):
-
-1. **OS-level Sandbox:** Bash commands run in an isolated environment
-2. **Filesystem Restrictions:** File operations restricted to the project directory only
-3. **Bash Allowlist:** Only specific commands are permitted:
-   - File inspection: `ls`, `cat`, `head`, `tail`, `wc`, `grep`
-   - Node.js: `npm`, `node`
-   - Version control: `git`
-   - Process management: `ps`, `lsof`, `sleep`, `pkill` (dev processes only)
-
-Commands not in the allowlist are blocked by the security hook.
-
----
-
-## Web UI Development
-
-The React UI is located in the `ui/` directory.
-
-### Development Mode
+### Backend
 
 ```bash
-cd ui
-npm install
-npm run dev      # Development server with hot reload
+bun --filter @autoforge/orchestrator run dev    # Watch mode, localhost:8080
+bun --filter @autoforge/orchestrator run start  # Production
 ```
 
-### Building for Production
+### Database
 
 ```bash
-cd ui
-npm run build    # Builds to ui/dist/
+bun --filter @autoforge/convex run dev      # Local dev server
+bun --filter @autoforge/convex run deploy   # Deploy to Convex cloud
+bun --filter @autoforge/convex run test     # Unit tests
 ```
 
-**Note:** The `start_ui.bat`/`start_ui.sh` scripts serve the pre-built UI from `ui/dist/`. After making UI changes, run `npm run build` to see them when using the start scripts.
+### Infrastructure
 
-### Tech Stack
+```bash
+cd infra
+npm ci
+npx cdk diff       # Preview changes
+npx cdk deploy     # Deploy to AWS
+```
 
-- React 18 with TypeScript
-- TanStack Query for data fetching
-- Tailwind CSS v4 with neobrutalism design
-- Radix UI components
-- WebSocket for real-time updates
+### Type Checking
 
-### Real-time Updates
-
-The UI receives live updates via WebSocket (`/ws/projects/{project_name}`):
-- `progress` - Test pass counts
-- `agent_status` - Running/paused/stopped/crashed
-- `log` - Agent output lines (streamed from subprocess stdout)
-- `feature_update` - Feature status changes
-
----
+```bash
+bun --filter '*' run typecheck    # All packages
+```
 
 ## Configuration
 
-AutoForge reads configuration from a `.env` file. The file location depends on how you installed AutoForge:
+Copy `.env.example` to `.env` and configure:
 
-| Install method | Config file location | Edit command |
+| Group | Variables | Purpose |
 |---|---|---|
-| npm (global) | `~/.autoforge/.env` | `autoforge config` |
-| From source | `.env` in the project root | Edit directly |
+| Auth0 | `AUTH0_SECRET`, `AUTH0_BASE_URL`, `AUTH0_ISSUER_BASE_URL`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET` | User authentication |
+| Convex | `NEXT_PUBLIC_CONVEX_URL`, `CONVEX_DEPLOY_KEY` | Database connection |
+| AWS | `AWS_REGION`, `AWS_ACCOUNT_ID`, `ECS_CLUSTER_NAME`, `ECR_REPO_URI` | Infrastructure |
+| Linear | `LINEAR_CLIENT_ID`, `LINEAR_CLIENT_SECRET`, `LINEAR_WEBHOOK_SECRET` | Ticket management |
+| Claude | `ANTHROPIC_API_KEY` | AI agent API access |
 
-A default config file is created automatically on first run. Use `autoforge config` to open it in your editor, or `autoforge config --show` to print the active values.
+## CI/CD
 
-### N8N Webhook Integration
-
-Add to your `.env` to send progress notifications to an N8N webhook:
-
-```bash
-# Optional: N8N webhook for progress notifications
-PROGRESS_N8N_WEBHOOK_URL=https://your-n8n-instance.com/webhook/your-webhook-id
-```
-
-When test progress increases, the agent sends:
-
-```json
-{
-  "event": "test_progress",
-  "passing": 45,
-  "total": 200,
-  "percentage": 22.5,
-  "project": "my_project",
-  "timestamp": "2025-01-15T14:30:00.000Z"
-}
-```
-
-### Alternative API Providers (GLM, Ollama, Kimi, Custom)
-
-Alternative providers are configured via the **Settings UI** (gear icon > API Provider). Select your provider, set the base URL, auth token, and model directly in the UI — no `.env` changes needed.
-
-Available providers: **Claude** (default), **GLM** (Zhipu AI), **Ollama** (local models), **Kimi** (Moonshot), **Custom**
-
-For Ollama, install [Ollama v0.14.0+](https://ollama.com), run `ollama serve`, and pull a coding model (e.g., `ollama pull qwen3-coder`). Then select "Ollama" in the Settings UI.
-
-### Using Vertex AI
-
-Add these variables to your `.env` file to run agents via Google Cloud Vertex AI:
-
-```bash
-CLAUDE_CODE_USE_VERTEX=1
-CLOUD_ML_REGION=us-east5
-ANTHROPIC_VERTEX_PROJECT_ID=your-gcp-project-id
-ANTHROPIC_DEFAULT_OPUS_MODEL=claude-opus-4-6
-ANTHROPIC_DEFAULT_SONNET_MODEL=claude-sonnet-4-5@20250929
-ANTHROPIC_DEFAULT_HAIKU_MODEL=claude-3-5-haiku@20241022
-```
-
-Requires `gcloud auth application-default login` first. Note the `@` separator (not `-`) in Vertex AI model names.
-
----
-
-## Customization
-
-### Changing the Application
-
-Use the `/create-spec` command when creating a new project, or manually edit the files in your project's `prompts/` directory:
-- `app_spec.txt` - Your application specification
-- `initializer_prompt.md` - Controls feature generation
-
-### Modifying Allowed Commands
-
-Edit `security.py` to add or remove commands from `ALLOWED_COMMANDS`.
-
----
-
-## Troubleshooting
-
-**"Claude CLI not found"**
-Install the Claude Code CLI using the instructions in the Prerequisites section.
-
-**"Not authenticated with Claude"**
-Run `claude login` to authenticate. The start script will prompt you to do this automatically.
-
-**"Appears to hang on first run"**
-This is normal. The initializer agent is generating detailed test cases, which takes significant time. Watch for `[Tool: ...]` output to confirm the agent is working.
-
-**"Command blocked by security hook"**
-The agent tried to run a command not in the allowlist. This is the security system working as intended. If needed, add the command to `ALLOWED_COMMANDS` in `security.py`.
-
-**"Python 3.11+ required but not found"**
-Install Python 3.11 or later from [python.org](https://www.python.org/downloads/). Make sure `python3` (or `python` on Windows) is on your PATH.
-
-**"Python venv module not available"**
-On Debian/Ubuntu, the venv module is packaged separately. Install it with `sudo apt install python3.XX-venv` (replace `XX` with your Python minor version, e.g., `python3.12-venv`).
-
-**"AutoForge is already running"**
-A server instance is already active. Use the browser URL shown in the terminal, or stop the existing instance with Ctrl+C first.
-
-**Virtual environment issues after a Python upgrade**
-Run `autoforge --repair` to delete and recreate the virtual environment from scratch.
-
----
+| Workflow | Trigger | Action |
+|---|---|---|
+| `ci.yml` | Push/PR to main | Typecheck, lint, Convex tests, Playwright E2E |
+| `deploy-web.yml` | Push to main (`apps/web/**`) | Deploy to Vercel |
+| `deploy-agent-image.yml` | Push to main (`apps/orchestrator/**`) | Build + push Docker image to ECR |
+| `deploy-infra.yml` | Push to main (`infra/**`) | CDK diff + deploy |
 
 ## License
 
 This project is licensed under the GNU Affero General Public License v3.0 - see the [LICENSE.md](LICENSE.md) file for details.
-Copyright (C) 2026 Leon van Zyl (https://leonvanzyl.com)

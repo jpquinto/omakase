@@ -1,0 +1,20 @@
+{
+  "name": "@autoforge/convex",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun convex dev",
+    "deploy": "bun convex deploy",
+    "test": "bun vitest run",
+    "test:watch": "bun vitest"
+  },
+  "dependencies": {
+    "convex": "^1.17.0"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0",
+    "typescript": "^5.7.0",
+    "@types/bun": "^1.2.0"
+  }
+}

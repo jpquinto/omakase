@@ -1,41 +1,40 @@
 name: CI
 
 on:
-  pull_request:
-    branches: [master, main]
   push:
-    branches: [master, main]
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
-  python:
+  lint-and-typecheck:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: oven-sh/setup-bun@v2
         with:
-          python-version: '3.11'
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-      - name: Lint with ruff
-        run: ruff check .
-      - name: Run security tests
-        run: python test_security.py
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun --filter '*' run typecheck
+      - run: bun --filter @autoforge/web run lint
 
-  ui:
+  test-convex:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ui
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: ui/package-lock.json
-      - name: Install dependencies
-        run: npm ci
-      - name: Lint
-        run: npm run lint
-      - name: Type check & Build
-        run: npm run build
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun --filter @autoforge/convex run test
+
+  test-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: cd apps/web && bun playwright install --with-deps chromium
+      - run: bun --filter @autoforge/web run test:e2e
