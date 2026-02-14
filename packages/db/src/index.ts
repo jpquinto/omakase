@@ -28,4 +28,8 @@ export type {
   NewAgentRun,
   Ticket,
   NewTicket,
+  AgentMessage,
+  AgentMessageSender,
+  AgentMessageType,
+  NewAgentMessage,
 } from "./schema/index.js";

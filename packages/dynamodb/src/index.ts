@@ -38,6 +38,7 @@ export {
 
 export {
   createAgentRun,
+  getAgentRun,
   updateAgentStatus,
   completeAgentRun,
   listActiveAgents,
@@ -48,3 +49,9 @@ export {
   syncTicket,
   updateTicketStatus,
 } from "./tickets.js";
+
+export {
+  createMessage,
+  listMessages,
+  listMessagesByFeature,
+} from "./agent-messages.js";

@@ -1,6 +1,7 @@
 import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { ulid } from "ulid";
 import { docClient, tableName } from "./client.js";
+import { createMessage } from "./agent-messages.js";
 import type { AgentRun, AgentRunRole, AgentRunStatus } from "@omakase/db";
 
 const TABLE = () => tableName("agent-runs");
@@ -46,7 +47,30 @@ export async function updateAgentStatus(params: {
     ExpressionAttributeNames: names,
     ExpressionAttributeValues: values,
   }));
+
+  // Post a status message to the chat stream
+  const run = await getAgentRun({ runId: params.runId });
+  if (run) {
+    const label = STATUS_LABELS[params.status] ?? params.status;
+    await createMessage({
+      runId: params.runId,
+      featureId: run.featureId,
+      projectId: run.projectId,
+      sender: "agent",
+      role: run.role,
+      content: `${label} phase`,
+      type: "status",
+    });
+  }
 }
+
+const STATUS_LABELS: Partial<Record<AgentRunStatus, string>> = {
+  started: "Started",
+  thinking: "Thinking",
+  coding: "Coding",
+  testing: "Testing",
+  reviewing: "Reviewing",
+};
 
 export async function completeAgentRun(params: {
   runId: string;
@@ -95,6 +119,40 @@ export async function completeAgentRun(params: {
     ExpressionAttributeNames: names,
     ExpressionAttributeValues: values,
   }));
+
+  // Post a completion/error message to the chat stream
+  const run = result.Item as AgentRun | undefined;
+  if (run) {
+    if (params.status === "failed") {
+      await createMessage({
+        runId: params.runId,
+        featureId: run.featureId,
+        projectId: run.projectId,
+        sender: "agent",
+        role: run.role,
+        content: params.errorMessage ?? "Agent failed",
+        type: "error",
+      });
+    } else {
+      await createMessage({
+        runId: params.runId,
+        featureId: run.featureId,
+        projectId: run.projectId,
+        sender: "agent",
+        role: run.role,
+        content: params.outputSummary ?? "Completed successfully",
+        type: "status",
+      });
+    }
+  }
+}
+
+export async function getAgentRun(params: { runId: string }): Promise<AgentRun | null> {
+  const result = await docClient.send(new GetCommand({
+    TableName: TABLE(),
+    Key: { id: params.runId },
+  }));
+  return (result.Item as AgentRun) ?? null;
 }
 
 export async function listActiveAgents(params: { projectId: string }): Promise<AgentRun[]> {

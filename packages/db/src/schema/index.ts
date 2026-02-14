@@ -4,3 +4,4 @@ export type { Feature, FeatureStatus, NewFeature } from "./features.js";
 export type { Agent, AgentRole, AgentStatus, NewAgent } from "./agents.js";
 export type { AgentRun, AgentRunRole, AgentRunStatus, NewAgentRun } from "./agent-runs.js";
 export type { Ticket, NewTicket } from "./tickets.js";
+export type { AgentMessage, AgentMessageSender, AgentMessageType, NewAgentMessage } from "./agent-messages.js";
