@@ -69,10 +69,52 @@ export function AgentChatPanel({ runId, agent, featureName, projectId, isActive,
   const prevStreamLen = useRef(0);
 
   // Welcome screen state (declared before auto-select so it's available)
-  const [pendingNewConversation, setPendingNewConversation] = useState(false);
+  // Show welcome by default when opening without a specific thread
+  const [pendingNewConversation, setPendingNewConversation] = useState(!initialThreadId);
   const [welcomeDismissed, setWelcomeDismissed] = useState(false);
   const [welcomeMounted, setWelcomeMounted] = useState(false);
   const welcomeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Deferred thread selection: when a thread is auto-created on first message,
+  // we wait until the agent finishes streaming before switching threadId.
+  // Switching immediately would cause the SSE to reconnect and lose the stream.
+  const deferredThreadIdRef = useRef<string | null>(null);
+  const streamStartedRef = useRef(false);
+
+  // Track when streaming starts so we know to wait for it to finish
+  useEffect(() => {
+    if (isThinking || streamingContent) {
+      streamStartedRef.current = true;
+    }
+  }, [isThinking, streamingContent]);
+
+  // Apply deferred thread ID once the agent response completes (or after timeout)
+  const deferredTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const applyDeferredThread = useCallback(() => {
+    if (!deferredThreadIdRef.current) return;
+    const id = deferredThreadIdRef.current;
+    deferredThreadIdRef.current = null;
+    streamStartedRef.current = false;
+    if (deferredTimerRef.current) { clearTimeout(deferredTimerRef.current); deferredTimerRef.current = null; }
+    setSelectedThreadId(id);
+    refetchThreads();
+  }, [refetchThreads]);
+
+  useEffect(() => {
+    if (!deferredThreadIdRef.current) return;
+
+    // Fallback: if streaming never starts within 10s, apply anyway
+    if (deferredTimerRef.current) clearTimeout(deferredTimerRef.current);
+    deferredTimerRef.current = setTimeout(applyDeferredThread, 10000);
+
+    // If streaming started and finished, apply now
+    if (streamStartedRef.current && !isThinking && !streamingContent) {
+      applyDeferredThread();
+    }
+
+    return () => { if (deferredTimerRef.current) { clearTimeout(deferredTimerRef.current); deferredTimerRef.current = null; } };
+  }, [isThinking, streamingContent, applyDeferredThread]);
 
   // Auto-select: initial thread, or most recent existing thread, or stay on welcome
   useEffect(() => {
@@ -142,8 +184,8 @@ export function AgentChatPanel({ runId, agent, featureName, projectId, isActive,
     setInput("");
     const result = await sendMessage(trimmed);
     if (result.createdThreadId) {
-      setSelectedThreadId(result.createdThreadId);
-      refetchThreads();
+      // Defer thread switch until streaming finishes to avoid breaking SSE
+      deferredThreadIdRef.current = result.createdThreadId;
     }
   };
 
@@ -162,8 +204,7 @@ export function AgentChatPanel({ runId, agent, featureName, projectId, isActive,
       metadata: { phase: "topic_prompt", gameId },
     });
     if (result.createdThreadId) {
-      setSelectedThreadId(result.createdThreadId);
-      refetchThreads();
+      deferredThreadIdRef.current = result.createdThreadId;
     }
   };
 
@@ -173,8 +214,7 @@ export function AgentChatPanel({ runId, agent, featureName, projectId, isActive,
       metadata: { phase: "question", gameId, topic },
     });
     if (result.createdThreadId) {
-      setSelectedThreadId(result.createdThreadId);
-      refetchThreads();
+      deferredThreadIdRef.current = result.createdThreadId;
     }
   };
 
@@ -190,25 +230,17 @@ export function AgentChatPanel({ runId, agent, featureName, projectId, isActive,
     setPendingNewConversation(false);
     const result = await sendMessage(text);
     if (result.createdThreadId) {
-      setSelectedThreadId(result.createdThreadId);
-      // Thread was auto-created server-side — refetch to sync sidebar
-      refetchThreads();
+      // Defer thread switch until streaming finishes to avoid breaking SSE
+      deferredThreadIdRef.current = result.createdThreadId;
     }
   };
 
-  const handleCreateThread = async () => {
-    try {
-      const thread = await createThread(undefined, pendingMode);
-      // Thread created on server + added to local state optimistically
-      setSelectedThreadId(thread.threadId);
-      setPendingNewConversation(false);
-      setWelcomeDismissed(false);
-    } catch {
-      // If API fails (e.g., table not deployed), fall back to local-only welcome
-      setSelectedThreadId(null);
-      setPendingNewConversation(true);
-      setWelcomeDismissed(false);
-    }
+  const handleCreateThread = () => {
+    // Don't create a DB record yet — just show the welcome screen.
+    // The thread will be auto-created server-side when the first message is sent.
+    setSelectedThreadId(null);
+    setPendingNewConversation(true);
+    setWelcomeDismissed(false);
   };
 
   const handleRenameThread = async (threadId: string, newTitle: string) => {
