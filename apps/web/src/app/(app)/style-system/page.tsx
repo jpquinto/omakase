@@ -88,6 +88,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { VoiceBlob } from "@/components/chat/voice-blob";
+import { Mic } from "lucide-react";
 
 // ============================================================================
 // Custom Hooks
@@ -150,6 +152,7 @@ const TAB_SECTIONS: Record<string, { id: string; label: string; icon: typeof Pal
     { id: "feedback", label: "Feedback", icon: MessageSquare },
     { id: "icons", label: "Icons", icon: Image },
     { id: "motion", label: "Motion", icon: Play },
+    { id: "voice", label: "Voice", icon: MessageSquare },
     { id: "spotify", label: "Spotify", icon: Play },
   ],
 };
@@ -3211,6 +3214,130 @@ function ComponentsPanel({ onSectionChange }: { onSectionChange: (id: string) =>
   );
 }
 
+function VoiceSection() {
+  const [activeAgent, setActiveAgent] = useState<"miso" | "nori" | "koji" | "toro">("miso");
+  const [blobActive, setBlobActive] = useState(false);
+
+  const agents = [
+    { id: "miso" as const, name: "Miso", mascot: "\uD83C\uDF5C", rgb: "251, 191, 36", role: "Architect" },
+    { id: "nori" as const, name: "Nori", mascot: "\uD83C\uDF59", rgb: "129, 140, 248", role: "Coder" },
+    { id: "koji" as const, name: "Koji", mascot: "\uD83C\uDF76", rgb: "248, 113, 113", role: "Reviewer" },
+    { id: "toro" as const, name: "Toro", mascot: "\uD83C\uDF63", rgb: "110, 231, 183", role: "Tester" },
+  ];
+
+  const current = agents.find((a) => a.id === activeAgent)!;
+
+  return (
+    <section id="voice" className="py-20">
+      <SectionHeader
+        title="Voice Chat"
+        subtitle="Talk mode with animated blob overlay, per-agent voice profiles, and real-time speech visualization."
+      />
+
+      {/* Voice Blob demo */}
+      <GlassCard className="mb-8">
+        <SubHeading>Voice Blob Overlay</SubHeading>
+        <p className="mb-6 text-sm text-oma-text-muted">
+          Organic morphing blobs displayed during TTS playback. Each agent gets their own color. Tap the blob to stop.
+        </p>
+
+        {/* Agent selector */}
+        <div className="mb-6 flex flex-wrap gap-2">
+          {agents.map((agent) => (
+            <button
+              key={agent.id}
+              onClick={() => setActiveAgent(agent.id)}
+              className={cn(
+                "flex items-center gap-2 rounded-oma-full px-4 py-2 text-sm transition-all",
+                activeAgent === agent.id
+                  ? "glass shadow-oma-sm text-oma-text"
+                  : "text-oma-text-muted hover:text-oma-text",
+              )}
+            >
+              <span>{agent.mascot}</span>
+              <span>{agent.name}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Demo container */}
+        <div className="relative h-[400px] overflow-hidden rounded-oma-lg border border-oma-glass-border bg-oma-bg">
+          {/* Background grid pattern */}
+          <div
+            className="absolute inset-0 opacity-5"
+            style={{
+              backgroundImage: `radial-gradient(rgba(${current.rgb}, 0.3) 1px, transparent 1px)`,
+              backgroundSize: "24px 24px",
+            }}
+          />
+
+          {/* Placeholder text */}
+          {!blobActive && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+              <span className="text-5xl">{current.mascot}</span>
+              <p className="text-sm text-oma-text-muted">{current.name} &middot; {current.role}</p>
+            </div>
+          )}
+
+          {/* The blob */}
+          <VoiceBlob
+            active={blobActive}
+            colorRgb={current.rgb}
+            mascot={current.mascot}
+            onStop={() => setBlobActive(false)}
+          />
+
+          {/* Toggle button */}
+          <button
+            onClick={() => setBlobActive(!blobActive)}
+            className={cn(
+              "absolute bottom-4 left-1/2 z-30 -translate-x-1/2 flex items-center gap-2 rounded-oma-full px-5 py-2.5 text-sm font-medium transition-all",
+              blobActive
+                ? "glass text-oma-text-muted hover:text-oma-text"
+                : "glass-primary text-oma-primary hover:scale-105",
+            )}
+          >
+            <Mic className="h-4 w-4" />
+            {blobActive ? "Stop" : "Preview Voice Blob"}
+          </button>
+        </div>
+      </GlassCard>
+
+      {/* Voice Waveform bars */}
+      <GlassCard>
+        <SubHeading>Voice Indicators</SubHeading>
+        <p className="mb-6 text-sm text-oma-text-muted">
+          Listening waveform bars and speaking indicators use agent palette colors.
+        </p>
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          {agents.map((agent) => (
+            <div key={agent.id} className="glass-sm flex items-center gap-4 rounded-oma px-5 py-4">
+              <span className="text-2xl">{agent.mascot}</span>
+              <div>
+                <p className="text-sm font-medium text-oma-text">{agent.name}</p>
+                <p className="text-xs text-oma-text-subtle">{agent.role}</p>
+              </div>
+              <div className="ml-auto flex items-center gap-[3px]">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <span
+                    key={i}
+                    className="inline-block w-[3px] rounded-full origin-bottom"
+                    style={{
+                      backgroundColor: `rgba(${agent.rgb}, 0.8)`,
+                      height: "16px",
+                      animation: `voice-bar 0.8s ease-in-out ${i * 0.12}s infinite`,
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </GlassCard>
+    </section>
+  );
+}
+
 function SpotifySection() {
   return (
     <section id="spotify" className="py-20">
@@ -3340,6 +3467,7 @@ function PatternsPanel({ onSectionChange }: { onSectionChange: (id: string) => v
       <div ref={observe("feedback")}><FeedbackSection /></div>
       <div ref={observe("icons")}><IconsSection /></div>
       <div ref={observe("motion")}><MotionSection /></div>
+      <div ref={observe("voice")}><VoiceSection /></div>
       <div ref={observe("spotify")}><SpotifySection /></div>
     </div>
   );
