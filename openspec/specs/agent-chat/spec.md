@@ -16,7 +16,7 @@ The system SHALL store chat messages in a DynamoDB `agent-messages` table with `
 - **THEN** the system fetches all messages for that `runId` from DynamoDB, ordered by timestamp ascending
 
 ### Requirement: Chat message API endpoints
-The system SHALL expose REST endpoints on the orchestrator for sending and retrieving chat messages.
+The system SHALL expose REST endpoints on the orchestrator for sending and retrieving chat messages. The work session start endpoint SHALL resolve the project's `repoUrl` from DynamoDB and pass it to the workspace provisioning system.
 
 #### Scenario: Send message endpoint
 - **WHEN** the frontend sends `POST /api/agent-runs/:runId/messages` with `{ content, sender: "user" }`
@@ -29,6 +29,10 @@ The system SHALL expose REST endpoints on the orchestrator for sending and retri
 #### Scenario: Send message to inactive agent run
 - **WHEN** the frontend sends a message to an agent run with status "completed" or "failed"
 - **THEN** the orchestrator returns a 409 Conflict with an error message indicating the agent is no longer active
+
+#### Scenario: Start work session resolves repo URL
+- **WHEN** the frontend sends `POST /api/agents/:agentName/work-sessions` with `{ projectId, threadId, prompt }`
+- **THEN** the orchestrator looks up the project's `repoUrl` from DynamoDB and passes it to the workspace provisioning system before spawning Claude Code
 
 ### Requirement: Chat panel UI component
 The system SHALL provide an `AgentChatPanel` React component that displays a message thread and an input field for sending messages. The component SHALL follow the Omakase liquid glass design system.
@@ -82,3 +86,25 @@ The system SHALL support three message types: `message` (regular chat), `status`
 #### Scenario: Error message rendering
 - **WHEN** a message of type "error" is displayed
 - **THEN** it renders with a red accent border and the `oma-error` color token
+
+### Requirement: Active work session lookup endpoint
+The system SHALL expose an endpoint to check if a thread has an active work session, enabling the frontend to reconnect instead of starting a new session.
+
+#### Scenario: Thread has an active work session
+- **WHEN** the frontend sends `GET /api/agents/:agentName/work-sessions/active?threadId=<threadId>`
+- **THEN** the orchestrator returns `{ active: true, runId: "<runId>" }` if a live session exists for that thread
+
+#### Scenario: Thread has no active work session
+- **WHEN** the frontend sends `GET /api/agents/:agentName/work-sessions/active?threadId=<threadId>`
+- **THEN** the orchestrator returns `{ active: false }`
+
+### Requirement: Frontend work session reconnection
+The system SHALL reconnect to an existing active work session when a user opens a work-mode thread that already has one running, instead of starting a new session.
+
+#### Scenario: User opens thread with active work session
+- **WHEN** a user opens a work-mode thread and the thread has an active work session
+- **THEN** the frontend queries the active session endpoint, receives the existing `runId`, sets it as `workSessionRunId`, and opens an SSE stream to resume receiving output
+
+#### Scenario: User opens thread with no active work session
+- **WHEN** a user opens a work-mode thread with no active session
+- **THEN** the frontend behaves normally — the next message sent starts a new work session
