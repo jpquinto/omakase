@@ -11,7 +11,7 @@
  *   Omakase "failing"     -> Linear "In Review" (needs attention)
  */
 
-import { linearGraphQL } from "./client.js";
+import { linearGraphQL } from "./client";
 
 // -----------------------------------------------------------------------
 // GraphQL Mutations

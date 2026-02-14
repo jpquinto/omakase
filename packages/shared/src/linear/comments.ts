@@ -6,7 +6,7 @@
  * issue so stakeholders get visibility without leaving Linear.
  */
 
-import { linearGraphQL } from "./client.js";
+import { linearGraphQL } from "./client";
 
 // -----------------------------------------------------------------------
 // GraphQL Mutation
