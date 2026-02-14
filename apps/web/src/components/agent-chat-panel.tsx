@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAgentChat } from "@/hooks/use-agent-chat";
 import { useAgentThreads } from "@/hooks/use-agent-threads";
+import { useVoiceChat } from "@/hooks/use-voice-chat";
 import { ThreadListSidebar } from "@/components/thread-list-sidebar";
 import { ConversationModeSelector } from "@/components/conversation-mode-selector";
 import { ChatMessageArea } from "@/components/chat/chat-message-area";
@@ -59,6 +60,36 @@ export function AgentChatPanel({ runId, agent, featureName, projectId, isActive,
       projectId: projectId ?? undefined,
     },
   );
+
+  // Voice chat
+  const voice = useVoiceChat({ role: agent.role });
+  const prevStreamContentRef = useRef("");
+
+  // Feed streaming tokens to TTS when talk mode is active
+  useEffect(() => {
+    if (!voice.isTalkMode || !streamingContent) return;
+    const prev = prevStreamContentRef.current;
+    if (streamingContent.length > prev.length) {
+      const newTokens = streamingContent.slice(prev.length);
+      voice.feedStreamingToken(newTokens);
+    }
+    prevStreamContentRef.current = streamingContent;
+  }, [streamingContent, voice.isTalkMode, voice.feedStreamingToken]);
+
+  // Flush TTS buffer when streaming completes
+  useEffect(() => {
+    if (voice.isTalkMode && prevStreamContentRef.current && !streamingContent && !isThinking) {
+      voice.flushSpeechBuffer();
+      prevStreamContentRef.current = "";
+    }
+  }, [streamingContent, isThinking, voice.isTalkMode, voice.flushSpeechBuffer]);
+
+  // Stop TTS on thread change or unmount
+  useEffect(() => {
+    prevStreamContentRef.current = "";
+    voice.stopSpeaking();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedThreadId]);
 
   const [input, setInput] = useState("");
   const [isScrolledUp, setIsScrolledUp] = useState(false);
@@ -185,6 +216,15 @@ export function AgentChatPanel({ runId, agent, featureName, projectId, isActive,
     const result = await sendMessage(trimmed);
     if (result.createdThreadId) {
       // Defer thread switch until streaming finishes to avoid breaking SSE
+      deferredThreadIdRef.current = result.createdThreadId;
+    }
+  };
+
+  const handleVoiceSend = async (text: string) => {
+    setWelcomeDismissed(true);
+    setPendingNewConversation(false);
+    const result = await sendMessage(text);
+    if (result.createdThreadId) {
       deferredThreadIdRef.current = result.createdThreadId;
     }
   };
@@ -341,6 +381,8 @@ export function AgentChatPanel({ runId, agent, featureName, projectId, isActive,
           onQuizTopicSelect={handleQuizTopicSelect}
           onQuizAnswer={handleQuizAnswer}
           onPlayAgain={handleLaunchQuiz}
+          isSpeaking={voice.isSpeaking}
+          onStopSpeaking={voice.stopSpeaking}
           welcomeOverlay={
             welcomeMounted ? (
               <ConversationWelcome
@@ -368,6 +410,17 @@ export function AgentChatPanel({ runId, agent, featureName, projectId, isActive,
           showWelcome={showWelcome}
           hasMessages={hasMessages}
           error={error}
+          voiceSupported={voice.isSupported}
+          isTalkMode={voice.isTalkMode}
+          isListening={voice.isListening}
+          isSpeaking={voice.isSpeaking}
+          transcript={voice.transcript}
+          voiceError={voice.error}
+          onToggleTalkMode={voice.toggleTalkMode}
+          onStartListening={voice.startListening}
+          onStopListening={voice.stopListening}
+          onStopSpeaking={voice.stopSpeaking}
+          onVoiceSend={handleVoiceSend}
         />
       </div>
     </div>

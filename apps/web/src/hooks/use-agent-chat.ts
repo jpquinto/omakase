@@ -183,12 +183,35 @@ export function useAgentChat(runId: string | null, options?: UseAgentChatOptions
     });
   }, []);
 
+  // Reconnect to existing active work session when opening a work-mode thread
+  useEffect(() => {
+    if (mode !== "work" || !threadId || !agentName || workSessionRunId) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await apiFetch<{ active: boolean; runId?: string }>(
+          `/api/agents/${agentName}/work-sessions/active?threadId=${threadId}`,
+        );
+        if (!cancelled && result.active && result.runId) {
+          setWorkSessionRunId(result.runId);
+          setIsConnected(true);
+          startListening(result.runId, threadId);
+        }
+      } catch {
+        // No active session — that's fine, user will start one with their next message
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [mode, threadId, agentName, workSessionRunId, startListening]);
+
   const sendMessage = useCallback(
     async (content: string, sendOpts?: SendMessageOptions): Promise<{ createdThreadId?: string }> => {
       // For work mode: start a work session on first message if none exists
       if (mode === "work" && !workSessionRunId) {
-        if (!agentName || !projectId) {
-          setError(new Error("Missing agentName or projectId for work session"));
+        if (!agentName) {
+          setError(new Error("Missing agentName for work session"));
           return {};
         }
 

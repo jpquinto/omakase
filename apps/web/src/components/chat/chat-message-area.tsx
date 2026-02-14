@@ -1,13 +1,14 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { ROLE_PALETTE, formatTimestamp } from "@/lib/chat-constants";
+import { ROLE_PALETTE, WELCOME_GLOW, formatTimestamp } from "@/lib/chat-constants";
 import type { AgentInfo } from "@/lib/chat-constants";
 import { Streamdown } from "streamdown";
 import { QuizTopicPrompt } from "@/components/quiz/quiz-topic-prompt";
 import { QuizQuestionCard } from "@/components/quiz/quiz-question-card";
 import { QuizAnswerResult } from "@/components/quiz/quiz-answer-result";
 import { QuizResults } from "@/components/quiz/quiz-results";
+import { VoiceBlob } from "@/components/chat/voice-blob";
 import type { AgentMessage, QuizMetadata } from "@omakase/db";
 
 // ---------------------------------------------------------------------------
@@ -31,6 +32,10 @@ interface ChatMessageAreaProps {
   onPlayAgain: () => void;
   /** Slot for welcome overlay rendered above the messages */
   welcomeOverlay?: React.ReactNode;
+  /** Whether TTS is currently speaking an agent response */
+  isSpeaking?: boolean;
+  /** Called to stop TTS playback */
+  onStopSpeaking?: () => void;
 }
 
 export function ChatMessageArea({
@@ -49,12 +54,23 @@ export function ChatMessageArea({
   onQuizAnswer,
   onPlayAgain,
   welcomeOverlay,
+  isSpeaking = false,
+  onStopSpeaking,
 }: ChatMessageAreaProps) {
+  const glowRgb = WELCOME_GLOW[agent.role];
   return (
     <>
       <div className="relative flex-1 overflow-hidden">
         {/* Welcome overlay slot */}
         {welcomeOverlay}
+
+        {/* Voice blob overlay — shown during TTS playback */}
+        <VoiceBlob
+          active={isSpeaking}
+          colorRgb={glowRgb}
+          mascot={agent.mascot}
+          onStop={onStopSpeaking}
+        />
 
         {/* Chat messages (scrollable) */}
         <div
@@ -86,6 +102,7 @@ export function ChatMessageArea({
               <div className="min-w-0 max-w-[88%]">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold text-oma-text">{agent.name}</span>
+                  {isSpeaking && <SpeakingIndicator role={agent.role} />}
                 </div>
                 <div className="mt-1 text-sm leading-relaxed text-oma-text">
                   <Streamdown mode="streaming" isAnimating>
@@ -251,6 +268,29 @@ function ChatMessage({ message, agent, onQuizTopicSelect, onQuizAnswer, onPlayAg
           {message.content}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Speaking indicator — sound wave bars shown during TTS playback
+// ---------------------------------------------------------------------------
+
+function SpeakingIndicator({ role }: { role: import("@omakase/db").AgentRunRole }) {
+  const glowRgb = WELCOME_GLOW[role];
+  return (
+    <div className="flex items-center gap-[2px] px-1" title="Speaking...">
+      {[0, 1, 2, 3].map((i) => (
+        <span
+          key={i}
+          className="inline-block w-[2px] rounded-full origin-bottom"
+          style={{
+            backgroundColor: `rgba(${glowRgb}, 0.7)`,
+            height: "10px",
+            animation: `voice-bar 0.6s ease-in-out ${i * 0.1}s infinite`,
+          }}
+        />
+      ))}
     </div>
   );
 }

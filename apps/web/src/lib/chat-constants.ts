@@ -95,6 +95,31 @@ export const WELCOME_GLOW: Record<AgentRunRole, string> = {
   tester: "110, 231, 183",
 };
 
+// ---------------------------------------------------------------------------
+// Voice chat profiles — per-agent TTS voice configuration
+// ---------------------------------------------------------------------------
+
+export interface VoiceProfile {
+  gender: "male" | "female";
+  pitch: number;
+  rate: number;
+  preferredVoice?: string;
+}
+
+/** Per-agent voice profiles for TTS. Miso & Toro = male, Nori & Koji = female */
+export const VOICE_PROFILES: Record<AgentRunRole, VoiceProfile> = {
+  architect: { gender: "male", pitch: 1.0, rate: 0.9 },
+  coder: { gender: "female", pitch: 1.0, rate: 1.0 },
+  reviewer: { gender: "female", pitch: 1.1, rate: 1.0 },
+  tester: { gender: "male", pitch: 0.9, rate: 1.0 },
+};
+
+/** Check if the browser supports SpeechRecognition (STT) */
+export function isVoiceChatSupported(): boolean {
+  if (typeof window === "undefined") return false;
+  return "SpeechRecognition" in window || "webkitSpeechRecognition" in window;
+}
+
 export function formatTimestamp(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
