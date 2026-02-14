@@ -16,8 +16,8 @@
     "plugins": [{ "name": "next" }],
     "paths": {
       "@/*": ["./src/*"],
-      "@autoforge/db": ["../../packages/db/src/index.ts"],
-      "@autoforge/shared": ["../../packages/shared/src/index.ts"]
+      "@omakase/db": ["../../packages/db/src/index.ts"],
+      "@omakase/shared": ["../../packages/shared/src/index.ts"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

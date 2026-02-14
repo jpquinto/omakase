@@ -1,14 +1,14 @@
 /**
  * Feature-to-Linear status synchronisation.
  *
- * When an AutoForge feature changes status, this module pushes the
+ * When an Omakase feature changes status, this module pushes the
  * corresponding state update back to the linked Linear issue via the
  * Linear GraphQL API.
  *
  * Status mapping:
- *   AutoForge "in_progress" -> Linear "In Progress"
- *   AutoForge "passing"     -> Linear "Done"
- *   AutoForge "failing"     -> Linear "In Review" (needs attention)
+ *   Omakase "in_progress" -> Linear "In Progress"
+ *   Omakase "passing"     -> Linear "Done"
+ *   Omakase "failing"     -> Linear "In Review" (needs attention)
  */
 
 import { linearGraphQL } from "./client";
@@ -90,7 +90,7 @@ type FeatureStatus = "pending" | "in_progress" | "passing" | "failing";
 interface SyncOptions {
   /** The Linear issue ID (UUID, not the human-readable identifier). */
   linearIssueId: string;
-  /** The current AutoForge feature status. */
+  /** The current Omakase feature status. */
   featureStatus: FeatureStatus;
   /** A valid Linear OAuth access token. */
   linearAccessToken: string;
@@ -135,7 +135,7 @@ interface IssueUpdateResponse {
 // -----------------------------------------------------------------------
 
 /**
- * Maps an AutoForge feature status to the target Linear workflow state
+ * Maps an Omakase feature status to the target Linear workflow state
  * name. Linear's default workflow typically includes states named
  * "In Progress", "Done", and "In Review", but these can be customised
  * per team.
@@ -181,7 +181,7 @@ function resolveTargetState(
 // -----------------------------------------------------------------------
 
 /**
- * Synchronise an AutoForge feature status to the corresponding Linear
+ * Synchronise an Omakase feature status to the corresponding Linear
  * issue workflow state.
  *
  * 1. Fetches the issue to determine which team it belongs to.

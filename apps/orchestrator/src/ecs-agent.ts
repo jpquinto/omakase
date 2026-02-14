@@ -20,7 +20,7 @@ import { ConvexHttpClient } from "convex/browser";
 
 // TODO: Replace with generated Convex API types once `npx convex codegen` is run.
 // For now we use type assertions when calling convex.mutation().
-// import { api } from "@autoforge/convex/_generated/api";
+// import { api } from "@omakase/convex/_generated/api";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -152,9 +152,9 @@ export async function startAgent(options: StartAgentOptions): Promise<StartAgent
     },
     // Tag the task for cost tracking and identification
     tags: [
-      { key: "autoforge:project", value: projectId },
-      { key: "autoforge:feature", value: featureId },
-      { key: "autoforge:role", value: role },
+      { key: "omakase:project", value: projectId },
+      { key: "omakase:feature", value: featureId },
+      { key: "omakase:role", value: role },
     ],
   });
 
@@ -209,7 +209,7 @@ export async function stopAgent(options: StopAgentOptions): Promise<void> {
   const command = new StopTaskCommand({
     cluster: ecsCluster,
     task: taskArn,
-    reason: reason ?? "Stopped by AutoForge orchestrator",
+    reason: reason ?? "Stopped by Omakase orchestrator",
   });
 
   try {

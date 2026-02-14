@@ -177,7 +177,7 @@ The Dockerfile (`apps/orchestrator/Dockerfile`) builds a single image used by bo
 
 ## Infrastructure: AWS CDK
 
-**Location:** `infra/lib/autoforge-stack.ts`
+**Location:** `infra/lib/omakase-stack.ts`
 
 Infrastructure-as-code using AWS CDK (TypeScript).
 
@@ -186,14 +186,14 @@ Infrastructure-as-code using AWS CDK (TypeScript).
 | Resource | Purpose |
 |---|---|
 | **VPC** | 2 AZs, public subnets (ALB), private subnets (ECS tasks), 1 NAT gateway |
-| **ECS Cluster** | `autoforge` cluster with Container Insights |
+| **ECS Cluster** | `omakase` cluster with Container Insights |
 | **ALB** | Public Application Load Balancer, HTTP on port 80 -> orchestrator port 8080 |
-| **ECR Repository** | `autoforge-agent` -- stores Docker images, keeps last 10, scan on push |
+| **ECR Repository** | `omakase-agent` -- stores Docker images, keeps last 10, scan on push |
 | **Orchestrator Service** | Fargate service (1 replica, 2GB RAM, 1 vCPU) behind ALB in private subnets |
 | **Agent Task Definition** | Fargate task def (2GB RAM, 1 vCPU) launched on-demand |
-| **Secrets Manager** | `autoforge/api-keys` -- stores `ANTHROPIC_API_KEY`, injected into containers |
+| **Secrets Manager** | `omakase/api-keys` -- stores `ANTHROPIC_API_KEY`, injected into containers |
 | **IAM Roles** | 3 roles: task execution (ECR pull + logs), orchestrator (RunTask + PassRole), agent (logs + secrets read) |
-| **CloudWatch Logs** | `/autoforge/orchestrator` and `/autoforge/agents` with 30-day retention |
+| **CloudWatch Logs** | `/omakase/orchestrator` and `/omakase/agents` with 30-day retention |
 
 ### Security
 

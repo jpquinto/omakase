@@ -31,7 +31,7 @@ export async function POST() {
     name: user.name,
     picture: user.picture,
     // Include custom claims if present.
-    roles: (user["https://autoforge.dev/roles"] as string[] | undefined) ?? [],
+    roles: (user["https://omakase.dev/roles"] as string[] | undefined) ?? [],
   };
 
   // TODO: Replace with an actual Convex mutation call once the

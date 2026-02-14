@@ -5,7 +5,7 @@ export default function LandingPage() {
     <main className="flex min-h-screen flex-col items-center justify-center p-8">
       <div className="neo-card rounded-none px-12 py-10 text-center">
         <h1 className="mb-4 text-5xl font-black tracking-tight text-neo-foreground">
-          Welcome to AutoForge
+          Welcome to Omakase
         </h1>
         <p className="mb-8 text-lg text-neo-muted-foreground">
           Autonomous development platform

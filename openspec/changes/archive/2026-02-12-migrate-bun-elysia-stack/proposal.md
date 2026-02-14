@@ -1,6 +1,6 @@
 ## Why
 
-The replatformed AutoForge stack currently uses Node.js as the runtime for both the Next.js frontend (`apps/web`) and the orchestrator backend (`apps/orchestrator`). Bun offers significantly faster startup times, native TypeScript execution (no transpilation step), and a built-in package manager with faster installs — all critical for a system that spins up agent containers frequently. Pairing Bun with Elysia (a Bun-native web framework) for the backend replaces the raw `http` module with end-to-end type safety and much better DX.
+The replatformed Omakase stack currently uses Node.js as the runtime for both the Next.js frontend (`apps/web`) and the orchestrator backend (`apps/orchestrator`). Bun offers significantly faster startup times, native TypeScript execution (no transpilation step), and a built-in package manager with faster installs — all critical for a system that spins up agent containers frequently. Pairing Bun with Elysia (a Bun-native web framework) for the backend replaces the raw `http` module with end-to-end type safety and much better DX.
 
 ## What Changes
 

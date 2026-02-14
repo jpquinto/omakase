@@ -10,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "AutoForge",
+  title: "Omakase",
   description: "Autonomous development platform",
 };
 

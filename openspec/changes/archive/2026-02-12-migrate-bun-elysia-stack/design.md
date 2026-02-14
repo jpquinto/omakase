@@ -1,6 +1,6 @@
 ## Context
 
-The AutoForge platform was recently replatformed from Python/FastAPI to a TypeScript monorepo with Next.js frontend and Node.js orchestrator backend. The backend uses a raw `http.createServer` for the health endpoint and the `tsx` package for development. The entire monorepo uses pnpm as the package manager and Node.js 20 as the runtime.
+The Omakase platform was recently replatformed from Python/FastAPI to a TypeScript monorepo with Next.js frontend and Node.js orchestrator backend. The backend uses a raw `http.createServer` for the health endpoint and the `tsx` package for development. The entire monorepo uses pnpm as the package manager and Node.js 20 as the runtime.
 
 Bun is a drop-in replacement for Node.js that executes TypeScript natively, has a significantly faster package manager, and starts ~4x faster — directly beneficial for agent containers that spin up frequently on ECS.
 

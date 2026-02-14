@@ -1,12 +1,12 @@
 /**
- * @autoforge/db — Drizzle ORM schema definitions for PostgreSQL.
+ * @omakase/db — Drizzle ORM schema definitions for PostgreSQL.
  *
  * This package mirrors the Convex document schema into relational tables,
  * enabling analytical queries, reporting, and data export via PostgreSQL.
  *
  * Usage:
- *   import { users, projects, features, agents, agentRuns, tickets } from "@autoforge/db";
- *   import type { Project, NewProject } from "@autoforge/db";
+ *   import { users, projects, features, agents, agentRuns, tickets } from "@omakase/db";
+ *   import type { Project, NewProject } from "@omakase/db";
  */
 
 // Re-export all table definitions and enum types from the schema barrel

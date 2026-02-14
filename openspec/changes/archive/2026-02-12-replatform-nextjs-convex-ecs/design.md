@@ -1,6 +1,6 @@
 ## Context
 
-AutoForge is currently a local-first Python/FastAPI application with SQLite storage, a Vite-based React SPA, and Claude Agent SDK integration for autonomous coding. It runs on the developer's machine via CLI or a local web server.
+Omakase is currently a local-first Python/FastAPI application with SQLite storage, a Vite-based React SPA, and Claude Agent SDK integration for autonomous coding. It runs on the developer's machine via CLI or a local web server.
 
 The goal is to transform it into a cloud-native, multi-tenant platform where teams of autonomous AI agents read Linear tickets, implement them, and report progress through a real-time dashboard. This requires replacing the entire runtime stack while preserving the core domain model (features, projects, agents, dependencies).
 

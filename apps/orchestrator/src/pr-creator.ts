@@ -110,7 +110,7 @@ export function buildPrBody(options: {
   sections.push("");
 
   sections.push("---");
-  sections.push("*This PR was created automatically by the AutoForge agent pipeline.*");
+  sections.push("*This PR was created automatically by the Omakase agent pipeline.*");
 
   let body = sections.join("\n");
 

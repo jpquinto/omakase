@@ -7,7 +7,7 @@ import { useState, useRef, useEffect } from "react";
 //
 // Terminal-style log viewer with a dark background, monospace font, agent
 // filtering, and auto-scroll behavior. Designed to mirror the logging
-// experience from the existing AutoForge UI.
+// experience from the existing Omakase UI.
 // ---------------------------------------------------------------------------
 
 interface LogEntry {

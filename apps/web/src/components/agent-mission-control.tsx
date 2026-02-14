@@ -5,7 +5,7 @@
 //
 // Displays a grid of agent cards showing each agent's mascot, name, role,
 // current status, and the feature they are working on. Matches the mascot
-// naming convention from the existing AutoForge UI (AgentMissionControl.tsx).
+// naming convention from the existing Omakase UI (AgentMissionControl.tsx).
 // ---------------------------------------------------------------------------
 
 interface Agent {

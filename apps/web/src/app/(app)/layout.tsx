@@ -12,7 +12,7 @@ export default function AppLayout({
         {/* Logo */}
         <div className="neo-border border-t-0 border-r-0 border-l-0 border-b-2 border-neo-border px-6 py-5">
           <Link href="/" className="text-2xl font-black tracking-tight">
-            AutoForge
+            Omakase
           </Link>
         </div>
 

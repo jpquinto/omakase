@@ -1,7 +1,7 @@
 /**
  * Linear comment posting for implementation updates.
  *
- * When an AutoForge agent completes work on a feature linked to a
+ * When an Omakase agent completes work on a feature linked to a
  * Linear issue, this module posts a formatted summary comment to the
  * issue so stakeholders get visibility without leaving Linear.
  */
@@ -77,7 +77,7 @@ interface CommentCreateResponse {
 function formatComment(options: CommentOptions): string {
   const lines: string[] = [];
 
-  lines.push(`## AutoForge Implementation Update`);
+  lines.push(`## Omakase Implementation Update`);
   lines.push("");
   lines.push(`**Feature:** ${options.featureName}`);
   lines.push(`**Agent:** ${options.agentName}`);
@@ -100,7 +100,7 @@ function formatComment(options: CommentOptions): string {
 
   lines.push("");
   lines.push("---");
-  lines.push("*Posted by [AutoForge](https://autoforge.dev)*");
+  lines.push("*Posted by [Omakase](https://omakase.dev)*");
 
   return lines.join("\n");
 }

@@ -1,6 +1,6 @@
-# AutoForge
+# Omakase
 
-An autonomous development platform powered by Claude Code. AutoForge uses a team of specialized AI agents -- architect, coder, reviewer, and tester -- to implement features from Linear tickets, running on AWS ECS Fargate with a real-time Next.js dashboard.
+An autonomous development platform powered by Claude Code. Omakase uses a team of specialized AI agents -- architect, coder, reviewer, and tester -- to implement features from Linear tickets, running on AWS ECS Fargate with a real-time Next.js dashboard.
 
 ## How It Works
 
@@ -53,8 +53,8 @@ irm https://claude.ai/install.ps1 | iex
 
 ```bash
 # Clone the repo
-git clone https://github.com/your-org/autoforge.git
-cd autoforge
+git clone https://github.com/your-org/omakase.git
+cd omakase
 
 # Install dependencies
 bun install
@@ -64,19 +64,19 @@ cp .env.example .env
 # Fill in Auth0, Convex, AWS, Linear, and Claude credentials
 
 # Start the frontend
-bun --filter @autoforge/web run dev
+bun --filter @omakase/web run dev
 
 # Start the orchestrator (in another terminal)
-bun --filter @autoforge/orchestrator run dev
+bun --filter @omakase/orchestrator run dev
 
 # Start Convex dev server (in another terminal)
-bun --filter @autoforge/convex run dev
+bun --filter @omakase/convex run dev
 ```
 
 ## Project Structure
 
 ```
-autoforge/
+omakase/
 ├── apps/
 │   ├── web/                    # Next.js 15 frontend
 │   │   ├── src/
@@ -115,7 +115,7 @@ autoforge/
 │   └── shared/                 # Shared utilities
 ├── infra/                      # AWS CDK
 │   └── lib/
-│       └── autoforge-stack.ts  # VPC, ECS, ALB, ECR, IAM, Secrets Manager
+│       └── omakase-stack.ts  # VPC, ECS, ALB, ECR, IAM, Secrets Manager
 ├── .github/workflows/          # CI/CD pipelines
 │   ├── ci.yml                  # Typecheck, lint, test
 │   ├── deploy-web.yml          # Vercel deployment
@@ -136,25 +136,25 @@ autoforge/
 ### Frontend
 
 ```bash
-bun --filter @autoforge/web run dev        # localhost:3000
-bun --filter @autoforge/web run build      # Production build
-bun --filter @autoforge/web run lint       # ESLint
-bun --filter @autoforge/web run test:e2e   # Playwright E2E tests
+bun --filter @omakase/web run dev        # localhost:3000
+bun --filter @omakase/web run build      # Production build
+bun --filter @omakase/web run lint       # ESLint
+bun --filter @omakase/web run test:e2e   # Playwright E2E tests
 ```
 
 ### Backend
 
 ```bash
-bun --filter @autoforge/orchestrator run dev    # Watch mode, localhost:8080
-bun --filter @autoforge/orchestrator run start  # Production
+bun --filter @omakase/orchestrator run dev    # Watch mode, localhost:8080
+bun --filter @omakase/orchestrator run start  # Production
 ```
 
 ### Database
 
 ```bash
-bun --filter @autoforge/convex run dev      # Local dev server
-bun --filter @autoforge/convex run deploy   # Deploy to Convex cloud
-bun --filter @autoforge/convex run test     # Unit tests
+bun --filter @omakase/convex run dev      # Local dev server
+bun --filter @omakase/convex run deploy   # Deploy to Convex cloud
+bun --filter @omakase/convex run test     # Unit tests
 ```
 
 ### Infrastructure

@@ -1,6 +1,6 @@
 ## Why
 
-AutoForge currently runs as a local Python/FastAPI application with SQLite storage, a React SPA frontend, and the Claude Agent SDK for autonomous coding. This architecture limits it to single-developer, local-only usage and cannot scale to team-based autonomous development. Replatforming to a cloud-native stack (Convex, Next.js/Vercel, ECS, Auth0) enables multi-tenant team access, real-time collaboration, and lays the foundation for an autonomous dev team that reads Linear tickets and implements them independently.
+Omakase currently runs as a local Python/FastAPI application with SQLite storage, a React SPA frontend, and the Claude Agent SDK for autonomous coding. This architecture limits it to single-developer, local-only usage and cannot scale to team-based autonomous development. Replatforming to a cloud-native stack (Convex, Next.js/Vercel, ECS, Auth0) enables multi-tenant team access, real-time collaboration, and lays the foundation for an autonomous dev team that reads Linear tickets and implements them independently.
 
 ## What Changes
 

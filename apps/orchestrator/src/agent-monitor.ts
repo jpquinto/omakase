@@ -20,7 +20,7 @@ import {
 import { ConvexHttpClient } from "convex/browser";
 
 // TODO: Replace with generated Convex API types once `npx convex codegen` is run.
-// import { api } from "@autoforge/convex/_generated/api";
+// import { api } from "@omakase/convex/_generated/api";
 
 // ---------------------------------------------------------------------------
 // Types

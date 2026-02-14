@@ -25,13 +25,13 @@ export const ROLES_ORDERED: readonly UserRole[] = [
  * Extract the primary role from an Auth0 session object.
  *
  * Auth0 custom claims are namespaced; we read the first entry from
- * `session.user["https://autoforge.dev/roles"]`. If the claim is
+ * `session.user["https://omakase.dev/roles"]`. If the claim is
  * missing or empty the caller receives the least-privileged role.
  */
 export function getUserRole(session: {
   user: Record<string, unknown>;
 }): UserRole {
-  const roles = session.user["https://autoforge.dev/roles"];
+  const roles = session.user["https://omakase.dev/roles"];
 
   if (Array.isArray(roles) && roles.length > 0) {
     const candidate = roles[0] as string;

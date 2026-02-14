@@ -4,7 +4,7 @@
 // Linear Ticket Badge Component
 //
 // Renders a compact, clickable badge that links to a Linear issue. Uses
-// neobrutalism styling consistent with the rest of the AutoForge UI.
+// neobrutalism styling consistent with the rest of the Omakase UI.
 //
 // The badge displays:
 //   [L icon] [Issue ID]  [status dot]

@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@autoforge/db", "@autoforge/shared"],
+  transpilePackages: ["@omakase/db", "@omakase/shared"],
 };
 
 export default nextConfig;

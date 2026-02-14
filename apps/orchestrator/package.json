@@ -1,5 +1,5 @@
 {
-  "name": "@autoforge/orchestrator",
+  "name": "@omakase/orchestrator",
   "version": "0.1.0",
   "private": true,
   "type": "module",

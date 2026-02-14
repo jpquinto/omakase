@@ -19,7 +19,7 @@ The monorepo SHALL use Bun's workspace feature configured via the root `package.
 - **THEN** all packages in `apps/*` and `packages/*` are linked and their dependencies installed
 
 #### Scenario: Cross-package imports work
-- **WHEN** `apps/web` imports from `@autoforge/db`
+- **WHEN** `apps/web` imports from `@omakase/db`
 - **THEN** the import resolves to the local workspace package without publishing
 
 ### Requirement: Bun package manager replaces pnpm
