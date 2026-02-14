@@ -511,6 +511,19 @@ export class OmakaseStack extends cdk.Stack {
       },
     });
 
+    const agentMessagesTable = new dynamodb.Table(this, "AgentMessagesTable", {
+      tableName: "omakase-agent-messages",
+      partitionKey: { name: "runId", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "timestamp", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+    agentMessagesTable.addGlobalSecondaryIndex({
+      indexName: "by_feature",
+      partitionKey: { name: "featureId", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "timestamp", type: dynamodb.AttributeType.STRING },
+    });
+
     // ---------------------------------------------------------------
     // Stack Outputs
     // ---------------------------------------------------------------
