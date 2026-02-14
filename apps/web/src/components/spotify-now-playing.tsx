@@ -1,16 +1,15 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { Music, Pause, ExternalLink } from "lucide-react";
+import { Music, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { useSpotifyNowPlaying } from "@/hooks/use-spotify-now-playing";
 
 /**
  * SpotifyNowPlaying — Compact glass mini-player for the navbar.
  *
  * Shows the currently playing Spotify track with album art, scrolling
- * track name, artist, and a thin progress bar. When nothing is playing
- * or Spotify isn't connected, it shows a minimal idle/connect state.
+ * track name, artist, playback controls, and a thin progress bar.
  */
 export function SpotifyNowPlaying() {
   const { track, connected, isLoading } = useSpotifyNowPlaying(5000);
@@ -29,6 +28,18 @@ export function SpotifyNowPlaying() {
       return () => clearTimeout(t);
     }
   }, [track?.name]);
+
+  const sendPlayback = useCallback(async (action: string) => {
+    try {
+      await fetch("/api/spotify/playback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+    } catch {
+      // Silently fail — UI will update on next poll
+    }
+  }, []);
 
   const progressPct = track
     ? Math.min((track.progress / track.duration) * 100, 100)
@@ -92,7 +103,7 @@ export function SpotifyNowPlaying() {
           </div>
         )}
 
-        {/* Pause overlay on hover */}
+        {/* Pause overlay */}
         {!track.isPlaying && (
           <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
             <Pause className="size-3 text-white" />
@@ -122,21 +133,43 @@ export function SpotifyNowPlaying() {
         />
       </div>
 
-      {/* Spotify link — appears on hover */}
-      <a
-        href={track.trackUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={cn(
-          "flex size-5 shrink-0 items-center justify-center rounded-full transition-all duration-300",
-          "opacity-0 group-hover/player:opacity-100",
-          "hover:bg-oma-primary/15 hover:text-oma-primary",
-          "text-oma-text-subtle",
-        )}
-        title="Open in Spotify"
-      >
-        <ExternalLink className="size-3" />
-      </a>
+      {/* Playback controls */}
+      <div className="flex shrink-0 items-center gap-0.5">
+        <button
+          onClick={() => sendPlayback("previous")}
+          className={cn(
+            "flex size-6 cursor-pointer items-center justify-center rounded-full transition-all duration-200",
+            "text-oma-text-subtle hover:bg-oma-primary/15 hover:text-oma-primary",
+          )}
+          title="Previous"
+        >
+          <SkipBack className="size-3" />
+        </button>
+        <button
+          onClick={() => sendPlayback(track.isPlaying ? "pause" : "play")}
+          className={cn(
+            "flex size-6 cursor-pointer items-center justify-center rounded-full transition-all duration-200",
+            "text-oma-text hover:bg-oma-primary/15 hover:text-oma-primary",
+          )}
+          title={track.isPlaying ? "Pause" : "Play"}
+        >
+          {track.isPlaying ? (
+            <Pause className="size-3" />
+          ) : (
+            <Play className="size-3" />
+          )}
+        </button>
+        <button
+          onClick={() => sendPlayback("next")}
+          className={cn(
+            "flex size-6 cursor-pointer items-center justify-center rounded-full transition-all duration-200",
+            "text-oma-text-subtle hover:bg-oma-primary/15 hover:text-oma-primary",
+          )}
+          title="Next"
+        >
+          <SkipForward className="size-3" />
+        </button>
+      </div>
 
       {/* Progress bar — thin line at the bottom */}
       <div className="absolute inset-x-2 -bottom-px h-[2px] overflow-hidden rounded-full bg-oma-bg-surface/50">
