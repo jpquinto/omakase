@@ -1,4 +1,4 @@
-import { BatchWriteCommand, GetCommand, PutCommand, QueryCommand, ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { BatchWriteCommand, DeleteCommand, GetCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { ulid } from "ulid";
 import { docClient, tableName } from "./client.js";
 import type { Feature } from "@omakase/db";
@@ -201,9 +201,10 @@ export async function createFromLinear(params: {
 }
 
 export async function getByLinearIssueId(params: { linearIssueId: string }): Promise<Feature | null> {
-  const result = await docClient.send(new ScanCommand({
+  const result = await docClient.send(new QueryCommand({
     TableName: TABLE(),
-    FilterExpression: "linearIssueId = :linearIssueId",
+    IndexName: "by_linearIssueId",
+    KeyConditionExpression: "linearIssueId = :linearIssueId",
     ExpressionAttributeValues: { ":linearIssueId": params.linearIssueId },
     Limit: 1,
   }));
@@ -246,4 +247,81 @@ export async function getFeatureStats(params: { projectId: string }): Promise<{
     passing: features.filter((f) => f.status === "passing").length,
     failing: features.filter((f) => f.status === "failing").length,
   };
+}
+
+export async function createFeature(params: {
+  projectId: string;
+  name: string;
+  description?: string;
+  priority?: number;
+  category?: string;
+}): Promise<Feature> {
+  const now = new Date().toISOString();
+  const feature: Feature = {
+    id: ulid(),
+    projectId: params.projectId,
+    name: params.name,
+    description: params.description,
+    priority: params.priority ?? 3,
+    category: params.category,
+    status: "pending",
+    dependencies: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await docClient.send(new PutCommand({ TableName: TABLE(), Item: feature }));
+  return feature;
+}
+
+export async function updateFeature(params: {
+  featureId: string;
+  name?: string;
+  description?: string;
+  priority?: number;
+  status?: Feature["status"];
+  category?: string;
+}): Promise<void> {
+  const now = new Date().toISOString();
+  const updates: string[] = ["updatedAt = :now"];
+  const names: Record<string, string> = {};
+  const values: Record<string, unknown> = { ":now": now };
+
+  if (params.name !== undefined) {
+    updates.push("#name = :name");
+    names["#name"] = "name";
+    values[":name"] = params.name;
+  }
+  if (params.description !== undefined) {
+    updates.push("description = :description");
+    values[":description"] = params.description;
+  }
+  if (params.priority !== undefined) {
+    updates.push("priority = :priority");
+    values[":priority"] = params.priority;
+  }
+  if (params.status !== undefined) {
+    updates.push("#status = :status");
+    names["#status"] = "status";
+    values[":status"] = params.status;
+  }
+  if (params.category !== undefined) {
+    updates.push("category = :category");
+    values[":category"] = params.category;
+  }
+
+  await docClient.send(new UpdateCommand({
+    TableName: TABLE(),
+    Key: { id: params.featureId },
+    UpdateExpression: `SET ${updates.join(", ")}`,
+    ...(Object.keys(names).length > 0 ? { ExpressionAttributeNames: names } : {}),
+    ExpressionAttributeValues: values,
+  }));
+}
+
+export async function deleteFeature(params: { featureId: string }): Promise<void> {
+  await docClient.send(new DeleteCommand({
+    TableName: TABLE(),
+    Key: { id: params.featureId },
+  }));
 }

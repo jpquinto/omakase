@@ -1,4 +1,4 @@
-import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, PutCommand, QueryCommand, ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { ulid } from "ulid";
 import { docClient, tableName } from "./client.js";
 import { createMessage } from "./agent-messages.js";
@@ -191,4 +191,103 @@ export async function getAgentLogs(params: {
   }
 
   throw new Error("Either featureId or agentId must be provided");
+}
+
+/** Map agent name to role */
+const AGENT_ROLE_MAP: Record<string, AgentRunRole> = {
+  miso: "architect",
+  nori: "coder",
+  koji: "reviewer",
+  toro: "tester",
+};
+
+/** List recent runs for an agent by name (maps to role). Returns most recent first, up to `limit`. */
+export async function listRunsByAgentName(params: {
+  agentName: string;
+  limit?: number;
+}): Promise<AgentRun[]> {
+  const role = AGENT_ROLE_MAP[params.agentName];
+  if (!role) return [];
+
+  const result = await docClient.send(new ScanCommand({
+    TableName: TABLE(),
+    FilterExpression: "#role = :role",
+    ExpressionAttributeNames: { "#role": "role" },
+    ExpressionAttributeValues: { ":role": role },
+  }));
+
+  const runs = (result.Items ?? []) as AgentRun[];
+  runs.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+  return runs.slice(0, params.limit ?? 20);
+}
+
+/** Get stats for an agent by name (maps to role). */
+export async function getAgentStatsByName(params: {
+  agentName: string;
+}): Promise<{
+  totalRuns: number;
+  successRate: number;
+  avgDurationMs: number;
+  lastRunAt: string | null;
+}> {
+  const role = AGENT_ROLE_MAP[params.agentName];
+  if (!role) return { totalRuns: 0, successRate: 0, avgDurationMs: 0, lastRunAt: null };
+
+  const result = await docClient.send(new ScanCommand({
+    TableName: TABLE(),
+    FilterExpression: "#role = :role",
+    ExpressionAttributeNames: { "#role": "role" },
+    ExpressionAttributeValues: { ":role": role },
+  }));
+
+  const runs = (result.Items ?? []) as AgentRun[];
+  if (runs.length === 0) return { totalRuns: 0, successRate: 0, avgDurationMs: 0, lastRunAt: null };
+
+  const completed = runs.filter(r => r.status === "completed");
+  const totalTerminated = runs.filter(r => r.status === "completed" || r.status === "failed");
+  const successRate = totalTerminated.length > 0 ? completed.length / totalTerminated.length : 0;
+
+  const durations = runs.filter(r => r.durationMs != null).map(r => r.durationMs!);
+  const avgDurationMs = durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : 0;
+
+  runs.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+
+  return {
+    totalRuns: runs.length,
+    successRate: Math.round(successRate * 1000) / 10,
+    avgDurationMs: Math.round(avgDurationMs),
+    lastRunAt: runs[0]?.startedAt ?? null,
+  };
+}
+
+/** Get daily activity counts for an agent over the past 365 days. */
+export async function getAgentActivityByName(params: {
+  agentName: string;
+}): Promise<{ date: string; count: number }[]> {
+  const role = AGENT_ROLE_MAP[params.agentName];
+  if (!role) return [];
+
+  const now = new Date();
+  const yearAgo = new Date(now);
+  yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+  const yearAgoStr = yearAgo.toISOString();
+
+  const result = await docClient.send(new ScanCommand({
+    TableName: TABLE(),
+    FilterExpression: "#role = :role AND startedAt >= :since",
+    ExpressionAttributeNames: { "#role": "role" },
+    ExpressionAttributeValues: { ":role": role, ":since": yearAgoStr },
+  }));
+
+  const runs = (result.Items ?? []) as AgentRun[];
+  const countsByDate: Record<string, number> = {};
+
+  for (const run of runs) {
+    const date = run.startedAt.slice(0, 10); // YYYY-MM-DD
+    countsByDate[date] = (countsByDate[date] ?? 0) + 1;
+  }
+
+  return Object.entries(countsByDate)
+    .map(([date, count]) => ({ date, count }))
+    .sort((a, b) => a.date.localeCompare(b.date));
 }
