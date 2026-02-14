@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
 /**
@@ -15,7 +15,17 @@ import { cookies } from "next/headers";
  *   LINEAR_CLIENT_ID   - OAuth application client ID from Linear
  *   LINEAR_REDIRECT_URI - Must match the registered redirect URI
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const { searchParams } = request.nextUrl;
+  const projectId = searchParams.get("projectId");
+
+  if (!projectId) {
+    return NextResponse.json(
+      { error: "Missing required query parameter: projectId" },
+      { status: 400 },
+    );
+  }
+
   const clientId = process.env.LINEAR_CLIENT_ID;
   const redirectUri = process.env.LINEAR_REDIRECT_URI;
 
@@ -33,17 +43,18 @@ export async function GET() {
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 
-  // Persist the state in an HTTP-only cookie so the callback can verify it.
+  // Persist the state and projectId in HTTP-only cookies so the callback
+  // can verify the state and associate the token with the correct project.
   const cookieStore = await cookies();
-  cookieStore.set("linear_oauth_state", state, {
+  const cookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: "lax" as const,
     path: "/",
-    // State token is short-lived -- 10 minutes should be plenty for the
-    // user to authorise the application.
     maxAge: 600,
-  });
+  };
+  cookieStore.set("linear_oauth_state", state, cookieOptions);
+  cookieStore.set("linear_oauth_project_id", projectId, cookieOptions);
 
   const params = new URLSearchParams({
     client_id: clientId,

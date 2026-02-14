@@ -37,6 +37,8 @@ interface Project {
   status: "active" | "archived";
   repoUrl?: string;
   maxConcurrency: number;
+  linearAccessToken?: string;
+  linearTeamId?: string;
 }
 
 /** Minimal feature shape returned from the DynamoDB query. */
@@ -48,6 +50,8 @@ interface Feature {
   priority: number;
   status: string;
   dependencies: string[];
+  linearIssueId?: string;
+  linearIssueUrl?: string;
 }
 
 /** Configuration for the FeatureWatcher. */
@@ -288,6 +292,9 @@ export class FeatureWatcher {
       repoOwner,
       repoName,
       githubToken: this.githubToken ?? "",
+      linearIssueId: feature.linearIssueId,
+      linearIssueUrl: feature.linearIssueUrl,
+      linearAccessToken: project.linearAccessToken,
     };
 
     const pipeline = new AgentPipeline(

@@ -9,6 +9,9 @@
  * are ingested -- all other issues are silently ignored.
  */
 
+import { apiFetch } from "@/lib/api-client";
+import type { Feature, Project } from "@omakase/db";
+
 // -----------------------------------------------------------------------
 // TypeScript interfaces for Linear webhook payloads
 // -----------------------------------------------------------------------
@@ -136,24 +139,37 @@ export async function handleIssueCreated(
     return;
   }
 
-  const labelNames = event.labels.map((l) => l.name);
+  // Resolve project from team ID
+  if (!event.team?.id) {
+    console.warn(`[Linear Sync] Issue ${event.identifier} has no team ID — skipping.`);
+    return;
+  }
 
-  // TODO: Replace with an actual orchestrator API call.
-  //
-  // Example:
-  //   import { apiFetch } from "@/lib/api-client";
-  //   await apiFetch("/api/features", {
-  //     method: "POST",
-  //     body: JSON.stringify({
-  //       projectId,        // Resolve from event.team?.id or a lookup table
-  //       name: event.title,
-  //       description: event.description ?? "",
-  //       priority: mapLinearPriority(event.priority),
-  //       category: labelNames.filter(l => l.toLowerCase() !== TRIGGER_LABEL.toLowerCase()).join(", ") || undefined,
-  //       linearIssueId: event.identifier,
-  //       linearIssueUrl: event.url,
-  //     }),
-  //   });
+  let project: Project;
+  try {
+    project = await apiFetch<Project>(`/api/projects/by-linear-team/${event.team.id}`);
+  } catch {
+    console.warn(`[Linear Sync] No project found for Linear team ${event.team.id} — skipping.`);
+    return;
+  }
+
+  const labelNames = event.labels.map((l) => l.name);
+  const category = labelNames
+    .filter((l) => l.toLowerCase() !== TRIGGER_LABEL.toLowerCase())
+    .join(", ") || undefined;
+
+  await apiFetch<Feature>("/api/features/from-linear", {
+    method: "POST",
+    body: JSON.stringify({
+      projectId: project.id,
+      name: event.title,
+      description: event.description ?? "",
+      priority: mapLinearPriority(event.priority),
+      category,
+      linearIssueId: event.identifier,
+      linearIssueUrl: event.url,
+    }),
+  });
 
   console.log(
     `[Linear Sync] Issue created: ${event.identifier} "${event.title}" ` +
@@ -172,31 +188,31 @@ export async function handleIssueUpdated(
 ): Promise<void> {
   const event = toIssueEvent(data);
 
-  // TODO: Replace with an actual orchestrator API call.
-  //
-  // Example:
-  //   import { apiFetch } from "@/lib/api-client";
-  //
-  //   // Look up the feature by its Linear issue identifier.
-  //   const feature = await apiFetch(`/api/features/by-linear-issue/${event.identifier}`);
-  //
-  //   if (!feature) {
-  //     // The issue may not have been ingested (e.g. label was added later).
-  //     // Check if it now has the trigger label and create it.
-  //     if (hasTriggerLabel(event.labels)) {
-  //       await handleIssueCreated(data);
-  //     }
-  //     return;
-  //   }
-  //
-  //   await apiFetch(`/api/features/${feature.id}`, {
-  //     method: "PATCH",
-  //     body: JSON.stringify({
-  //       name: event.title,
-  //       description: event.description ?? "",
-  //       priority: mapLinearPriority(event.priority),
-  //     }),
-  //   });
+  // Look up the feature by its Linear issue identifier.
+  let feature: Feature | null;
+  try {
+    feature = await apiFetch<Feature>(`/api/features/by-linear-issue/${event.identifier}`);
+  } catch {
+    feature = null;
+  }
+
+  if (!feature) {
+    // The issue may not have been ingested (e.g. label was added later).
+    // Check if it now has the trigger label and create it.
+    if (hasTriggerLabel(event.labels)) {
+      await handleIssueCreated(data);
+    }
+    return;
+  }
+
+  await apiFetch(`/api/features/${feature.id}/from-linear`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      name: event.title,
+      description: event.description ?? "",
+      priority: mapLinearPriority(event.priority),
+    }),
+  });
 
   console.log(
     `[Linear Sync] Issue updated: ${event.identifier} "${event.title}" ` +

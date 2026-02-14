@@ -26,6 +26,7 @@ import {
 import { startAgent, stopAgent, releaseFeature, type AgentRole } from "./ecs-agent.js";
 import { AgentMonitor, type AgentCompletionResult } from "./agent-monitor.js";
 import { createPullRequest, buildPrBody } from "./pr-creator.js";
+import { LinearSyncHook } from "./linear-sync.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -51,6 +52,12 @@ export interface PipelineConfig {
   githubToken: string;
   /** The base branch to merge into (default "main"). */
   baseBranch?: string;
+  /** Linear issue ID or identifier for status sync (optional). */
+  linearIssueId?: string;
+  /** Linear issue URL for reference in comments (optional). */
+  linearIssueUrl?: string;
+  /** Linear OAuth access token for API calls (optional). */
+  linearAccessToken?: string;
 }
 
 /** ECS infrastructure configuration shared across all pipeline steps. */
@@ -125,6 +132,7 @@ export class AgentPipeline {
   private readonly config: PipelineConfig;
   private readonly ecsConfig: EcsConfig;
   private readonly ecsClient: ECSClient;
+  private readonly linearSync: LinearSyncHook;
 
   constructor(
     config: PipelineConfig,
@@ -136,6 +144,12 @@ export class AgentPipeline {
     this.config = config;
     this.ecsConfig = ecsConfig;
     this.ecsClient = ecsClient;
+    this.linearSync = new LinearSyncHook({
+      linearAccessToken: config.linearAccessToken,
+      linearIssueId: config.linearIssueId,
+      linearIssueUrl: config.linearIssueUrl,
+      featureName: config.featureName,
+    });
   }
 
   /**
@@ -157,6 +171,9 @@ export class AgentPipeline {
       `[pipeline] Starting pipeline for feature ${this.featureId} ` +
         `("${this.config.featureName}") in project ${this.projectId}`
     );
+
+    // Notify Linear that the pipeline is starting
+    await this.linearSync.onPipelineStart();
 
     try {
       // Step 1: Architect
@@ -190,6 +207,9 @@ export class AgentPipeline {
       // All steps passed -- mark feature as passing and create PR
       await this.markFeaturePassing();
       const prUrl = await this.createPullRequest();
+
+      // Notify Linear of success
+      await this.linearSync.onPipelineSuccess(prUrl ?? undefined);
 
       console.log(
         `[pipeline] Pipeline SUCCEEDED for feature ${this.featureId}. PR: ${prUrl ?? "none"}`
@@ -420,6 +440,9 @@ export class AgentPipeline {
 
     // Mark the feature as failing
     await this.markFeatureFailing();
+
+    // Notify Linear of failure
+    await this.linearSync.onPipelineFailure(failedStep, errorMessage);
 
     return {
       success: false,

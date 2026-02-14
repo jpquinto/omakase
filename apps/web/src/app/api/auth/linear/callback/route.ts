@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { apiFetch } from "@/lib/api-client";
 
 /**
  * GET /api/auth/linear/callback
@@ -55,8 +56,11 @@ export async function GET(request: NextRequest) {
   const cookieStore = await cookies();
   const storedState = cookieStore.get("linear_oauth_state")?.value;
 
-  // Clear the state cookie immediately -- it is single-use.
+  const projectId = cookieStore.get("linear_oauth_project_id")?.value;
+
+  // Clear the OAuth cookies immediately -- they are single-use.
   cookieStore.delete("linear_oauth_state");
+  cookieStore.delete("linear_oauth_project_id");
 
   if (!storedState || storedState !== state) {
     return NextResponse.json(
@@ -104,20 +108,49 @@ export async function GET(request: NextRequest) {
   // ------------------------------------------------------------------
   // 3. Store the access token via the orchestrator API
   // ------------------------------------------------------------------
-  // TODO: Replace with an actual orchestrator API call to persist the
-  // Linear access token against the current project/user.
-  //
-  // Example:
-  //   import { apiFetch } from "@/lib/api-client";
-  //   await apiFetch("/api/projects/linear-token", {
-  //     method: "POST",
-  //     body: JSON.stringify({
-  //       projectId,
-  //       linearAccessToken: tokenData.access_token,
-  //     }),
-  //   });
-  //
-  console.log("[Linear OAuth] Access token obtained successfully. Scope:", tokenData.scope);
+  if (!projectId) {
+    console.error("[Linear OAuth] No projectId found in OAuth state cookie.");
+    const redirectUrl = new URL("/projects", request.url);
+    redirectUrl.searchParams.set("linear_error", "Missing project context for OAuth flow");
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  // Fetch the user's default team from Linear to store alongside the token.
+  let linearTeamId: string | undefined;
+  try {
+    const viewerResponse = await fetch("https://api.linear.app/graphql", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${tokenData.access_token}`,
+      },
+      body: JSON.stringify({
+        query: `{ viewer { organization { teams { nodes { id key name } } } } }`,
+      }),
+    });
+    const viewerData = await viewerResponse.json() as {
+      data?: { viewer: { organization: { teams: { nodes: { id: string; key: string; name: string }[] } } } };
+    };
+    linearTeamId = viewerData.data?.viewer?.organization?.teams?.nodes?.[0]?.id;
+  } catch (err) {
+    console.warn("[Linear OAuth] Failed to fetch team from Linear:", err);
+  }
+
+  try {
+    await apiFetch(`/api/projects/${projectId}/linear-token`, {
+      method: "POST",
+      body: JSON.stringify({
+        linearAccessToken: tokenData.access_token,
+        linearTeamId: linearTeamId ?? "",
+      }),
+    });
+    console.log("[Linear OAuth] Access token persisted for project:", projectId);
+  } catch (err) {
+    console.error("[Linear OAuth] Failed to persist access token:", err);
+    const redirectUrl = new URL("/projects", request.url);
+    redirectUrl.searchParams.set("linear_error", "Failed to save Linear credentials");
+    return NextResponse.redirect(redirectUrl);
+  }
 
   // ------------------------------------------------------------------
   // 4. Redirect to /projects with a success message

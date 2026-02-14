@@ -1,4 +1,4 @@
-import { DeleteCommand, GetCommand, PutCommand, QueryCommand, UpdateCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { DeleteCommand, GetCommand, PutCommand, QueryCommand, ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { ulid } from "ulid";
 import { docClient, tableName } from "./client.js";
 import type { Project, NewProject } from "@omakase/db";
@@ -91,6 +91,16 @@ export async function updateProject(params: {
     ExpressionAttributeValues: values,
     ...(Object.keys(names).length > 0 ? { ExpressionAttributeNames: names } : {}),
   }));
+}
+
+export async function getByLinearTeamId(params: { linearTeamId: string }): Promise<Project | null> {
+  const result = await docClient.send(new ScanCommand({
+    TableName: TABLE(),
+    FilterExpression: "linearTeamId = :linearTeamId",
+    ExpressionAttributeValues: { ":linearTeamId": params.linearTeamId },
+    Limit: 1,
+  }));
+  return (result.Items?.[0] as Project) ?? null;
 }
 
 export async function deleteProject(params: { projectId: string }): Promise<void> {

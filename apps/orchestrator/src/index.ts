@@ -27,6 +27,11 @@ import {
   getFeatureStats,
   listActiveAgents,
   getAgentLogs,
+  createFromLinear,
+  getByLinearIssueId,
+  updateFromLinear,
+  getByLinearTeamId,
+  updateProject,
 } from "@omakase/dynamodb";
 
 import { FeatureWatcher, type FeatureWatcherConfig } from "./feature-watcher.js";
@@ -128,6 +133,50 @@ const app = new Elysia()
     const agentId = query.agentId;
     if (!featureId && !agentId) return { error: "featureId or agentId query parameter required" };
     return await getAgentLogs({ featureId, agentId });
+  })
+  // Linear integration endpoints
+  .post("/api/features/from-linear", async ({ body }) => {
+    const { projectId, name, description, priority, category, linearIssueId, linearIssueUrl } = body as {
+      projectId: string;
+      name: string;
+      description?: string;
+      priority: number;
+      category?: string;
+      linearIssueId: string;
+      linearIssueUrl: string;
+    };
+    return await createFromLinear({ projectId, name, description, priority, category, linearIssueId, linearIssueUrl });
+  })
+  .get("/api/features/by-linear-issue/:linearIssueId", async ({ params }) => {
+    const feature = await getByLinearIssueId({ linearIssueId: params.linearIssueId });
+    if (!feature) {
+      return new Response(JSON.stringify({ error: "Feature not found" }), { status: 404 });
+    }
+    return feature;
+  })
+  .patch("/api/features/:featureId/from-linear", async ({ params, body }) => {
+    const { name, description, priority } = body as {
+      name: string;
+      description?: string;
+      priority: number;
+    };
+    await updateFromLinear({ featureId: params.featureId, name, description, priority });
+    return { success: true };
+  })
+  .post("/api/projects/:projectId/linear-token", async ({ params, body }) => {
+    const { linearAccessToken, linearTeamId } = body as {
+      linearAccessToken: string;
+      linearTeamId: string;
+    };
+    await updateProject({ projectId: params.projectId, linearAccessToken, linearTeamId });
+    return { success: true };
+  })
+  .get("/api/projects/by-linear-team/:teamId", async ({ params }) => {
+    const project = await getByLinearTeamId({ linearTeamId: params.teamId });
+    if (!project) {
+      return new Response(JSON.stringify({ error: "Project not found" }), { status: 404 });
+    }
+    return project;
   })
   // Catch-all 404
   .onError(({ set }) => {

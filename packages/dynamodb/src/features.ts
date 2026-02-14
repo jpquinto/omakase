@@ -1,4 +1,4 @@
-import { BatchWriteCommand, GetCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { BatchWriteCommand, GetCommand, PutCommand, QueryCommand, ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { ulid } from "ulid";
 import { docClient, tableName } from "./client.js";
 import type { Feature } from "@omakase/db";
@@ -160,6 +160,72 @@ export async function markFeatureInProgress(params: {
     ExpressionAttributeValues: {
       ":status": "in_progress",
       ":agentId": params.agentId,
+      ":now": now,
+    },
+  }));
+}
+
+export async function createFromLinear(params: {
+  projectId: string;
+  name: string;
+  description?: string;
+  priority: number;
+  category?: string;
+  linearIssueId: string;
+  linearIssueUrl: string;
+}): Promise<Feature> {
+  // Check for duplicate linearIssueId
+  const existing = await getByLinearIssueId({ linearIssueId: params.linearIssueId });
+  if (existing) {
+    return existing;
+  }
+
+  const now = new Date().toISOString();
+  const feature: Feature = {
+    id: ulid(),
+    projectId: params.projectId,
+    name: params.name,
+    description: params.description,
+    priority: params.priority,
+    category: params.category,
+    status: "pending",
+    dependencies: [],
+    linearIssueId: params.linearIssueId,
+    linearIssueUrl: params.linearIssueUrl,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await docClient.send(new PutCommand({ TableName: TABLE(), Item: feature }));
+  return feature;
+}
+
+export async function getByLinearIssueId(params: { linearIssueId: string }): Promise<Feature | null> {
+  const result = await docClient.send(new ScanCommand({
+    TableName: TABLE(),
+    FilterExpression: "linearIssueId = :linearIssueId",
+    ExpressionAttributeValues: { ":linearIssueId": params.linearIssueId },
+    Limit: 1,
+  }));
+  return (result.Items?.[0] as Feature) ?? null;
+}
+
+export async function updateFromLinear(params: {
+  featureId: string;
+  name: string;
+  description?: string;
+  priority: number;
+}): Promise<void> {
+  const now = new Date().toISOString();
+  await docClient.send(new UpdateCommand({
+    TableName: TABLE(),
+    Key: { id: params.featureId },
+    UpdateExpression: "SET #name = :name, description = :description, priority = :priority, updatedAt = :now",
+    ExpressionAttributeNames: { "#name": "name" },
+    ExpressionAttributeValues: {
+      ":name": params.name,
+      ":description": params.description,
+      ":priority": params.priority,
       ":now": now,
     },
   }));

@@ -9,6 +9,7 @@ export {
 export {
   createProject,
   getProject,
+  getByLinearTeamId,
   listProjects,
   listActiveProjects,
   updateProject,
@@ -17,13 +18,16 @@ export {
 
 export {
   createFeaturesBulk,
+  createFromLinear,
   listFeatures,
   getFeature,
+  getByLinearIssueId,
   getReadyFeatures,
   claimFeature,
   markFeaturePassing,
   markFeatureFailing,
   markFeatureInProgress,
+  updateFromLinear,
   getFeatureStats,
 } from "./features.js";
 
