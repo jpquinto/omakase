@@ -18,6 +18,7 @@ export {
 
 export {
   createFeaturesBulk,
+  createFeature,
   createFromLinear,
   listFeatures,
   getFeature,
@@ -28,6 +29,8 @@ export {
   markFeatureFailing,
   markFeatureInProgress,
   updateFromLinear,
+  updateFeature,
+  deleteFeature,
   getFeatureStats,
 } from "./features.js";
 
@@ -43,6 +46,9 @@ export {
   completeAgentRun,
   listActiveAgents,
   getAgentLogs,
+  listRunsByAgentName,
+  getAgentStatsByName,
+  getAgentActivityByName,
 } from "./agent-runs.js";
 
 export {
@@ -54,4 +60,32 @@ export {
   createMessage,
   listMessages,
   listMessagesByFeature,
+  listMessagesByThread,
 } from "./agent-messages.js";
+
+export {
+  createThread,
+  getThread,
+  listThreadsByAgent,
+  updateThread,
+  updateThreadMetadata,
+} from "./agent-threads.js";
+export type { PaginatedThreads } from "./agent-threads.js";
+
+export {
+  createMemory,
+  listMemories,
+  deleteMemory,
+  deleteMemoriesByAgentProject,
+} from "./agent-memories.js";
+
+export {
+  getPersonality,
+  putPersonality,
+  deletePersonality,
+} from "./agent-personalities.js";
+
+export {
+  DEFAULT_PERSONALITIES,
+  getDefaultPersonality,
+} from "./default-personalities.js";
