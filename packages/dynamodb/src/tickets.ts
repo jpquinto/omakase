@@ -1,7 +1,7 @@
 import { PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { ulid } from "ulid";
 import { docClient, tableName } from "./client.js";
-import type { Ticket } from "@autoforge/db";
+import type { Ticket } from "@omakase/db";
 
 const TABLE = () => tableName("tickets");
 

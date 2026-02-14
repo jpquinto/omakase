@@ -3,8 +3,9 @@
 // ---------------------------------------------------------------------------
 // Linear Ticket Badge Component
 //
-// Renders a compact, clickable badge that links to a Linear issue. Uses
-// neobrutalism styling consistent with the rest of the AutoForge UI.
+// Renders a compact, clickable badge that links to a Linear issue. Uses the
+// Omakase liquid glass design system with frosted glass surfaces and soft
+// glow hover effects.
 //
 // The badge displays:
 //   [L icon] [Issue ID]  [status dot]
@@ -21,21 +22,21 @@ interface LinearTicketBadgeProps {
   status?: "backlog" | "todo" | "in_progress" | "done" | "cancelled";
 }
 
-/** Maps Linear status to a Tailwind background color class. */
+/** Maps Linear status to an Omakase background color class. */
 function statusDotColor(status: LinearTicketBadgeProps["status"]): string {
   switch (status) {
     case "backlog":
-      return "bg-neo-muted-foreground";
+      return "bg-oma-text-faint";
     case "todo":
-      return "bg-neo-pending";
+      return "bg-oma-pending";
     case "in_progress":
-      return "bg-neo-progress";
+      return "bg-oma-progress";
     case "done":
-      return "bg-neo-done";
+      return "bg-oma-done";
     case "cancelled":
-      return "bg-neo-fail";
+      return "bg-oma-fail";
     default:
-      return "bg-neo-muted-foreground";
+      return "bg-oma-text-faint";
   }
 }
 
@@ -77,10 +78,9 @@ export function LinearTicketBadge({
       rel="noopener noreferrer"
       title={`Open ${linearIssueId} in Linear`}
       className={
-        "neo-border inline-flex items-center gap-1.5 bg-white px-2 py-1 " +
-        "text-[11px] font-bold text-neo-foreground no-underline " +
-        "transition-all hover:-translate-y-px hover:shadow-neo-sm " +
-        "active:translate-y-px active:shadow-none"
+        "glass-sm inline-flex items-center gap-1.5 rounded-oma-full px-2.5 py-1 " +
+        "text-[11px] font-medium text-oma-text no-underline " +
+        "transition-all hover:scale-105 hover:glow-primary"
       }
     >
       <LinearIcon />

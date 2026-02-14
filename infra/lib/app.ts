@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 import * as cdk from "aws-cdk-lib";
-import { AutoforgeStack } from "./autoforge-stack";
+import { OmakaseStack } from "./omakase-stack";
 
 const app = new cdk.App();
 
-new AutoforgeStack(app, "AutoforgeStack", {
+new OmakaseStack(app, "OmakaseStack", {
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,
     region: process.env.CDK_DEFAULT_REGION,
   },
-  description: "AutoForge ECS infrastructure - orchestrator and agent services",
+  description: "Omakase ECS infrastructure - orchestrator and agent services",
 });

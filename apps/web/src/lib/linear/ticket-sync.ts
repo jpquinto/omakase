@@ -2,10 +2,10 @@
  * Ticket ingestion handlers for Linear issue webhook events.
  *
  * When Linear issues are created or updated, these handlers synchronise
- * the relevant data into AutoForge features stored in DynamoDB via the
+ * the relevant data into Omakase features stored in DynamoDB via the
  * orchestrator API.
  *
- * Only issues that carry the configured trigger label (e.g. "autoforge")
+ * Only issues that carry the configured trigger label (e.g. "omakase")
  * are ingested -- all other issues are silently ignored.
  */
 
@@ -46,7 +46,7 @@ export interface LinearTeam {
  * Shape of the `data` object for Issue webhook events from Linear.
  *
  * This is a subset of the fields Linear includes -- only the ones
- * relevant to AutoForge are typed explicitly.
+ * relevant to Omakase are typed explicitly.
  */
 export interface LinearIssueEvent {
   id: string;
@@ -68,10 +68,10 @@ export interface LinearIssueEvent {
 // -----------------------------------------------------------------------
 
 /**
- * The Linear label name that marks an issue for ingestion into AutoForge.
+ * The Linear label name that marks an issue for ingestion into Omakase.
  * Only issues carrying this label will be synced as features.
  */
-const TRIGGER_LABEL = process.env.LINEAR_TRIGGER_LABEL ?? "autoforge";
+const TRIGGER_LABEL = process.env.LINEAR_TRIGGER_LABEL ?? "omakase";
 
 // -----------------------------------------------------------------------
 // Priority Mapping
@@ -79,9 +79,9 @@ const TRIGGER_LABEL = process.env.LINEAR_TRIGGER_LABEL ?? "autoforge";
 
 /**
  * Map Linear priority (0 = no priority, 1 = urgent, 4 = low) to
- * AutoForge priority (1 = critical, 5 = minor).
+ * Omakase priority (1 = critical, 5 = minor).
  *
- * Linear priority 0 (no priority) maps to AutoForge 3 (medium) as a
+ * Linear priority 0 (no priority) maps to Omakase 3 (medium) as a
  * reasonable default.
  */
 function mapLinearPriority(linearPriority: number): number {

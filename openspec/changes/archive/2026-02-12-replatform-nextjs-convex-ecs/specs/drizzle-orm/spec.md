@@ -29,5 +29,5 @@ The system SHALL use Drizzle Kit for generating and applying schema migrations w
 The system SHALL export Drizzle-inferred types (e.g., `Feature`, `Project`, `Agent`, `Ticket`) from a shared package consumed by both frontend and backend.
 
 #### Scenario: Frontend imports shared types
-- **WHEN** a Next.js component imports `Feature` from `@autoforge/db`
+- **WHEN** a Next.js component imports `Feature` from `@omakase/db`
 - **THEN** the type includes all fields defined in the Drizzle schema with correct TypeScript types

@@ -30,7 +30,8 @@ export async function POST() {
     email: user.email,
     name: user.name,
     picture: user.picture,
-    roles: (user["https://autoforge.dev/roles"] as string[] | undefined) ?? [],
+    // Include custom claims if present.
+    roles: (user["https://omakase.dev/roles"] as string[] | undefined) ?? [],
   };
 
   // TODO: Call orchestrator API to upsert user once the endpoint is added.

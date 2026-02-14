@@ -2,7 +2,7 @@
 
 - [x] 1.1 Initialize monorepo structure with `packages/` (db, shared) and `apps/` (web, orchestrator) directories
 - [x] 1.2 Set up pnpm workspace with `pnpm-workspace.yaml` linking packages and apps
-- [x] 1.3 Configure root `tsconfig.json` with path aliases for `@autoforge/db`, `@autoforge/shared`
+- [x] 1.3 Configure root `tsconfig.json` with path aliases for `@omakase/db`, `@omakase/shared`
 - [x] 1.4 Add root ESLint and Prettier configuration with TypeScript support
 - [x] 1.5 Create `.env.example` with all required environment variables (Auth0, Convex, AWS, Linear)
 
@@ -23,7 +23,7 @@
 
 - [x] 3.1 Set up `packages/db/` with Drizzle ORM and `drizzle-kit`
 - [x] 3.2 Define Drizzle schema files mirroring Convex tables (projects, features, agents, tickets)
-- [x] 3.3 Export inferred TypeScript types (`Feature`, `Project`, `Agent`, `Ticket`, `AgentRun`) from `@autoforge/db`
+- [x] 3.3 Export inferred TypeScript types (`Feature`, `Project`, `Agent`, `Ticket`, `AgentRun`) from `@omakase/db`
 - [x] 3.4 Configure `drizzle-kit` for migration generation and verify alignment with Convex schema
 
 ## 4. Next.js Frontend Foundation

@@ -10,9 +10,9 @@ import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { Construct } from "constructs";
 
 /**
- * AutoForge ECS infrastructure stack.
+ * Omakase ECS infrastructure stack.
  *
- * Creates the full backend environment for running AutoForge orchestrator
+ * Creates the full backend environment for running Omakase orchestrator
  * and on-demand agent tasks on AWS Fargate, fronted by an Application
  * Load Balancer.
  *
@@ -26,11 +26,11 @@ import { Construct } from "constructs";
  * - IAM roles with least-privilege policies
  * - CloudWatch log groups with 30-day retention
  */
-export class AutoforgeStack extends cdk.Stack {
+export class OmakaseStack extends cdk.Stack {
   /** The ECS cluster where services and tasks run. */
   public readonly cluster: ecs.Cluster;
 
-  /** The ECR repository holding the autoforge-agent Docker image. */
+  /** The ECR repository holding the omakase-agent Docker image. */
   public readonly repository: ecr.Repository;
 
   /** The Application Load Balancer fronting the orchestrator. */
@@ -45,7 +45,7 @@ export class AutoforgeStack extends cdk.Stack {
 
     // VPC with public subnets for the ALB and private subnets (with NAT)
     // for ECS tasks. Two AZs provide basic high-availability.
-    const vpc = new ec2.Vpc(this, "AutoforgeVpc", {
+    const vpc = new ec2.Vpc(this, "OmakaseVpc", {
       maxAzs: 2,
       natGateways: 1,
       subnetConfiguration: [
@@ -63,9 +63,9 @@ export class AutoforgeStack extends cdk.Stack {
     });
 
     // ECS Cluster
-    this.cluster = new ecs.Cluster(this, "AutoforgeCluster", {
+    this.cluster = new ecs.Cluster(this, "OmakaseCluster", {
       vpc,
-      clusterName: "autoforge",
+      clusterName: "omakase",
       containerInsights: true,
     });
 
@@ -74,14 +74,14 @@ export class AutoforgeStack extends cdk.Stack {
       this,
       "OrchestratorLogGroup",
       {
-        logGroupName: "/autoforge/orchestrator",
+        logGroupName: "/omakase/orchestrator",
         retention: logs.RetentionDays.ONE_MONTH,
         removalPolicy: cdk.RemovalPolicy.DESTROY,
       },
     );
 
     const agentsLogGroup = new logs.LogGroup(this, "AgentsLogGroup", {
-      logGroupName: "/autoforge/agents",
+      logGroupName: "/omakase/agents",
       retention: logs.RetentionDays.ONE_MONTH,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
@@ -90,7 +90,7 @@ export class AutoforgeStack extends cdk.Stack {
     // Allows inbound HTTP (80) and HTTPS (443) from anywhere.
     const albSecurityGroup = new ec2.SecurityGroup(this, "AlbSecurityGroup", {
       vpc,
-      description: "AutoForge ALB - allows HTTP/HTTPS inbound",
+      description: "Omakase ALB - allows HTTP/HTTPS inbound",
       allowAllOutbound: true,
     });
     albSecurityGroup.addIngressRule(
@@ -107,7 +107,7 @@ export class AutoforgeStack extends cdk.Stack {
     // Security group for ECS tasks. Only allows traffic from the ALB.
     const ecsSecurityGroup = new ec2.SecurityGroup(this, "EcsSecurityGroup", {
       vpc,
-      description: "AutoForge ECS tasks - allows traffic from ALB only",
+      description: "Omakase ECS tasks - allows traffic from ALB only",
       allowAllOutbound: true,
     });
     ecsSecurityGroup.addIngressRule(
@@ -117,7 +117,7 @@ export class AutoforgeStack extends cdk.Stack {
     );
 
     // Application Load Balancer in public subnets
-    this.alb = new elbv2.ApplicationLoadBalancer(this, "AutoforgeAlb", {
+    this.alb = new elbv2.ApplicationLoadBalancer(this, "OmakaseAlb", {
       vpc,
       internetFacing: true,
       securityGroup: albSecurityGroup,
@@ -129,7 +129,7 @@ export class AutoforgeStack extends cdk.Stack {
     // ---------------------------------------------------------------
 
     this.repository = new ecr.Repository(this, "AgentRepository", {
-      repositoryName: "autoforge-agent",
+      repositoryName: "omakase-agent",
       imageScanOnPush: true,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
       lifecycleRules: [
@@ -148,15 +148,15 @@ export class AutoforgeStack extends cdk.Stack {
     // Secrets Manager secret placeholder for API keys (referenced by roles below).
     // The actual secret value is managed outside of CDK.
     const apiKeysSecret = new secretsmanager.Secret(this, "ApiKeysSecret", {
-      secretName: "autoforge/api-keys",
+      secretName: "omakase/api-keys",
       description:
-        "API keys used by AutoForge agents (e.g. ANTHROPIC_API_KEY)",
+        "API keys used by Omakase agents (e.g. ANTHROPIC_API_KEY)",
     });
 
     // Task execution role - shared by both orchestrator and agent tasks.
     // Grants permissions to pull images from ECR and write to CloudWatch Logs.
     const executionRole = new iam.Role(this, "TaskExecutionRole", {
-      roleName: "autoforge-task-execution",
+      roleName: "omakase-task-execution",
       assumedBy: new iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
       managedPolicies: [
         iam.ManagedPolicy.fromAwsManagedPolicyName(
@@ -168,7 +168,7 @@ export class AutoforgeStack extends cdk.Stack {
     // Orchestrator task role - allows the orchestrator to launch, stop,
     // and describe agent tasks, and write logs.
     const orchestratorTaskRole = new iam.Role(this, "OrchestratorTaskRole", {
-      roleName: "autoforge-orchestrator-task",
+      roleName: "omakase-orchestrator-task",
       assumedBy: new iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
     });
 
@@ -207,7 +207,7 @@ export class AutoforgeStack extends cdk.Stack {
     // Agent task role - allows agents to write logs and read API keys
     // from Secrets Manager.
     const agentTaskRole = new iam.Role(this, "AgentTaskRole", {
-      roleName: "autoforge-agent-task",
+      roleName: "omakase-agent-task",
       assumedBy: new iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
     });
 
@@ -225,7 +225,7 @@ export class AutoforgeStack extends cdk.Stack {
     );
 
     // Task 1.3: Grant the orchestrator read/write access to all
-    // DynamoDB tables used by AutoForge.
+    // DynamoDB tables used by Omakase.
     orchestratorTaskRole.addToPolicy(
       new iam.PolicyStatement({
         sid: "DynamoDbReadWrite",
@@ -240,8 +240,8 @@ export class AutoforgeStack extends cdk.Stack {
           "dynamodb:Scan",
         ],
         resources: [
-          `arn:aws:dynamodb:${this.region}:${this.account}:table/autoforge-*`,
-          `arn:aws:dynamodb:${this.region}:${this.account}:table/autoforge-*/index/*`,
+          `arn:aws:dynamodb:${this.region}:${this.account}:table/omakase-*`,
+          `arn:aws:dynamodb:${this.region}:${this.account}:table/omakase-*/index/*`,
         ],
       }),
     );
@@ -347,7 +347,7 @@ export class AutoforgeStack extends cdk.Stack {
         cpu: 1024,
         executionRole,
         taskRole: agentTaskRole,
-        family: "autoforge-agent",
+        family: "omakase-agent",
       },
     );
 
@@ -392,7 +392,7 @@ export class AutoforgeStack extends cdk.Stack {
     // construct table names at runtime.
     orchestratorContainer.addEnvironment(
       "DYNAMODB_TABLE_PREFIX",
-      "autoforge-",
+      "omakase-",
     );
 
     // ---------------------------------------------------------------
@@ -403,7 +403,7 @@ export class AutoforgeStack extends cdk.Stack {
     // query patterns used by the orchestrator and dashboard.
 
     const usersTable = new dynamodb.Table(this, "UsersTable", {
-      tableName: "autoforge-users",
+      tableName: "omakase-users",
       partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
@@ -418,7 +418,7 @@ export class AutoforgeStack extends cdk.Stack {
     });
 
     const projectsTable = new dynamodb.Table(this, "ProjectsTable", {
-      tableName: "autoforge-projects",
+      tableName: "omakase-projects",
       partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
@@ -430,7 +430,7 @@ export class AutoforgeStack extends cdk.Stack {
     });
 
     const featuresTable = new dynamodb.Table(this, "FeaturesTable", {
-      tableName: "autoforge-features",
+      tableName: "omakase-features",
       partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
@@ -454,7 +454,7 @@ export class AutoforgeStack extends cdk.Stack {
     });
 
     const agentsTable = new dynamodb.Table(this, "AgentsTable", {
-      tableName: "autoforge-agents",
+      tableName: "omakase-agents",
       partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
@@ -471,7 +471,7 @@ export class AutoforgeStack extends cdk.Stack {
     });
 
     const agentRunsTable = new dynamodb.Table(this, "AgentRunsTable", {
-      tableName: "autoforge-agent-runs",
+      tableName: "omakase-agent-runs",
       partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
@@ -493,7 +493,7 @@ export class AutoforgeStack extends cdk.Stack {
     });
 
     const ticketsTable = new dynamodb.Table(this, "TicketsTable", {
-      tableName: "autoforge-tickets",
+      tableName: "omakase-tickets",
       partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: cdk.RemovalPolicy.DESTROY,

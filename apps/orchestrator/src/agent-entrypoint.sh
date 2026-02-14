@@ -2,7 +2,7 @@
 # ---------------------------------------------------------------------------
 # Agent Entrypoint Script
 #
-# The main entrypoint for AutoForge agent containers. Orchestrates the full
+# The main entrypoint for Omakase agent containers. Orchestrates the full
 # agent lifecycle:
 #   1. Bootstrap workspace (clone repo, checkout branch, install deps)
 #   2. Copy role-specific CLAUDE.md to workspace root
@@ -54,7 +54,7 @@ FEATURE_DESCRIPTION="${FEATURE_DESCRIPTION:-No description provided.}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROLES_DIR="${SCRIPT_DIR}/agent-roles"
 
-echo "=== AutoForge Agent Entrypoint ==="
+echo "=== Omakase Agent Entrypoint ==="
 echo "  Role        : ${AGENT_ROLE}"
 echo "  Feature     : ${FEATURE_ID}"
 echo "  Feature Name: ${FEATURE_NAME}"
@@ -94,8 +94,8 @@ echo "Copied ${AGENT_ROLE} CLAUDE.md to workspace root."
 
 echo "--- Step 3: Configuring git identity ---"
 cd "${WORKSPACE}"
-git config user.name "AutoForge ${AGENT_ROLE^} Agent"
-git config user.email "autoforge+${AGENT_ROLE}@noreply.github.com"
+git config user.name "Omakase ${AGENT_ROLE^} Agent"
+git config user.email "omakase+${AGENT_ROLE}@noreply.github.com"
 
 # ---------------------------------------------------------------------------
 # Step 4: Build the prompt based on agent role

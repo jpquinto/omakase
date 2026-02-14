@@ -17,7 +17,7 @@ import { ECSClient } from "@aws-sdk/client-ecs";
 import {
   listActiveProjects,
   getReadyFeatures,
-} from "@autoforge/dynamodb";
+} from "@omakase/dynamodb";
 
 import { ConcurrencyManager } from "./concurrency.js";
 import {

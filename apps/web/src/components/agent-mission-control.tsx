@@ -4,8 +4,8 @@
 // Agent Mission Control Component
 //
 // Displays a grid of agent cards showing each agent's mascot, name, role,
-// current status, and the feature they are working on. Matches the mascot
-// naming convention from the existing AutoForge UI (AgentMissionControl.tsx).
+// current status, and the feature they are working on. Uses the Omakase
+// liquid glass design system with glass surfaces and soft color accents.
 // ---------------------------------------------------------------------------
 
 interface Agent {
@@ -52,13 +52,13 @@ const MOCK_AGENTS: Agent[] = [
   },
 ];
 
-/** Maps agent status to a dot color class */
+/** Maps agent status to an Omakase dot color class */
 function statusDotColor(status: Agent["status"]): string {
   const colors: Record<Agent["status"], string> = {
-    idle: "bg-neo-muted-foreground",
-    running: "bg-neo-done",
-    stopped: "bg-neo-pending",
-    failed: "bg-neo-fail",
+    idle: "bg-oma-text-faint",
+    running: "bg-oma-done",
+    stopped: "bg-oma-pending",
+    failed: "bg-oma-fail",
   };
   return colors[status];
 }
@@ -74,13 +74,13 @@ function statusLabel(status: Agent["status"]): string {
   return labels[status];
 }
 
-/** Maps agent role to a styled background */
+/** Maps agent role to Omakase color classes */
 function roleBadgeColor(role: Agent["role"]): string {
   const colors: Record<Agent["role"], string> = {
-    architect: "bg-neo-primary text-white",
-    coder: "bg-neo-progress text-neo-foreground",
-    reviewer: "bg-neo-accent text-neo-foreground",
-    tester: "bg-neo-done text-neo-foreground",
+    architect: "bg-oma-indigo/20 text-oma-indigo",
+    coder: "bg-oma-progress/20 text-oma-progress",
+    reviewer: "bg-oma-primary/20 text-oma-primary",
+    tester: "bg-oma-jade/20 text-oma-jade",
   };
   return colors[role];
 }
@@ -90,10 +90,10 @@ export function AgentMissionControl() {
     <div className="space-y-4">
       {/* Section header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-black tracking-tight text-neo-foreground">
+        <h2 className="font-serif text-lg font-semibold text-oma-text">
           Agent Mission Control
         </h2>
-        <span className="neo-border bg-neo-muted px-2.5 py-1 text-xs font-bold text-neo-foreground">
+        <span className="glass-sm rounded-full px-3 py-1 text-xs font-medium text-oma-text-muted">
           {MOCK_AGENTS.filter((a) => a.status === "running").length}/{MOCK_AGENTS.length} active
         </span>
       </div>
@@ -103,20 +103,24 @@ export function AgentMissionControl() {
         {MOCK_AGENTS.map((agent) => (
           <div
             key={agent.id}
-            className="neo-card rounded-none p-5 transition-transform hover:-translate-y-0.5"
+            className="glass rounded-oma-lg glass-edge p-5 transition-all duration-200 hover:scale-[1.02]"
           >
             {/* Mascot and name */}
             <div className="mb-3 flex items-center gap-3">
-              <span className="text-3xl leading-none" role="img" aria-label={agent.name}>
+              <span
+                className="glass-sm rounded-oma flex h-12 w-12 items-center justify-center text-2xl leading-none"
+                role="img"
+                aria-label={agent.name}
+              >
                 {agent.mascot}
               </span>
               <div>
-                <h3 className="text-sm font-black text-neo-foreground">
+                <h3 className="text-sm font-semibold text-oma-text">
                   {agent.name}
                 </h3>
                 {/* Role badge */}
                 <span
-                  className={`neo-border mt-0.5 inline-block rounded-none px-1.5 py-0.5 text-[10px] font-bold uppercase ${roleBadgeColor(agent.role)}`}
+                  className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${roleBadgeColor(agent.role)}`}
                 >
                   {agent.role}
                 </span>
@@ -130,24 +134,24 @@ export function AgentMissionControl() {
                   agent.status === "running" ? "animate-pulse" : ""
                 }`}
               />
-              <span className="text-xs font-bold text-neo-muted-foreground">
+              <span className="text-xs font-medium text-oma-text-muted">
                 {statusLabel(agent.status)}
               </span>
             </div>
 
-            {/* Current feature */}
+            {/* Current feature or awaiting state */}
             {agent.currentFeature ? (
-              <div className="neo-border rounded-none bg-neo-muted px-3 py-2">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-neo-muted-foreground">
+              <div className="glass-sm rounded-oma px-3 py-2">
+                <p className="text-[10px] font-medium uppercase tracking-wider text-oma-text-subtle">
                   Working on
                 </p>
-                <p className="text-xs font-black text-neo-foreground">
+                <p className="text-xs font-medium text-oma-text">
                   {agent.currentFeature}
                 </p>
               </div>
             ) : (
-              <div className="neo-border rounded-none border-dashed bg-neo-bg px-3 py-2">
-                <p className="text-[10px] font-bold text-neo-muted-foreground">
+              <div className="glass-sm rounded-oma border border-dashed border-oma-glass-border px-3 py-2">
+                <p className="text-[10px] font-medium text-oma-text-muted">
                   Awaiting assignment
                 </p>
               </div>

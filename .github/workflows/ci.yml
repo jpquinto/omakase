@@ -16,7 +16,7 @@ jobs:
           bun-version: latest
       - run: bun install --frozen-lockfile
       - run: bun --filter '*' run typecheck
-      - run: bun --filter @autoforge/web run lint
+      - run: bun --filter @omakase/web run lint
 
   test-e2e:
     runs-on: ubuntu-latest
@@ -27,4 +27,4 @@ jobs:
           bun-version: latest
       - run: bun install --frozen-lockfile
       - run: cd apps/web && bun playwright install --with-deps chromium
-      - run: bun --filter @autoforge/web run test:e2e
+      - run: bun --filter @omakase/web run test:e2e

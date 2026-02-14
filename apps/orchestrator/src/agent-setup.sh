@@ -34,7 +34,7 @@ BASE_BRANCH="${BASE_BRANCH:-main}"
 GIT_DEPTH="${GIT_DEPTH:-0}"
 BRANCH_NAME="agent/${FEATURE_ID}"
 
-echo "=== AutoForge Agent Workspace Setup ==="
+echo "=== Omakase Agent Workspace Setup ==="
 echo "  Repository : ${REPO_URL}"
 echo "  Feature    : ${FEATURE_ID}"
 echo "  Branch     : ${BRANCH_NAME}"

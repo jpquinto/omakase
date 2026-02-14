@@ -1,5 +1,5 @@
 /**
- * index.ts -- Entry point for the AutoForge orchestrator service.
+ * index.ts -- Entry point for the Omakase orchestrator service.
  *
  * Uses Elysia (Bun-native web framework) for the HTTP server with typed
  * routes and request logging middleware. Initializes the ECS client and
@@ -27,7 +27,7 @@ import {
   getFeatureStats,
   listActiveAgents,
   getAgentLogs,
-} from "@autoforge/dynamodb";
+} from "@omakase/dynamodb";
 
 import { FeatureWatcher, type FeatureWatcherConfig } from "./feature-watcher.js";
 import type { EcsConfig } from "./pipeline.js";

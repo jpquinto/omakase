@@ -10,7 +10,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-AutoForge is an autonomous development platform that uses a team of AI agents (architect, coder, reviewer, tester) to implement features from Linear tickets. The orchestrator polls for ready features, runs a 4-step agent pipeline on AWS ECS Fargate, and reports results back to a real-time dashboard.
+Omakase is an autonomous development platform that uses a team of AI agents (architect, coder, reviewer, tester) to implement features from Linear tickets. The orchestrator polls for ready features, runs a 4-step agent pipeline on AWS ECS Fargate, and reports results back to a real-time dashboard.
 
 For full tech stack details, see [TECH_STACK.md](TECH_STACK.md).
 
@@ -41,13 +41,13 @@ Managed via Bun workspaces (`"workspaces": ["apps/*", "packages/*"]` in root `pa
 bun install
 
 # Frontend (Next.js)
-bun --filter @autoforge/web run dev        # Dev server at localhost:3000
-bun --filter @autoforge/web run build      # Production build
-bun --filter @autoforge/web run lint       # ESLint
+bun --filter @omakase/web run dev        # Dev server at localhost:3000
+bun --filter @omakase/web run build      # Production build
+bun --filter @omakase/web run lint       # ESLint
 
 # Backend (Elysia orchestrator)
-bun --filter @autoforge/orchestrator run dev   # Dev server with watch mode
-bun --filter @autoforge/orchestrator run start # Production start
+bun --filter @omakase/orchestrator run dev   # Dev server with watch mode
+bun --filter @omakase/orchestrator run start # Production start
 
 # Type checking (all packages)
 bun --filter '*' run typecheck
@@ -66,8 +66,8 @@ npx cdk deploy    # Deploy to AWS
 
 ```bash
 # Frontend E2E tests
-bun --filter @autoforge/web run test:e2e
-bun --filter @autoforge/web run test:e2e:ui    # With Playwright UI
+bun --filter @omakase/web run test:e2e
+bun --filter @omakase/web run test:e2e:ui    # With Playwright UI
 ```
 
 ### CI/CD
@@ -110,7 +110,7 @@ Next.js 15 App Router with React 19, Tailwind CSS v4 (neobrutalism design), and 
 **Linear integration (`src/lib/linear/`):**
 - `client.ts` -- Linear GraphQL client
 - `ticket-sync.ts` -- Bidirectional Linear issue <-> DynamoDB feature sync
-- `status-sync.ts` -- Status mapping between Linear and AutoForge
+- `status-sync.ts` -- Status mapping between Linear and Omakase
 - `comments.ts` -- Linear comment sync
 - `dependency-sync.ts` -- Dependency mapping
 
@@ -162,7 +162,7 @@ TypeScript type definitions (`Feature`, `Project`, `Agent`, `User`, `Ticket`, `A
 
 AWS CDK stack creating: VPC (2 AZs), ECS Cluster, ALB, ECR repository, Orchestrator Fargate service, Agent task definition, IAM roles, Secrets Manager, CloudWatch log groups.
 
-See `infra/lib/autoforge-stack.ts` for the full resource definition.
+See `infra/lib/omakase-stack.ts` for the full resource definition.
 
 ## Key Patterns
 

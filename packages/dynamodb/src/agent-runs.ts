@@ -1,7 +1,7 @@
 import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { ulid } from "ulid";
 import { docClient, tableName } from "./client.js";
-import type { AgentRun, AgentRunRole, AgentRunStatus } from "@autoforge/db";
+import type { AgentRun, AgentRunRole, AgentRunStatus } from "@omakase/db";
 
 const TABLE = () => tableName("agent-runs");
 

@@ -20,7 +20,7 @@ import {
 import {
   updateAgentStatus as dbUpdateAgentStatus,
   completeAgentRun as dbCompleteAgentRun,
-} from "@autoforge/dynamodb";
+} from "@omakase/dynamodb";
 
 // ---------------------------------------------------------------------------
 // Types

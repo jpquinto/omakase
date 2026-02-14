@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
-import type { Project, Feature, AgentRun } from "@autoforge/db";
+import type { Project, Feature, AgentRun } from "@omakase/db";
 
 interface UseQueryResult<T> {
   data: T | undefined;

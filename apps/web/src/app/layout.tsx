@@ -29,7 +29,7 @@ const notoSerifJP = Noto_Serif_JP({
 });
 
 export const metadata: Metadata = {
-  title: "AutoForge",
+  title: "Omakase",
   description: "Autonomous development platform",
 };
 

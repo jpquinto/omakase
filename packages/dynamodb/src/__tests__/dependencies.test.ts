@@ -1,5 +1,5 @@
 import { describe, it, expect, mock, beforeEach } from "bun:test";
-import type { Feature } from "@autoforge/db";
+import type { Feature } from "@omakase/db";
 
 // ---------------------------------------------------------------------------
 // Mock setup

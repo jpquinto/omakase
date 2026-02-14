@@ -15,7 +15,7 @@ The system SHALL allow users to connect their Linear workspace via OAuth, storin
 The system SHALL sync Linear issues (filtered by label or project) into the feature backlog as features in Convex.
 
 #### Scenario: New Linear issue creates a feature
-- **WHEN** a Linear issue is created with the configured label (e.g., "autoforge")
+- **WHEN** a Linear issue is created with the configured label (e.g., "omakase")
 - **THEN** a webhook fires and a corresponding feature is created in Convex with the issue title, description, priority, and Linear issue ID
 
 #### Scenario: Linear issue update syncs to feature

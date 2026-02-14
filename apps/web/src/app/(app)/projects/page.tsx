@@ -57,10 +57,10 @@ export default function ProjectsPage() {
     <div>
       {/* Page header */}
       <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-3xl font-black tracking-tight text-neo-foreground">
+        <h1 className="font-serif text-2xl font-semibold text-oma-text">
           Projects
         </h1>
-        <button className="neo-btn rounded-none bg-neo-primary px-5 py-2.5 text-sm text-neo-primary-foreground">
+        <button className="rounded-oma bg-gradient-to-r from-oma-primary to-oma-primary-dim px-5 py-2.5 text-sm font-medium text-white shadow-oma-sm transition-all duration-200 hover:shadow-oma-glow-primary hover:brightness-110">
           + New Project
         </button>
       </div>
@@ -79,47 +79,48 @@ export default function ProjectsPage() {
             <Link
               key={project.id}
               href={`/projects/${project.id}`}
-              className="neo-card block rounded-none p-6 transition-transform hover:-translate-y-0.5 hover:shadow-[5px_5px_0px_#000000]"
+              className="glass glass-edge glass-hover block rounded-oma-lg p-6 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-oma-glow-primary hover:scale-[1.01]"
             >
               {/* Card header */}
               <div className="mb-4 flex items-start justify-between">
-                <h2 className="text-lg font-black tracking-tight text-neo-foreground">
+                <h2 className="text-lg font-semibold tracking-tight text-oma-text">
                   {project.name}
                 </h2>
 
                 {/* Active agents badge */}
                 {project.activeAgents > 0 ? (
-                  <span className="neo-border inline-flex items-center gap-1 rounded-none bg-neo-progress px-2 py-0.5 text-xs font-bold text-neo-foreground">
-                    <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-neo-foreground" />
-                    {project.activeAgents} agent{project.activeAgents > 1 ? "s" : ""}
+                  <span className="glass-primary inline-flex items-center gap-1.5 rounded-oma-full px-2.5 py-1 text-xs font-medium text-oma-primary">
+                    <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-oma-progress" />
+                    {project.activeAgents} agent
+                    {project.activeAgents > 1 ? "s" : ""}
                   </span>
                 ) : (
-                  <span className="neo-border inline-flex items-center rounded-none bg-neo-muted px-2 py-0.5 text-xs font-bold text-neo-muted-foreground">
+                  <span className="glass-sm inline-flex items-center rounded-oma-full px-2.5 py-1 text-xs font-medium text-oma-text-subtle">
                     Idle
                   </span>
                 )}
               </div>
 
               {/* Description */}
-              <p className="mb-5 text-sm text-neo-muted-foreground leading-relaxed">
+              <p className="mb-5 text-sm leading-relaxed text-oma-text-muted">
                 {project.description}
               </p>
 
               {/* Progress section */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span className="text-neo-foreground">
+                <div className="flex items-center justify-between text-xs font-medium">
+                  <span className="text-oma-text">
                     {project.featuresPassing}/{project.featuresTotal} passing
                   </span>
-                  <span className="text-neo-muted-foreground">
+                  <span className="text-oma-text-muted">
                     {progressPercent}%
                   </span>
                 </div>
 
                 {/* Progress bar */}
-                <div className="neo-border h-3 w-full overflow-hidden rounded-none bg-neo-muted">
+                <div className="h-2 w-full overflow-hidden rounded-oma-full bg-oma-bg-surface">
                   <div
-                    className="h-full bg-neo-done transition-all duration-500 ease-out"
+                    className="h-full rounded-oma-full bg-gradient-to-r from-oma-jade to-oma-done transition-all duration-500 ease-out"
                     style={{ width: `${progressPercent}%` }}
                   />
                 </div>

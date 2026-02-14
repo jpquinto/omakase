@@ -1,21 +1,21 @@
 ---
-name: gsd-to-autoforge-spec
+name: gsd-to-omakase-spec
 description: |
-  Convert GSD codebase mapping to AutoForge app_spec.txt. This skill should be used when
-  the user has run /gsd:map-codebase and wants to use AutoForge on an existing project.
-  Triggers: "convert to autoforge", "gsd to spec", "create app_spec from codebase",
-  "use autoforge on existing project", after /gsd:map-codebase completion.
+  Convert GSD codebase mapping to Omakase app_spec.txt. This skill should be used when
+  the user has run /gsd:map-codebase and wants to use Omakase on an existing project.
+  Triggers: "convert to omakase", "gsd to spec", "create app_spec from codebase",
+  "use omakase on existing project", after /gsd:map-codebase completion.
 ---
 
-# GSD to AutoForge Spec Converter
+# GSD to Omakase Spec Converter
 
-Converts `.planning/codebase/*.md` (GSD mapping output) to `.autoforge/prompts/app_spec.txt` (AutoForge format).
+Converts `.planning/codebase/*.md` (GSD mapping output) to `.omakase/prompts/app_spec.txt` (Omakase format).
 
 ## When to Use
 
 - After running `/gsd:map-codebase` on an existing project
-- When onboarding an existing codebase to AutoForge
-- User wants AutoForge to continue development on existing code
+- When onboarding an existing codebase to Omakase
+- User wants Omakase to continue development on existing code
 
 ## Prerequisites
 
@@ -84,12 +84,12 @@ Extract:
 
 Create `prompts/` directory:
 ```bash
-mkdir -p .autoforge/prompts
+mkdir -p .omakase/prompts
 ```
 
-**Mapping GSD Documents to AutoForge Spec:**
+**Mapping GSD Documents to Omakase Spec:**
 
-| GSD Source | AutoForge Target |
+| GSD Source | Omakase Target |
 |------------|------------------|
 | STACK.md Languages | `<technology_stack>` |
 | STACK.md Frameworks | `<frontend>`, `<backend>` |
@@ -114,7 +114,7 @@ mkdir -p .autoforge/prompts
 **Write the spec file** using the XML format from [references/app-spec-format.md](references/app-spec-format.md):
 
 ```bash
-cat > .autoforge/prompts/app_spec.txt << 'EOF'
+cat > .omakase/prompts/app_spec.txt << 'EOF'
 <project_specification>
   <project_name>{from package.json or directory}</project_name>
 
@@ -173,9 +173,9 @@ EOF
 ### Step 5: Verify Generated Spec
 
 ```bash
-head -100 .autoforge/prompts/app_spec.txt
+head -100 .omakase/prompts/app_spec.txt
 echo "---"
-grep -c "User can\|System\|API\|Feature" .autoforge/prompts/app_spec.txt || echo "0"
+grep -c "User can\|System\|API\|Feature" .omakase/prompts/app_spec.txt || echo "0"
 ```
 
 **Validation checklist:**
@@ -194,15 +194,15 @@ Output:
 app_spec.txt generated from GSD codebase mapping.
 
 Source: .planning/codebase/*.md
-Output: .autoforge/prompts/app_spec.txt
+Output: .omakase/prompts/app_spec.txt
 
-Next: Start AutoForge
+Next: Start Omakase
 
   cd {project_dir}
-  python ~/projects/autoforge/start.py
+  python ~/projects/omakase/start.py
 
 Or via UI:
-  ~/projects/autoforge/start_ui.sh
+  ~/projects/omakase/start_ui.sh
 
 The Initializer will create features.db from this spec.
 ```

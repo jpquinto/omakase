@@ -1,7 +1,7 @@
 import { BatchWriteCommand, GetCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { ulid } from "ulid";
 import { docClient, tableName } from "./client.js";
-import type { Feature } from "@autoforge/db";
+import type { Feature } from "@omakase/db";
 
 const TABLE = () => tableName("features");
 

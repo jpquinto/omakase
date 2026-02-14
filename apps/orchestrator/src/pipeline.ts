@@ -21,7 +21,7 @@ import {
   markFeatureFailing as dbMarkFeatureFailing,
   createAgentRun as dbCreateAgentRun,
   completeAgentRun as dbCompleteAgentRun,
-} from "@autoforge/dynamodb";
+} from "@omakase/dynamodb";
 
 import { startAgent, stopAgent, releaseFeature, type AgentRole } from "./ecs-agent.js";
 import { AgentMonitor, type AgentCompletionResult } from "./agent-monitor.js";

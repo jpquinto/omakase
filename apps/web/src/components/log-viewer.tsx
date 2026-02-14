@@ -6,8 +6,8 @@ import { useState, useRef, useEffect } from "react";
 // Log Viewer Component
 //
 // Terminal-style log viewer with a dark background, monospace font, agent
-// filtering, and auto-scroll behavior. Designed to mirror the logging
-// experience from the existing AutoForge UI.
+// filtering, and auto-scroll behavior. Uses the Omakase liquid glass design
+// system with frosted glass filter bar and deep terminal area.
 // ---------------------------------------------------------------------------
 
 interface LogEntry {
@@ -46,26 +46,26 @@ const AGENT_FILTERS = [
   { index: 4, label: "Hoot" },
 ];
 
-/** Maps log level to text color for terminal display */
+/** Maps log level to an Omakase text color for terminal display */
 function levelColor(level: LogEntry["level"]): string {
   const colors: Record<LogEntry["level"], string> = {
-    info: "text-gray-300",
-    warn: "text-yellow-400",
-    error: "text-red-400",
-    success: "text-green-400",
+    info: "text-oma-text-muted",
+    warn: "text-oma-warning",
+    error: "text-oma-error",
+    success: "text-oma-done",
   };
   return colors[level];
 }
 
-/** Maps agent index to a color for the agent tag */
+/** Maps agent index to an Omakase accent color for the agent tag */
 function agentColor(index: number): string {
   const colors: Record<number, string> = {
-    1: "text-cyan-400",
-    2: "text-purple-400",
-    3: "text-orange-400",
-    4: "text-emerald-400",
+    1: "text-oma-info",
+    2: "text-oma-indigo",
+    3: "text-oma-gold",
+    4: "text-oma-jade",
   };
-  return colors[index] ?? "text-gray-400";
+  return colors[index] ?? "text-oma-text-subtle";
 }
 
 export function LogViewer() {
@@ -85,20 +85,20 @@ export function LogViewer() {
   }, [filteredLogs.length, activeFilter]);
 
   return (
-    <div className="neo-card flex flex-col overflow-hidden rounded-none">
+    <div className="glass flex flex-col overflow-hidden rounded-oma-lg">
       {/* Filter bar */}
-      <div className="flex items-center gap-2 border-b-2 border-neo-border bg-neo-muted px-4 py-2.5">
-        <span className="text-xs font-bold uppercase tracking-wider text-neo-muted-foreground">
+      <div className="flex items-center gap-2 border-b border-oma-glass-border bg-oma-bg-surface/50 px-4 py-2.5">
+        <span className="text-xs font-medium uppercase tracking-wider text-oma-text-subtle">
           Filter:
         </span>
         {AGENT_FILTERS.map((filter) => (
           <button
             key={filter.index}
             onClick={() => setActiveFilter(filter.index)}
-            className={`neo-border rounded-none px-2.5 py-1 text-xs font-bold transition-colors ${
+            className={`px-2.5 py-1 text-xs font-medium transition-colors ${
               activeFilter === filter.index
-                ? "bg-neo-foreground text-white"
-                : "bg-white text-neo-foreground hover:bg-neo-muted"
+                ? "glass-primary rounded-oma-sm text-oma-primary"
+                : "glass-sm rounded-oma-sm text-oma-text-muted hover:text-oma-text"
             }`}
           >
             {filter.label}
@@ -109,12 +109,12 @@ export function LogViewer() {
       {/* Terminal log area */}
       <div
         ref={scrollRef}
-        className="h-96 overflow-y-auto bg-[#0a0a0a] px-4 py-3 font-mono text-[13px] leading-relaxed"
+        className="h-96 overflow-y-auto rounded-b-oma-lg bg-oma-bg-deep px-4 py-3 font-mono text-[13px] leading-relaxed"
       >
         {filteredLogs.map((log) => (
           <div key={log.id} className="flex gap-2 py-0.5">
             {/* Timestamp */}
-            <span className="shrink-0 text-gray-600">{log.timestamp}</span>
+            <span className="shrink-0 text-oma-text-faint">{log.timestamp}</span>
 
             {/* Agent tag */}
             <span className={`shrink-0 font-bold ${agentColor(log.agentIndex)}`}>
@@ -128,7 +128,7 @@ export function LogViewer() {
 
         {filteredLogs.length === 0 && (
           <div className="flex h-full items-center justify-center">
-            <span className="text-gray-600">No log entries for this filter.</span>
+            <span className="text-oma-text-faint">No log entries for this filter.</span>
           </div>
         )}
       </div>

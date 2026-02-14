@@ -9,13 +9,14 @@ import { AgentMissionControl } from "@/components/agent-mission-control";
 import { LogViewer } from "@/components/log-viewer";
 import { CelebrationOverlay } from "@/components/celebration-overlay";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
 // Project Detail Page
 //
 // Tabbed layout showing all aspects of a single project: Kanban board,
 // dependency graph, agent mission control, logs, and settings. Uses the
-// neobrutalism design system with bold tab borders and status colors.
+// Omakase liquid glass design system with frosted surfaces and glow accents.
 //
 // Mock data will be replaced with orchestrator API hooks once wired:
 //   import { useProject, useProjectFeatures } from "@/hooks/use-api";
@@ -79,20 +80,23 @@ export default function ProjectDetailPage() {
 
       {/* Breadcrumb and project header */}
       <div>
-        <div className="mb-2 flex items-center gap-2 text-xs font-bold text-neo-muted-foreground">
-          <Link href="/projects" className="hover:text-neo-foreground">
+        <div className="mb-2 flex items-center gap-2 text-xs font-medium text-oma-text-subtle">
+          <Link
+            href="/projects"
+            className="transition-colors hover:text-oma-primary"
+          >
             Projects
           </Link>
           <span>/</span>
-          <span className="text-neo-foreground">{MOCK_PROJECT.name}</span>
+          <span className="text-oma-text">{MOCK_PROJECT.name}</span>
         </div>
 
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-black tracking-tight text-neo-foreground">
+            <h1 className="font-serif text-2xl font-semibold text-oma-text">
               {MOCK_PROJECT.name}
             </h1>
-            <p className="mt-1 text-sm text-neo-muted-foreground">
+            <p className="mt-1 text-sm text-oma-text-muted">
               {MOCK_PROJECT.description}
             </p>
           </div>
@@ -100,30 +104,31 @@ export default function ProjectDetailPage() {
           {/* Stats badges */}
           <div className="flex items-center gap-3">
             {/* Progress badge */}
-            <div className="neo-card flex items-center gap-2 rounded-none px-3 py-2">
-              <div className="neo-border h-2.5 w-20 overflow-hidden rounded-none bg-neo-muted">
+            <div className="glass-sm flex items-center gap-2.5 rounded-oma px-3 py-2">
+              <div className="h-1.5 w-20 overflow-hidden rounded-oma-full bg-oma-bg-surface">
                 <div
-                  className="h-full bg-neo-done"
+                  className="h-full rounded-oma-full bg-oma-done transition-all duration-500 ease-out"
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
-              <span className="text-xs font-black text-neo-foreground">
+              <span className="text-xs font-medium text-oma-text">
                 {MOCK_PROJECT.featuresPassing}/{MOCK_PROJECT.featuresTotal}
               </span>
             </div>
 
             {/* Active agents badge */}
-            <div className="neo-card flex items-center gap-1.5 rounded-none bg-neo-progress px-3 py-2">
-              <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-neo-foreground" />
-              <span className="text-xs font-black text-neo-foreground">
-                {MOCK_PROJECT.activeAgents} agent{MOCK_PROJECT.activeAgents !== 1 ? "s" : ""}
+            <div className="glass-primary flex items-center gap-1.5 rounded-oma px-3 py-2">
+              <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-oma-progress" />
+              <span className="text-xs font-medium text-oma-primary">
+                {MOCK_PROJECT.activeAgents} agent
+                {MOCK_PROJECT.activeAgents !== 1 ? "s" : ""}
               </span>
             </div>
 
             {/* Celebrate button (for demo) */}
             <button
               onClick={() => setShowCelebration(true)}
-              className="neo-btn rounded-none bg-neo-accent px-3 py-2 text-xs text-neo-foreground"
+              className="rounded-oma bg-gradient-to-r from-oma-gold to-oma-gold-soft px-3 py-2 text-xs font-medium text-white shadow-oma-sm transition-all duration-200 hover:shadow-oma-glow-gold hover:brightness-110"
             >
               Celebrate
             </button>
@@ -132,23 +137,24 @@ export default function ProjectDetailPage() {
       </div>
 
       {/* Tab bar */}
-      <div className="neo-border flex overflow-hidden bg-neo-card">
+      <div className="glass-sm flex overflow-hidden rounded-oma-lg">
         {TABS.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`relative border-r-2 border-neo-border px-6 py-3 text-sm font-black uppercase tracking-wider transition-colors last:border-r-0 ${
+              className={cn(
+                "relative border-r border-oma-glass-border px-6 py-3 text-sm font-medium tracking-wide transition-all duration-200 last:border-r-0",
                 isActive
-                  ? "bg-neo-foreground text-white"
-                  : "bg-neo-card text-neo-foreground hover:bg-neo-muted"
-              }`}
+                  ? "glass-primary text-oma-primary"
+                  : "text-oma-text-muted hover:bg-white/[0.04] hover:text-oma-text",
+              )}
             >
               {tab.label}
-              {/* Active tab bottom indicator */}
+              {/* Active tab bottom indicator: gradient accent line */}
               {isActive && (
-                <span className="absolute bottom-0 left-0 h-[3px] w-full bg-neo-primary" />
+                <span className="absolute bottom-0 left-0 h-[2px] w-full bg-gradient-to-r from-oma-primary to-oma-primary-soft" />
               )}
             </button>
           );
@@ -156,7 +162,7 @@ export default function ProjectDetailPage() {
       </div>
 
       {/* Tab content */}
-      <div className="animate-[fade-in_0.15s_ease-out]">
+      <div className="animate-oma-fade-up">
         {activeTab === "kanban" && <KanbanBoard />}
         {activeTab === "graph" && <DependencyGraph />}
         {activeTab === "agents" && <AgentMissionControl />}
@@ -172,15 +178,17 @@ export default function ProjectDetailPage() {
 // ---------------------------------------------------------------------------
 
 function SettingsTab({ projectId }: { projectId: string }) {
+  const [yoloEnabled, setYoloEnabled] = useState(false);
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <h2 className="text-lg font-black tracking-tight text-neo-foreground">
+      <h2 className="font-serif text-lg font-semibold text-oma-text">
         Project Settings
       </h2>
 
       {/* General settings */}
-      <div className="neo-card rounded-none p-6">
-        <h3 className="mb-4 text-sm font-black uppercase tracking-wider text-neo-foreground">
+      <div className="glass rounded-oma-lg p-6">
+        <h3 className="mb-4 text-xs font-medium uppercase tracking-wider text-oma-text-subtle">
           General
         </h3>
 
@@ -189,7 +197,7 @@ function SettingsTab({ projectId }: { projectId: string }) {
           <div>
             <label
               htmlFor="project-name"
-              className="mb-1 block text-xs font-bold text-neo-muted-foreground"
+              className="mb-1.5 block text-xs font-medium text-oma-text-muted"
             >
               Project Name
             </label>
@@ -197,7 +205,7 @@ function SettingsTab({ projectId }: { projectId: string }) {
               id="project-name"
               type="text"
               defaultValue={MOCK_PROJECT.name}
-              className="neo-border w-full rounded-none bg-white px-3 py-2 text-sm font-semibold text-neo-foreground outline-none focus:shadow-[3px_3px_0px_#6366f1]"
+              className="glass-sm w-full rounded-oma border border-oma-glass-border bg-transparent px-3 py-2.5 text-sm text-oma-text outline-none transition-colors focus:border-oma-primary focus:ring-1 focus:ring-oma-primary/30"
             />
           </div>
 
@@ -205,7 +213,7 @@ function SettingsTab({ projectId }: { projectId: string }) {
           <div>
             <label
               htmlFor="project-desc"
-              className="mb-1 block text-xs font-bold text-neo-muted-foreground"
+              className="mb-1.5 block text-xs font-medium text-oma-text-muted"
             >
               Description
             </label>
@@ -213,15 +221,15 @@ function SettingsTab({ projectId }: { projectId: string }) {
               id="project-desc"
               rows={3}
               defaultValue={MOCK_PROJECT.description}
-              className="neo-border w-full resize-none rounded-none bg-white px-3 py-2 text-sm font-semibold text-neo-foreground outline-none focus:shadow-[3px_3px_0px_#6366f1]"
+              className="glass-sm w-full resize-none rounded-oma border border-oma-glass-border bg-transparent px-3 py-2.5 text-sm text-oma-text outline-none transition-colors focus:border-oma-primary focus:ring-1 focus:ring-oma-primary/30"
             />
           </div>
         </div>
       </div>
 
       {/* Agent settings */}
-      <div className="neo-card rounded-none p-6">
-        <h3 className="mb-4 text-sm font-black uppercase tracking-wider text-neo-foreground">
+      <div className="glass rounded-oma-lg p-6">
+        <h3 className="mb-4 text-xs font-medium uppercase tracking-wider text-oma-text-subtle">
           Agent Configuration
         </h3>
 
@@ -230,7 +238,7 @@ function SettingsTab({ projectId }: { projectId: string }) {
           <div>
             <label
               htmlFor="max-concurrency"
-              className="mb-1 block text-xs font-bold text-neo-muted-foreground"
+              className="mb-1.5 block text-xs font-medium text-oma-text-muted"
             >
               Max Concurrency
             </label>
@@ -240,48 +248,68 @@ function SettingsTab({ projectId }: { projectId: string }) {
               min={1}
               max={5}
               defaultValue={3}
-              className="neo-border w-24 rounded-none bg-white px-3 py-2 text-sm font-semibold text-neo-foreground outline-none focus:shadow-[3px_3px_0px_#6366f1]"
+              className="glass-sm w-24 rounded-oma border border-oma-glass-border bg-transparent px-3 py-2.5 text-sm text-oma-text outline-none transition-colors focus:border-oma-primary focus:ring-1 focus:ring-oma-primary/30"
             />
-            <p className="mt-1 text-[11px] text-neo-muted-foreground">
+            <p className="mt-1.5 text-[11px] text-oma-text-muted">
               Maximum number of concurrent coding agents (1-5)
             </p>
           </div>
 
-          {/* YOLO mode */}
+          {/* YOLO mode toggle */}
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-black text-neo-foreground">YOLO Mode</p>
-              <p className="text-[11px] text-neo-muted-foreground">
+              <p className="text-sm font-medium text-oma-text">YOLO Mode</p>
+              <p className="text-[11px] text-oma-text-muted">
                 Skip testing for rapid prototyping
               </p>
             </div>
-            <div className="neo-border flex h-6 w-11 cursor-pointer items-center rounded-none bg-neo-muted px-0.5">
-              <div className="h-4 w-4 rounded-none bg-neo-foreground transition-transform" />
-            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={yoloEnabled}
+              onClick={() => setYoloEnabled(!yoloEnabled)}
+              className={cn(
+                "relative flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-oma-full border border-oma-glass-border transition-colors duration-200",
+                yoloEnabled
+                  ? "bg-oma-primary/20 border-oma-primary/40"
+                  : "bg-oma-bg-surface",
+              )}
+            >
+              <span
+                className={cn(
+                  "pointer-events-none block h-4 w-4 rounded-full shadow-oma-sm transition-transform duration-200",
+                  yoloEnabled
+                    ? "translate-x-[22px] bg-oma-primary"
+                    : "translate-x-[3px] bg-oma-text-subtle",
+                )}
+              />
+            </button>
           </div>
         </div>
       </div>
 
       {/* Danger zone */}
-      <div className="neo-card rounded-none border-neo-fail p-6" style={{ borderColor: "#f87171" }}>
-        <h3 className="mb-4 text-sm font-black uppercase tracking-wider text-neo-fail">
+      <div className="glass rounded-oma-lg border border-oma-secondary/30 p-6">
+        <h3 className="mb-4 text-xs font-medium uppercase tracking-wider text-oma-secondary">
           Danger Zone
         </h3>
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-bold text-neo-foreground">Archive Project</p>
-            <p className="text-[11px] text-neo-muted-foreground">
+            <p className="text-sm font-medium text-oma-text">
+              Archive Project
+            </p>
+            <p className="text-[11px] text-oma-text-muted">
               Archive this project and stop all agents
             </p>
           </div>
-          <button className="neo-btn rounded-none bg-neo-fail px-4 py-2 text-xs text-white">
+          <button className="rounded-oma bg-oma-secondary px-4 py-2 text-xs font-medium text-white transition-colors duration-200 hover:bg-oma-secondary-dim">
             Archive
           </button>
         </div>
       </div>
 
       {/* Project ID for reference */}
-      <p className="text-[10px] font-bold text-neo-muted-foreground">
+      <p className="text-[10px] font-medium text-oma-text-faint">
         Project ID: {projectId}
       </p>
     </div>

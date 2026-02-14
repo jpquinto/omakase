@@ -1,6 +1,6 @@
 import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, tableName } from "./client.js";
-import type { Feature } from "@autoforge/db";
+import type { Feature } from "@omakase/db";
 import { listFeatures } from "./features.js";
 
 const TABLE = () => tableName("features");

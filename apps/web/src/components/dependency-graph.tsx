@@ -8,7 +8,8 @@ import dagre from "dagre";
 //
 // Uses dagre for automatic graph layout and renders an SVG-based directed
 // graph of features. Nodes are colored by status and edges represent
-// dependency relationships.
+// dependency relationships. Styled with the Omakase liquid glass design
+// system for glass surfaces and soft color accents.
 // ---------------------------------------------------------------------------
 
 interface GraphFeature {
@@ -31,13 +32,13 @@ const MOCK_GRAPH_FEATURES: GraphFeature[] = [
   { id: "f10", name: "Admin Dashboard", status: "pending", dependencies: ["f1", "f2", "f3", "f7"] },
 ];
 
-/** Maps feature status to fill color */
+/** Maps feature status to fill color using Omakase status tokens */
 function statusColor(status: GraphFeature["status"]): string {
   const colors: Record<GraphFeature["status"], string> = {
-    pending: "#fbbf24",    // neo-pending
-    in_progress: "#22d3ee", // neo-progress
-    passing: "#4ade80",    // neo-done
-    failing: "#f87171",    // neo-fail
+    pending: "#fbbf24",     // oma-pending
+    in_progress: "#38bdf8", // oma-progress
+    passing: "#4ade80",     // oma-done
+    failing: "#f87171",     // oma-fail
   };
   return colors[status];
 }
@@ -168,7 +169,7 @@ export function DependencyGraph() {
   if (!layout) {
     return (
       <div className="flex h-96 items-center justify-center">
-        <span className="text-sm font-bold text-neo-muted-foreground">
+        <span className="text-sm font-medium text-oma-text-subtle">
           Computing layout...
         </span>
       </div>
@@ -176,16 +177,16 @@ export function DependencyGraph() {
   }
 
   return (
-    <div ref={containerRef} className="neo-card overflow-auto rounded-none p-2">
+    <div ref={containerRef} className="glass overflow-auto rounded-oma-lg p-4">
       {/* Legend */}
       <div className="mb-3 flex items-center gap-4 px-2">
         {(["pending", "in_progress", "passing", "failing"] as const).map((status) => (
           <div key={status} className="flex items-center gap-1.5">
             <div
-              className="neo-border h-3 w-3 rounded-none"
+              className="h-3 w-3 rounded-oma-full"
               style={{ backgroundColor: statusColor(status) }}
             />
-            <span className="text-[11px] font-bold text-neo-foreground">
+            <span className="text-[11px] font-medium text-oma-text-muted">
               {statusLabel(status)}
             </span>
           </div>
@@ -209,7 +210,7 @@ export function DependencyGraph() {
             refY="3.5"
             orient="auto"
           >
-            <polygon points="0 0, 10 3.5, 0 7" fill="#000" />
+            <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
           </marker>
         </defs>
 
@@ -224,7 +225,7 @@ export function DependencyGraph() {
               key={`edge-${i}`}
               d={pointsToPath(edge.points)}
               fill="none"
-              stroke={isHighlighted ? "#6366f1" : "#000"}
+              stroke={isHighlighted ? "#f472b6" : "rgba(255,255,255,0.15)"}
               strokeWidth={isHighlighted ? 2.5 : 1.5}
               markerEnd="url(#arrowhead)"
               opacity={hoveredNode === null || isHighlighted ? 1 : 0.2}
@@ -236,7 +237,7 @@ export function DependencyGraph() {
         {/* Nodes */}
         {layout.nodes.map((node) => {
           const isHovered = hoveredNode === node.id;
-          const rx = 8; // rounded corners
+          const rx = 12; // rounded-oma corners
 
           return (
             <g
@@ -256,14 +257,14 @@ export function DependencyGraph() {
                   : 0.35
               }
             >
-              {/* Hard shadow */}
+              {/* Subtle soft shadow */}
               <rect
-                x={node.x - node.width / 2 + 3}
-                y={node.y - node.height / 2 + 3}
+                x={node.x - node.width / 2 + 2}
+                y={node.y - node.height / 2 + 2}
                 width={node.width}
                 height={node.height}
                 rx={rx}
-                fill="#000"
+                fill="rgba(0,0,0,0.15)"
               />
               {/* Node body */}
               <rect
@@ -273,8 +274,8 @@ export function DependencyGraph() {
                 height={node.height}
                 rx={rx}
                 fill={statusColor(node.status)}
-                stroke="#000"
-                strokeWidth={2}
+                stroke="rgba(255,255,255,0.1)"
+                strokeWidth={1}
               />
               {/* Node label */}
               <text
@@ -283,7 +284,8 @@ export function DependencyGraph() {
                 textAnchor="middle"
                 dominantBaseline="central"
                 className="text-xs font-bold"
-                fill="#0a0a0a"
+                fill="#ffffff"
+                style={{ textShadow: "0 1px 3px rgba(0,0,0,0.4)" }}
               >
                 {node.name}
               </text>

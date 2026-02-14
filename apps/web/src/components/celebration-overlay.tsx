@@ -7,8 +7,8 @@ import { useEffect, useState, useCallback } from "react";
 //
 // Renders a fullscreen confetti animation using pure CSS keyframes. No
 // external libraries required. The overlay auto-hides after 5 seconds.
-// Confetti pieces are randomly positioned and colored using the design
-// system's status/brand colors.
+// Confetti pieces are randomly positioned and colored using the Omakase
+// design system's brand and accent colors.
 // ---------------------------------------------------------------------------
 
 interface CelebrationOverlayProps {
@@ -18,16 +18,16 @@ interface CelebrationOverlayProps {
   onComplete?: () => void;
 }
 
-/** Colors used for confetti pieces, drawn from the design system */
+/** Colors used for confetti pieces, drawn from the Omakase design system */
 const CONFETTI_COLORS = [
-  "#fbbf24", // neo-pending (yellow)
-  "#22d3ee", // neo-progress (cyan)
-  "#4ade80", // neo-done (green)
-  "#6366f1", // neo-primary (indigo)
-  "#f59e0b", // neo-accent (amber)
-  "#f87171", // neo-fail (red)
-  "#a78bfa", // violet
-  "#fb923c", // orange
+  "#f472b6", // oma-primary (sakura pink)
+  "#f87171", // oma-secondary (beni red)
+  "#fbbf24", // oma-gold
+  "#6ee7b7", // oma-jade
+  "#818cf8", // oma-indigo
+  "#38bdf8", // oma-info (sky blue)
+  "#f9a8d4", // oma-primary-soft
+  "#fca5a5", // oma-secondary-soft
 ];
 
 interface ConfettiPiece {

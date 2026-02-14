@@ -1,5 +1,5 @@
 {
-  "name": "@autoforge/dynamodb",
+  "name": "@omakase/dynamodb",
   "version": "0.1.0",
   "private": true,
   "type": "module",

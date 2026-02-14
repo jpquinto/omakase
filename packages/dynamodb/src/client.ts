@@ -11,7 +11,7 @@ export const docClient = DynamoDBDocumentClient.from(rawClient, {
   },
 });
 
-const TABLE_PREFIX = process.env.DYNAMODB_TABLE_PREFIX ?? "autoforge-";
+const TABLE_PREFIX = process.env.DYNAMODB_TABLE_PREFIX ?? "omakase-";
 
 export function tableName(name: string): string {
   return `${TABLE_PREFIX}${name}`;

@@ -4,8 +4,8 @@
 // Kanban Board Component
 //
 // Renders features across four status columns: Pending, In Progress, Passing,
-// and Failing. Each column has a distinct color header consistent with the
-// neobrutalism design tokens defined in globals.css.
+// and Failing. Each column uses a glass surface with a colored left-border
+// accent. Cards use the Omakase liquid glass design system.
 // ---------------------------------------------------------------------------
 
 interface Feature {
@@ -33,15 +33,14 @@ const MOCK_FEATURES: Feature[] = [
 interface ColumnConfig {
   status: Feature["status"];
   label: string;
-  headerBg: string;
-  dotColor: string;
+  borderColor: string;
 }
 
 const COLUMNS: ColumnConfig[] = [
-  { status: "pending", label: "Pending", headerBg: "bg-neo-pending", dotColor: "bg-neo-pending" },
-  { status: "in_progress", label: "In Progress", headerBg: "bg-neo-progress", dotColor: "bg-neo-progress" },
-  { status: "passing", label: "Passing", headerBg: "bg-neo-done", dotColor: "bg-neo-done" },
-  { status: "failing", label: "Failing", headerBg: "bg-neo-fail", dotColor: "bg-neo-fail" },
+  { status: "pending", label: "Pending", borderColor: "border-oma-pending" },
+  { status: "in_progress", label: "In Progress", borderColor: "border-oma-progress" },
+  { status: "passing", label: "Passing", borderColor: "border-oma-done" },
+  { status: "failing", label: "Failing", borderColor: "border-oma-fail" },
 ];
 
 /** Maps priority numbers (1-5) to display labels */
@@ -56,16 +55,16 @@ function priorityLabel(priority: number): string {
   return labels[priority] ?? `P${priority}`;
 }
 
-/** Maps priority numbers to background color classes */
+/** Maps priority numbers to Omakase color classes */
 function priorityColor(priority: number): string {
   const colors: Record<number, string> = {
-    1: "bg-neo-fail text-white",
-    2: "bg-neo-accent text-neo-foreground",
-    3: "bg-neo-progress text-neo-foreground",
-    4: "bg-neo-muted text-neo-foreground",
-    5: "bg-neo-muted text-neo-muted-foreground",
+    1: "bg-oma-fail/20 text-oma-fail",
+    2: "bg-oma-secondary/20 text-oma-secondary",
+    3: "bg-oma-progress/20 text-oma-progress",
+    4: "bg-oma-bg-surface text-oma-text-muted",
+    5: "bg-oma-bg-surface text-oma-text-faint",
   };
-  return colors[priority] ?? "bg-neo-muted text-neo-foreground";
+  return colors[priority] ?? "bg-oma-bg-surface text-oma-text-muted";
 }
 
 export function KanbanBoard() {
@@ -75,14 +74,14 @@ export function KanbanBoard() {
         const features = MOCK_FEATURES.filter((f) => f.status === column.status);
         return (
           <div key={column.status} className="flex flex-col">
-            {/* Column header */}
+            {/* Column header — glass surface with colored left accent */}
             <div
-              className={`neo-border mb-3 flex items-center justify-between px-4 py-2.5 ${column.headerBg}`}
+              className={`glass-sm rounded-oma mb-3 flex items-center justify-between border-l-4 px-4 py-2.5 ${column.borderColor}`}
             >
-              <span className="text-sm font-black uppercase tracking-wider text-neo-foreground">
+              <span className="text-sm font-semibold uppercase tracking-wider text-oma-text">
                 {column.label}
               </span>
-              <span className="neo-border inline-flex h-6 w-6 items-center justify-center bg-white text-xs font-bold text-neo-foreground">
+              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-oma-bg-surface text-xs font-medium text-oma-text-muted">
                 {features.length}
               </span>
             </div>
@@ -92,10 +91,10 @@ export function KanbanBoard() {
               {features.map((feature) => (
                 <div
                   key={feature.id}
-                  className="neo-card rounded-none p-4 transition-transform hover:-translate-y-0.5"
+                  className="glass rounded-oma glass-hover p-4 transition-all duration-200 hover:scale-[1.02]"
                 >
                   {/* Feature name */}
-                  <h3 className="mb-2 text-sm font-black leading-tight text-neo-foreground">
+                  <h3 className="mb-2 text-sm font-semibold leading-tight text-oma-text">
                     {feature.name}
                   </h3>
 
@@ -103,20 +102,20 @@ export function KanbanBoard() {
                   <div className="mb-2 flex flex-wrap items-center gap-1.5">
                     {/* Priority badge */}
                     <span
-                      className={`neo-border inline-block rounded-none px-1.5 py-0.5 text-[10px] font-bold uppercase ${priorityColor(feature.priority)}`}
+                      className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${priorityColor(feature.priority)}`}
                     >
                       {priorityLabel(feature.priority)}
                     </span>
 
                     {/* Category tag */}
-                    <span className="neo-border inline-block rounded-none bg-neo-primary px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
+                    <span className="inline-block rounded-full bg-oma-primary/15 px-2 py-0.5 text-[10px] font-medium text-oma-primary">
                       {feature.category}
                     </span>
                   </div>
 
                   {/* Dependency count */}
                   {feature.dependencyCount > 0 && (
-                    <p className="text-[11px] font-semibold text-neo-muted-foreground">
+                    <p className="text-[11px] font-medium text-oma-text-subtle">
                       {feature.dependencyCount} dependenc{feature.dependencyCount === 1 ? "y" : "ies"}
                     </p>
                   )}
@@ -125,8 +124,8 @@ export function KanbanBoard() {
 
               {/* Empty state */}
               {features.length === 0 && (
-                <div className="neo-border flex h-24 items-center justify-center border-dashed bg-neo-muted">
-                  <span className="text-xs font-bold text-neo-muted-foreground">
+                <div className="glass-sm rounded-oma flex h-24 items-center justify-center border border-dashed border-oma-glass-border">
+                  <span className="text-xs font-medium text-oma-text-muted">
                     No features
                   </span>
                 </div>

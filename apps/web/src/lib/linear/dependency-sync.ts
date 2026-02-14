@@ -1,13 +1,13 @@
 /**
  * Dependency synchronisation between Linear issue relations and
- * AutoForge feature dependencies.
+ * Omakase feature dependencies.
  *
  * Linear supports several relation types (blocks, is-blocked-by,
  * relates-to, duplicates). This module handles the "blocks" relation
- * type and maps it to AutoForge feature dependencies.
+ * type and maps it to Omakase feature dependencies.
  *
  * When a "blocks" relation is created in Linear between two issues
- * that are both tracked as AutoForge features, a corresponding
+ * that are both tracked as Omakase features, a corresponding
  * dependency edge is added in the DynamoDB feature graph via the
  * orchestrator API. Removing the relation removes the dependency.
  */
@@ -58,12 +58,12 @@ function toRelationEvent(data: Record<string, unknown>): LinearRelationEvent {
  * Handle an IssueRelation.create event from Linear.
  *
  * If the relation type is "blocks", we add a dependency in the
- * AutoForge feature graph: the blocking issue's feature becomes a
+ * Omakase feature graph: the blocking issue's feature becomes a
  * dependency of the blocked issue's feature.
  *
  * Relation direction:
  *   event.issue  ----blocks---->  event.relatedIssue
- *   In AutoForge: relatedIssue depends on issue
+ *   In Omakase: relatedIssue depends on issue
  */
 export async function handleRelationCreated(
   data: Record<string, unknown>,
@@ -71,7 +71,7 @@ export async function handleRelationCreated(
   const event = toRelationEvent(data);
 
   if (event.type !== "blocks") {
-    // Only "blocks" relations map to AutoForge dependencies.
+    // Only "blocks" relations map to Omakase dependencies.
     console.log(
       `[Linear Dependency Sync] Ignoring relation type "${event.type}" ` +
         `between ${event.issue.identifier} and ${event.relatedIssue.identifier}.`,
@@ -84,7 +84,7 @@ export async function handleRelationCreated(
   // Example:
   //   import { apiFetch } from "@/lib/api-client";
   //
-  //   // Resolve both issues to AutoForge features.
+  //   // Resolve both issues to Omakase features.
   //   const blockingFeature = await apiFetch(
   //     `/api/features/by-linear-issue/${event.issue.identifier}`,
   //   );
@@ -114,7 +114,7 @@ export async function handleRelationCreated(
 /**
  * Handle an IssueRelation.remove event from Linear.
  *
- * Removes the corresponding dependency from the AutoForge feature
+ * Removes the corresponding dependency from the Omakase feature
  * graph if both issues are tracked features.
  */
 export async function handleRelationRemoved(

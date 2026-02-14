@@ -28,7 +28,7 @@ jobs:
       - name: Build and push Docker image
         env:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          ECR_REPOSITORY: autoforge-agent
+          ECR_REPOSITORY: omakase-agent
           IMAGE_TAG: ${{ github.sha }}
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG apps/orchestrator/
