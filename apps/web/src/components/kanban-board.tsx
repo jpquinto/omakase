@@ -8,27 +8,9 @@
 // accent. Cards use the Omakase liquid glass design system.
 // ---------------------------------------------------------------------------
 
-interface Feature {
-  id: string;
-  name: string;
-  priority: number;
-  category: string;
-  status: "pending" | "in_progress" | "passing" | "failing";
-  dependencyCount: number;
-}
-
-const MOCK_FEATURES: Feature[] = [
-  { id: "f1", name: "User Authentication", priority: 1, category: "Auth", status: "passing", dependencyCount: 0 },
-  { id: "f2", name: "Database Schema", priority: 1, category: "Core", status: "passing", dependencyCount: 0 },
-  { id: "f3", name: "Product Listing", priority: 2, category: "Commerce", status: "passing", dependencyCount: 1 },
-  { id: "f4", name: "Shopping Cart", priority: 2, category: "Commerce", status: "in_progress", dependencyCount: 2 },
-  { id: "f5", name: "Checkout Flow", priority: 3, category: "Commerce", status: "pending", dependencyCount: 3 },
-  { id: "f6", name: "Payment Integration", priority: 3, category: "Payments", status: "pending", dependencyCount: 2 },
-  { id: "f7", name: "Order History", priority: 4, category: "Commerce", status: "pending", dependencyCount: 2 },
-  { id: "f8", name: "Search & Filters", priority: 3, category: "UI", status: "in_progress", dependencyCount: 1 },
-  { id: "f9", name: "Email Notifications", priority: 5, category: "Infra", status: "failing", dependencyCount: 1 },
-  { id: "f10", name: "Admin Dashboard", priority: 4, category: "Admin", status: "pending", dependencyCount: 4 },
-];
+import { useProjectFeatures } from "@/hooks/use-api";
+import { LinearTicketBadge } from "@/components/linear-ticket-badge";
+import type { Feature } from "@omakase/db";
 
 interface ColumnConfig {
   status: Feature["status"];
@@ -67,11 +49,18 @@ function priorityColor(priority: number): string {
   return colors[priority] ?? "bg-oma-bg-surface text-oma-text-muted";
 }
 
-export function KanbanBoard() {
+interface KanbanBoardProps {
+  projectId: string;
+}
+
+export function KanbanBoard({ projectId }: KanbanBoardProps) {
+  const { data: allFeatures } = useProjectFeatures(projectId);
+  const featureList = allFeatures ?? [];
+
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
       {COLUMNS.map((column) => {
-        const features = MOCK_FEATURES.filter((f) => f.status === column.status);
+        const features = featureList.filter((f) => f.status === column.status);
         return (
           <div key={column.status} className="flex flex-col">
             {/* Column header — glass surface with colored left accent */}
@@ -108,15 +97,27 @@ export function KanbanBoard() {
                     </span>
 
                     {/* Category tag */}
-                    <span className="inline-block rounded-full bg-oma-primary/15 px-2 py-0.5 text-[10px] font-medium text-oma-primary">
-                      {feature.category}
-                    </span>
+                    {feature.category && (
+                      <span className="inline-block rounded-full bg-oma-primary/15 px-2 py-0.5 text-[10px] font-medium text-oma-primary">
+                        {feature.category}
+                      </span>
+                    )}
                   </div>
 
+                  {/* Linear badge */}
+                  {feature.linearIssueId && feature.linearIssueUrl && (
+                    <div className="mb-2">
+                      <LinearTicketBadge
+                        linearIssueId={feature.linearIssueId}
+                        linearIssueUrl={feature.linearIssueUrl}
+                      />
+                    </div>
+                  )}
+
                   {/* Dependency count */}
-                  {feature.dependencyCount > 0 && (
+                  {feature.dependencies.length > 0 && (
                     <p className="text-[11px] font-medium text-oma-text-subtle">
-                      {feature.dependencyCount} dependenc{feature.dependencyCount === 1 ? "y" : "ies"}
+                      {feature.dependencies.length} dependenc{feature.dependencies.length === 1 ? "y" : "ies"}
                     </p>
                   )}
                 </div>

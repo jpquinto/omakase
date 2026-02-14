@@ -101,9 +101,9 @@ function statusLabel(status: Agent["status"]): string {
 /** Maps agent role to Omakase color classes */
 function roleBadgeColor(role: Agent["role"]): string {
   const colors: Record<Agent["role"], string> = {
-    architect: "bg-oma-indigo/20 text-oma-indigo",
-    coder: "bg-oma-progress/20 text-oma-progress",
-    reviewer: "bg-oma-primary/20 text-oma-primary",
+    architect: "bg-oma-gold/20 text-oma-gold",
+    coder: "bg-oma-indigo/20 text-oma-indigo",
+    reviewer: "bg-oma-secondary/20 text-oma-secondary",
     tester: "bg-oma-jade/20 text-oma-jade",
   };
   return colors[role];

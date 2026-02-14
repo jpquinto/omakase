@@ -177,9 +177,9 @@ export function DependencyGraph() {
   }
 
   return (
-    <div ref={containerRef} className="glass overflow-auto rounded-oma-lg p-4">
+    <div ref={containerRef} className="glass overflow-hidden rounded-oma-lg p-5">
       {/* Legend */}
-      <div className="mb-3 flex items-center gap-4 px-2">
+      <div className="mb-4 flex items-center gap-5 px-1">
         {(["pending", "in_progress", "passing", "failing"] as const).map((status) => (
           <div key={status} className="flex items-center gap-1.5">
             <div
@@ -195,10 +195,9 @@ export function DependencyGraph() {
 
       {/* SVG graph */}
       <svg
-        width={layout.width}
-        height={layout.height}
         viewBox={`0 0 ${layout.width} ${layout.height}`}
-        className="block"
+        className="block w-full"
+        style={{ maxHeight: "70vh" }}
       >
         {/* Arrow marker definition */}
         <defs>
@@ -210,8 +209,11 @@ export function DependencyGraph() {
             refY="3.5"
             orient="auto"
           >
-            <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
+            <polygon points="0 0, 10 3.5, 0 7" fill="rgba(255,255,255,0.25)" />
           </marker>
+          <filter id="node-glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="8" />
+          </filter>
         </defs>
 
         {/* Edges */}
@@ -225,8 +227,8 @@ export function DependencyGraph() {
               key={`edge-${i}`}
               d={pointsToPath(edge.points)}
               fill="none"
-              stroke={isHighlighted ? "#f472b6" : "rgba(255,255,255,0.15)"}
-              strokeWidth={isHighlighted ? 2.5 : 1.5}
+              stroke={isHighlighted ? "rgba(244,114,182,0.6)" : "rgba(255,255,255,0.08)"}
+              strokeWidth={isHighlighted ? 2 : 1}
               markerEnd="url(#arrowhead)"
               opacity={hoveredNode === null || isHighlighted ? 1 : 0.2}
               className="transition-opacity duration-150"
@@ -237,7 +239,6 @@ export function DependencyGraph() {
         {/* Nodes */}
         {layout.nodes.map((node) => {
           const isHovered = hoveredNode === node.id;
-          const rx = 12; // rounded-oma corners
 
           return (
             <g
@@ -245,8 +246,8 @@ export function DependencyGraph() {
               onMouseEnter={() => handleNodeHover(node.id)}
               onMouseLeave={() => handleNodeHover(null)}
               className="cursor-pointer"
-              opacity={
-                hoveredNode === null || isHovered
+              style={{
+                opacity: hoveredNode === null || isHovered
                   ? 1
                   : layout.edges.some(
                       (e) =>
@@ -254,38 +255,59 @@ export function DependencyGraph() {
                         (e.to === hoveredNode && e.from === node.id),
                     )
                   ? 1
-                  : 0.35
-              }
+                  : 0.35,
+                transition: "opacity 150ms ease",
+              }}
             >
-              {/* Subtle soft shadow */}
-              <rect
-                x={node.x - node.width / 2 + 2}
-                y={node.y - node.height / 2 + 2}
-                width={node.width}
-                height={node.height}
-                rx={rx}
-                fill="rgba(0,0,0,0.15)"
-              />
-              {/* Node body */}
+              {/* Glow behind node on hover */}
+              {isHovered && (
+                <rect
+                  x={node.x - node.width / 2 - 4}
+                  y={node.y - node.height / 2 - 4}
+                  width={node.width + 8}
+                  height={node.height + 8}
+                  rx={16}
+                  fill={statusColor(node.status)}
+                  opacity={0.15}
+                  filter="url(#node-glow)"
+                />
+              )}
+              {/* Node body — dark glass surface */}
               <rect
                 x={node.x - node.width / 2}
                 y={node.y - node.height / 2}
                 width={node.width}
                 height={node.height}
-                rx={rx}
+                rx={12}
+                fill="rgba(15, 15, 20, 0.7)"
+                stroke={isHovered ? statusColor(node.status) : "rgba(255,255,255,0.08)"}
+                strokeWidth={isHovered ? 1.5 : 1}
+              />
+              {/* Left accent bar */}
+              <rect
+                x={node.x - node.width / 2}
+                y={node.y - node.height / 2}
+                width={4}
+                height={node.height}
+                rx={2}
                 fill={statusColor(node.status)}
-                stroke="rgba(255,255,255,0.1)"
-                strokeWidth={1}
+                opacity={0.8}
+              />
+              {/* Status dot */}
+              <circle
+                cx={node.x - node.width / 2 + 18}
+                cy={node.y}
+                r={3.5}
+                fill={statusColor(node.status)}
               />
               {/* Node label */}
               <text
-                x={node.x}
+                x={node.x - node.width / 2 + 30}
                 y={node.y + 1}
-                textAnchor="middle"
+                textAnchor="start"
                 dominantBaseline="central"
-                className="text-xs font-bold"
-                fill="#ffffff"
-                style={{ textShadow: "0 1px 3px rgba(0,0,0,0.4)" }}
+                className="text-xs font-medium"
+                fill="rgba(255,255,255,0.85)"
               >
                 {node.name}
               </text>

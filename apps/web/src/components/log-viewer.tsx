@@ -84,9 +84,9 @@ function levelColor(level: LogEntry["level"]): string {
 /** Maps agent index to an Omakase accent color for the agent tag */
 function agentColor(index: number): string {
   const colors: Record<number, string> = {
-    1: "text-oma-info",
+    1: "text-oma-gold",
     2: "text-oma-indigo",
-    3: "text-oma-gold",
+    3: "text-oma-secondary",
     4: "text-oma-jade",
   };
   return colors[index] ?? "text-oma-text-subtle";
