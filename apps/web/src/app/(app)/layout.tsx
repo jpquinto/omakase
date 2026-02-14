@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useState, useCallback, useMemo } from "react";
 import { cn } from "@/lib/utils";
+import { useProject } from "@/hooks/use-api";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { AgentChatPanel } from "@/components/agent-chat-panel";
 import { ThreadListSidebar } from "@/components/thread-list-sidebar";
@@ -212,6 +213,61 @@ function AgentStatusCard({ agent, collapsed, index, onOpenChat }: {
 }
 
 // ---------------------------------------------------------------------------
+// Breadcrumb — resolves pathname segments into labeled, linked breadcrumbs
+// ---------------------------------------------------------------------------
+
+interface BreadcrumbSegment {
+  label: string;
+  href: string;
+}
+
+function useBreadcrumbs(pathname: string): BreadcrumbSegment[] {
+  return useMemo(() => {
+    const parts = pathname.split("/").filter(Boolean);
+    if (parts.length === 0) return [{ label: "Dashboard", href: "/" }];
+
+    const segments: BreadcrumbSegment[] = [];
+
+    // First segment — match to NAV_ITEMS
+    const navItem = NAV_ITEMS.find((item) => item.href === `/${parts[0]}`);
+    segments.push({
+      label: navItem?.label ?? parts[0].replace(/-/g, " "),
+      href: `/${parts[0]}`,
+    });
+
+    // Remaining segments
+    for (let i = 1; i < parts.length; i++) {
+      const segment = parts[i];
+      const href = "/" + parts.slice(0, i + 1).join("/");
+
+      if (parts[0] === "agents") {
+        // Resolve agent name from AGENTS constant
+        const agent = AGENTS.find((a) => a.id === segment);
+        if (agent) {
+          segments.push({ label: agent.name, href });
+          continue;
+        }
+      }
+
+      // For project IDs, the ProjectBreadcrumbLabel component will handle display
+      // For all other segments, prettify the slug
+      segments.push({
+        label: segment.replace(/-/g, " "),
+        href,
+      });
+    }
+
+    return segments;
+  }, [pathname]);
+}
+
+/** Resolves a project ID to its name for breadcrumb display */
+function ProjectBreadcrumbLabel({ projectId }: { projectId: string }) {
+  const { data: project } = useProject(projectId);
+  return <>{project?.name ?? projectId}</>;
+}
+
+// ---------------------------------------------------------------------------
 // Chat Sidebar — shown when on /agents/[name]/chat routes
 // ---------------------------------------------------------------------------
 
@@ -289,6 +345,8 @@ export default function AppLayout({
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [chatTarget, setChatTarget] = useState<ChatTarget | null>(null);
+
+  const breadcrumbs = useBreadcrumbs(pathname);
 
   // Detect chat page route: /agents/[name]/chat
   const chatRouteMatch = useMemo(() => {
@@ -521,16 +579,39 @@ export default function AppLayout({
       >
         {/* Header */}
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between px-6 backdrop-blur-xl">
-          <div className="flex items-center gap-2">
-            {/* Breadcrumb-like current section */}
-            <span className="text-xs font-medium uppercase tracking-widest text-oma-text-subtle">
-              {NAV_ITEMS.find(
-                (item) =>
-                  pathname === item.href ||
-                  pathname.startsWith(item.href + "/")
-              )?.label ?? "Dashboard"}
-            </span>
-          </div>
+          <nav className="flex items-center gap-2" aria-label="Breadcrumb">
+            {breadcrumbs.map((crumb, i) => {
+              const isLast = i === breadcrumbs.length - 1;
+              const isProjectId = i === 1 && pathname.startsWith("/projects/");
+              return (
+                <span key={crumb.href} className="flex items-center gap-2">
+                  {i > 0 && (
+                    <span className="text-[10px] text-oma-text-subtle/50">/</span>
+                  )}
+                  {isLast ? (
+                    <span className="text-xs font-medium uppercase tracking-widest text-oma-text-muted">
+                      {isProjectId ? (
+                        <ProjectBreadcrumbLabel projectId={crumb.label} />
+                      ) : (
+                        crumb.label
+                      )}
+                    </span>
+                  ) : (
+                    <Link
+                      href={crumb.href}
+                      className="text-xs font-medium uppercase tracking-widest text-oma-text-subtle transition-colors duration-200 hover:text-oma-text"
+                    >
+                      {isProjectId ? (
+                        <ProjectBreadcrumbLabel projectId={crumb.label} />
+                      ) : (
+                        crumb.label
+                      )}
+                    </Link>
+                  )}
+                </span>
+              );
+            })}
+          </nav>
 
           <div className="flex items-center gap-3">
             <WeatherWidget />
