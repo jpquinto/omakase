@@ -6,10 +6,14 @@
 # agent lifecycle:
 #   1. Bootstrap workspace (clone repo, checkout branch, install deps)
 #   2. Copy role-specific CLAUDE.md to workspace root
-#   3. Build a prompt with feature context for the Claude Code CLI
-#   4. Invoke Claude Code CLI in autonomous mode
-#   5. Push commits to remote
-#   6. Determine exit code (special handling for reviewer verdict)
+#   2b. Fetch personality from DynamoDB and prepend to CLAUDE.md
+#   2c. Fetch memories from DynamoDB and write to .claude/memory/MEMORY.md
+#   3. Configure git identity (using personality display name if available)
+#   4. Build a prompt with feature context for the Claude Code CLI
+#   5. Invoke Claude Code CLI in autonomous mode
+#   6. Push commits to remote
+#   6b. Extract new memories from agent output and save to DynamoDB
+#   7. Determine exit code (special handling for reviewer verdict)
 #
 # Required environment variables:
 #   AGENT_ROLE          - One of: architect, coder, reviewer, tester
@@ -22,6 +26,7 @@
 #   FEATURE_DESCRIPTION - Feature description and acceptance criteria
 #   WORKSPACE           - Workspace directory (default: /workspace)
 #   BASE_BRANCH         - Branch to base the feature branch on (default: main)
+#   PROJECT_ID          - Project ID for memory scoping (optional)
 # ---------------------------------------------------------------------------
 
 set -euo pipefail
@@ -51,8 +56,18 @@ WORKSPACE="${WORKSPACE:-/workspace}"
 BASE_BRANCH="${BASE_BRANCH:-main}"
 FEATURE_NAME="${FEATURE_NAME:-Feature ${FEATURE_ID}}"
 FEATURE_DESCRIPTION="${FEATURE_DESCRIPTION:-No description provided.}"
+PROJECT_ID="${PROJECT_ID:-}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROLES_DIR="${SCRIPT_DIR}/agent-roles"
+MEMORY_HELPER="${SCRIPT_DIR}/memory-helper.ts"
+
+# Map agent roles to agent names (Miso, Nori, Koji, Toro)
+case "${AGENT_ROLE}" in
+  architect) AGENT_NAME="miso" ;;
+  coder)     AGENT_NAME="nori" ;;
+  reviewer)  AGENT_NAME="koji" ;;
+  tester)    AGENT_NAME="toro" ;;
+esac
 
 echo "=== Omakase Agent Entrypoint ==="
 echo "  Role        : ${AGENT_ROLE}"
@@ -89,12 +104,67 @@ cp "${ROLE_CLAUDE_MD}" "${WORKSPACE}/CLAUDE.md"
 echo "Copied ${AGENT_ROLE} CLAUDE.md to workspace root."
 
 # ---------------------------------------------------------------------------
+# Step 2b: Fetch personality and prepend to CLAUDE.md
+#
+# The personality prompt is prepended above the role instructions so that
+# the agent has a distinctive voice while still following role constraints.
+# ---------------------------------------------------------------------------
+
+echo "--- Step 2b: Injecting personality for ${AGENT_NAME} ---"
+
+PERSONALITY_BLOCK=""
+if [ -f "${MEMORY_HELPER}" ]; then
+  PERSONALITY_BLOCK=$(bun run "${MEMORY_HELPER}" fetch-personality --agent "${AGENT_NAME}" 2>/dev/null || true)
+fi
+
+DISPLAY_NAME=""
+if [ -n "${PERSONALITY_BLOCK}" ]; then
+  # Extract display name from personality block for git identity
+  DISPLAY_NAME=$(echo "${PERSONALITY_BLOCK}" | grep '^\*\*Name:\*\*' | sed 's/\*\*Name:\*\* //' || true)
+  # Prepend personality to CLAUDE.md
+  EXISTING_CLAUDE_MD=$(cat "${WORKSPACE}/CLAUDE.md")
+  printf '%s\n\n%s' "${PERSONALITY_BLOCK}" "${EXISTING_CLAUDE_MD}" > "${WORKSPACE}/CLAUDE.md"
+  echo "Injected ${AGENT_NAME} personality into CLAUDE.md."
+else
+  echo "No personality configured for ${AGENT_NAME}, using role instructions only."
+fi
+
+# ---------------------------------------------------------------------------
+# Step 2c: Fetch memories and write to .claude/memory/MEMORY.md
+#
+# Claude Code auto-discovers .claude/memory/MEMORY.md as persistent context.
+# We fetch project-scoped memories from DynamoDB and write them there.
+# ---------------------------------------------------------------------------
+
+echo "--- Step 2c: Injecting memories for ${AGENT_NAME} ---"
+
+if [ -n "${PROJECT_ID}" ] && [ -f "${MEMORY_HELPER}" ]; then
+  MEMORY_CONTENT=$(bun run "${MEMORY_HELPER}" fetch-memory --agent "${AGENT_NAME}" --project "${PROJECT_ID}" 2>/dev/null || true)
+
+  if [ -n "${MEMORY_CONTENT}" ]; then
+    mkdir -p "${WORKSPACE}/.claude/memory"
+    echo "${MEMORY_CONTENT}" > "${WORKSPACE}/.claude/memory/MEMORY.md"
+    echo "Wrote memories to .claude/memory/MEMORY.md"
+  else
+    echo "No memories found for ${AGENT_NAME} in project ${PROJECT_ID}."
+  fi
+else
+  echo "Skipping memory injection (no PROJECT_ID or memory-helper not found)."
+fi
+
+# ---------------------------------------------------------------------------
 # Step 3: Configure git identity for agent commits
 # ---------------------------------------------------------------------------
 
 echo "--- Step 3: Configuring git identity ---"
 cd "${WORKSPACE}"
-git config user.name "Omakase ${AGENT_ROLE^} Agent"
+
+# Use personality display name if available, otherwise default
+if [ -n "${DISPLAY_NAME}" ]; then
+  git config user.name "${DISPLAY_NAME} (Omakase ${AGENT_ROLE^})"
+else
+  git config user.name "Omakase ${AGENT_ROLE^} Agent"
+fi
 git config user.email "omakase+${AGENT_ROLE}@noreply.github.com"
 
 # ---------------------------------------------------------------------------
@@ -203,6 +273,36 @@ else
     # can detect this and retry.
   }
   echo "Pushed commits to origin/${BRANCH_NAME}"
+fi
+
+# ---------------------------------------------------------------------------
+# Step 6b: Extract and save new memories
+#
+# After the main Claude Code run, we extract learnings by running a
+# lightweight second Claude call that identifies key patterns and insights
+# the agent discovered. These are saved to DynamoDB for future runs.
+# ---------------------------------------------------------------------------
+
+echo "--- Step 6b: Extracting memories from agent output ---"
+
+if [ -n "${PROJECT_ID}" ] && [ -f "${MEMORY_HELPER}" ] && [ "${CLAUDE_EXIT_CODE}" -eq 0 -o "${AGENT_ROLE}" = "reviewer" ]; then
+  EXTRACTION_PROMPT="You just completed work as the ${AGENT_ROLE} agent on a codebase. Review what you did and identify 1-3 key learnings about this project's patterns, conventions, gotchas, or architectural decisions that would help you in future runs on this same project. Focus on project-specific knowledge, not general programming knowledge.
+
+Output ONLY a JSON array of strings, no other text. Example: [\"This project uses barrel exports in every module\", \"The API routes follow RESTful naming with /api/v1 prefix\"]
+
+If there are no noteworthy project-specific learnings, output an empty array: []"
+
+  EXTRACTED_MEMORIES=$(claude -p "${EXTRACTION_PROMPT}" --max-tokens 500 --dangerously-skip-permissions 2>/dev/null || true)
+
+  if [ -n "${EXTRACTED_MEMORIES}" ]; then
+    echo "${EXTRACTED_MEMORIES}" | bun run "${MEMORY_HELPER}" save-memory --agent "${AGENT_NAME}" --project "${PROJECT_ID}" 2>&1 || {
+      echo "WARNING: Failed to save extracted memories (non-fatal)."
+    }
+  else
+    echo "No memories extracted (extraction returned empty)."
+  fi
+else
+  echo "Skipping memory extraction (no PROJECT_ID, failed run, or memory-helper not found)."
 fi
 
 # ---------------------------------------------------------------------------

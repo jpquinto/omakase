@@ -21,6 +21,7 @@
  */
 
 import { Elysia } from "elysia";
+import { cors } from "@elysiajs/cors";
 import { ECSClient } from "@aws-sdk/client-ecs";
 import {
   listProjects,
@@ -31,17 +32,43 @@ import {
   getAgentLogs,
   getAgentRun,
   createFromLinear,
+  createFeature,
+  createFeaturesBulk,
   getByLinearIssueId,
   updateFromLinear,
+  updateFeature,
+  deleteFeature,
   getByLinearTeamId,
   updateProject,
+  addDependency,
+  removeDependency,
   createMessage,
   listMessages,
+  listMessagesByThread,
+  createThread,
+  getThread,
+  listThreadsByAgent,
+  updateThread,
+  createMemory,
+  listMemories,
+  deleteMemory,
+  deleteMemoriesByAgentProject,
+  getPersonality,
+  putPersonality,
+  deletePersonality,
+  listRunsByAgentName,
+  getAgentStatsByName,
+  getAgentActivityByName,
+  getDefaultPersonality,
 } from "@omakase/dynamodb";
-import type { AgentMessageSender, AgentMessageType, AgentRunRole } from "@omakase/db";
+import type { AgentMessageSender, AgentMessageType, AgentRunRole, AgentThreadMode, AgentThreadStatus, QuizMetadata } from "@omakase/db";
 
 import { FeatureWatcher, type FeatureWatcherConfig } from "./feature-watcher.js";
 import type { EcsConfig, ExecutionMode } from "./pipeline.js";
+import { generateAgentResponse } from "./agent-responder.js";
+import { handleQuizMessage } from "./quiz-handler.js";
+import { subscribe } from "./stream-bus.js";
+import { WorkSessionManager } from "./work-session-manager.js";
 
 // ---------------------------------------------------------------------------
 // Environment configuration
@@ -97,12 +124,14 @@ const watcherConfig: FeatureWatcherConfig = {
 };
 
 const watcher = new FeatureWatcher(ecsClient, watcherConfig);
+const workSessionManager = new WorkSessionManager(LOCAL_WORKSPACE_ROOT);
 
 // ---------------------------------------------------------------------------
 // Elysia HTTP server
 // ---------------------------------------------------------------------------
 
 const app = new Elysia()
+  .use(cors({ origin: true }))
   // Request logging middleware
   .onBeforeHandle(({ request, store }) => {
     (store as Record<string, number>).startTime = performance.now();
@@ -192,19 +221,173 @@ const app = new Elysia()
     }
     return project;
   })
+  // Feature CRUD endpoints (bulk before single to avoid route matching conflicts)
+  .post("/api/projects/:projectId/features/bulk", async ({ params, body, set }) => {
+    const { features } = body as {
+      features: Array<{
+        name: string;
+        description?: string;
+        priority: number;
+        category?: string;
+        linearIssueId?: string;
+        linearIssueUrl?: string;
+      }>;
+    };
+    if (!features || features.length === 0) {
+      set.status = 400;
+      return { error: "features array is required and must not be empty" };
+    }
+    // Check for duplicates by linearIssueId and separate linear vs plain features
+    const skipped: string[] = [];
+    const linearFeatures: typeof features = [];
+    const plainFeatures: typeof features = [];
+    for (const f of features) {
+      if (f.linearIssueId) {
+        const existing = await getByLinearIssueId({ linearIssueId: f.linearIssueId });
+        if (existing) {
+          skipped.push(f.linearIssueId);
+          continue;
+        }
+        linearFeatures.push(f);
+      } else {
+        plainFeatures.push(f);
+      }
+    }
+    const created = [];
+    // Create features with Linear fields individually (uses createFromLinear which sets linear fields)
+    for (const f of linearFeatures) {
+      const feature = await createFromLinear({
+        projectId: params.projectId,
+        name: f.name,
+        description: f.description,
+        priority: f.priority,
+        category: f.category,
+        linearIssueId: f.linearIssueId!,
+        linearIssueUrl: f.linearIssueUrl ?? "",
+      });
+      created.push(feature);
+    }
+    // Create plain features in bulk
+    if (plainFeatures.length > 0) {
+      const bulk = await createFeaturesBulk({
+        projectId: params.projectId,
+        features: plainFeatures.map((f) => ({
+          name: f.name,
+          description: f.description,
+          priority: f.priority,
+          category: f.category,
+        })),
+      });
+      created.push(...bulk);
+    }
+    set.status = 201;
+    return { created, skipped };
+  })
+  .post("/api/projects/:projectId/features", async ({ params, body, set }) => {
+    const { name, description, priority, category } = body as {
+      name: string;
+      description?: string;
+      priority?: number;
+      category?: string;
+    };
+    if (!name) {
+      set.status = 400;
+      return { error: "name is required" };
+    }
+    const feature = await createFeature({
+      projectId: params.projectId,
+      name,
+      description,
+      priority,
+      category,
+    });
+    set.status = 201;
+    return feature;
+  })
+  .patch("/api/features/:featureId", async ({ params, body }) => {
+    const { name, description, priority, status, category } = body as {
+      name?: string;
+      description?: string;
+      priority?: number;
+      status?: string;
+      category?: string;
+    };
+    await updateFeature({
+      featureId: params.featureId,
+      name,
+      description,
+      priority,
+      status: status as "pending" | "in_progress" | "passing" | "failing" | undefined,
+      category,
+    });
+    return { success: true };
+  })
+  .delete("/api/features/:featureId", async ({ params }) => {
+    await deleteFeature({ featureId: params.featureId });
+    return { success: true };
+  })
+  // Dependency management endpoints
+  .post("/api/features/:featureId/dependencies", async ({ params, body, set }) => {
+    const { dependsOnId } = body as { dependsOnId: string };
+    if (!dependsOnId) {
+      set.status = 400;
+      return { error: "dependsOnId is required" };
+    }
+    try {
+      await addDependency({ featureId: params.featureId, dependsOnId });
+      return { success: true };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes("circular")) {
+        set.status = 409;
+        return { error: msg };
+      }
+      throw error;
+    }
+  })
+  .delete("/api/features/:featureId/dependencies/:dependsOnId", async ({ params }) => {
+    await removeDependency({ featureId: params.featureId, dependsOnId: params.dependsOnId });
+    return { success: true };
+  })
+  // Linear disconnect endpoint
+  .delete("/api/projects/:projectId/linear-token", async ({ params }) => {
+    await updateProject({ projectId: params.projectId, linearAccessToken: "", linearTeamId: "" });
+    return { success: true };
+  })
   // Agent chat endpoints
   .post("/api/agent-runs/:runId/messages", async ({ params, body, set }) => {
-    const { content, sender, role, type } = body as {
+    const { content, sender, role, type, threadId, metadata } = body as {
       content: string;
       sender: AgentMessageSender;
       role?: AgentRunRole | null;
       type?: AgentMessageType;
+      threadId?: string;
+      metadata?: QuizMetadata;
     };
     if (!content) {
       set.status = 400;
       return { error: "content is required" };
     }
-    const run = await getAgentRun({ runId: params.runId });
+    let run = await getAgentRun({ runId: params.runId });
+
+    // For synthetic chat-* runIds (from global agent chat), create an in-memory stub
+    // so messages can be stored without a real DynamoDB agent-run record.
+    if (!run && params.runId.startsWith("chat-")) {
+      const roleFromId = params.runId.replace("chat-", "") as AgentRunRole;
+      const CHAT_ROLE_TO_AGENT: Record<string, string> = {
+        architect: "miso", coder: "nori", reviewer: "koji", tester: "toro",
+      };
+      run = {
+        id: params.runId,
+        agentId: CHAT_ROLE_TO_AGENT[roleFromId] ?? roleFromId,
+        projectId: "general",
+        featureId: "chat",
+        role: roleFromId,
+        status: "started",
+        startedAt: new Date().toISOString(),
+      } as NonNullable<typeof run>;
+    }
+
     if (!run) {
       set.status = 404;
       return { error: "Agent run not found" };
@@ -213,6 +396,27 @@ const app = new Elysia()
       set.status = 409;
       return { error: "Agent run is no longer active" };
     }
+
+    // Auto-create thread if not provided and sender is user
+    let resolvedThreadId = threadId;
+    let createdThread = null;
+    if (!resolvedThreadId && (sender ?? "user") === "user") {
+      try {
+        const ROLE_TO_AGENT: Record<string, string> = {
+          architect: "miso", coder: "nori", reviewer: "koji", tester: "toro",
+        };
+        const agentName = ROLE_TO_AGENT[run.role] ?? run.role;
+        createdThread = await createThread({
+          agentName,
+          projectId: run.projectId,
+        });
+        resolvedThreadId = createdThread.threadId;
+      } catch (err) {
+        console.error("[orchestrator] Failed to auto-create thread (table may not exist):", err);
+        // Continue without a thread — message will still be saved
+      }
+    }
+
     const message = await createMessage({
       runId: params.runId,
       featureId: run.featureId,
@@ -221,9 +425,54 @@ const app = new Elysia()
       role: role ?? run.role,
       content,
       type: type ?? "message",
+      threadId: resolvedThreadId,
+      metadata,
     });
+    // Route user messages based on type and thread mode
+    if ((sender ?? "user") === "user") {
+      // Quiz messages get routed to the quiz handler
+      if ((type ?? "message") === "quiz" && metadata) {
+        handleQuizMessage(params.runId, content, metadata, resolvedThreadId, {
+          featureId: run.featureId,
+          projectId: run.projectId,
+          role: run.role,
+        }).catch((err) =>
+          console.error("[orchestrator] Quiz handler error:", err)
+        );
+      } else {
+        // Check if this thread is a work mode thread
+        let isWorkMode = false;
+        if (resolvedThreadId) {
+          try {
+            const ROLE_TO_AGENT_MAP: Record<string, string> = {
+              architect: "miso", coder: "nori", reviewer: "koji", tester: "toro",
+            };
+            const agentName = ROLE_TO_AGENT_MAP[run.role] ?? run.role;
+            const thread = await getThread({ agentName, threadId: resolvedThreadId });
+            isWorkMode = thread?.mode === "work";
+          } catch (err) {
+            console.error("[orchestrator] Failed to get thread for mode check:", err);
+          }
+        }
+
+        if (isWorkMode) {
+          // Route to WorkSessionManager
+          const session = workSessionManager.getSession(params.runId);
+          if (session) {
+            workSessionManager.sendMessage(params.runId, content).catch((err) =>
+              console.error("[orchestrator] Work session message error:", err)
+            );
+          }
+        } else {
+          // Route to Anthropic API personality chat
+          generateAgentResponse(params.runId, content, resolvedThreadId).catch((err) =>
+            console.error("[orchestrator] Agent response error:", err)
+          );
+        }
+      }
+    }
     set.status = 201;
-    return message;
+    return { ...message, ...(createdThread ? { createdThread } : {}) };
   })
   .get("/api/agent-runs/:runId/messages", async ({ params, query }) => {
     const since = query.since as string | undefined;
@@ -233,6 +482,8 @@ const app = new Elysia()
   .get("/api/agent-runs/:runId/messages/stream", async ({ params, request }) => {
     const runId = params.runId;
     const lastEventId = request.headers.get("Last-Event-ID");
+    const url = new URL(request.url);
+    const threadId = url.searchParams.get("threadId") ?? undefined;
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -248,32 +499,53 @@ const app = new Elysia()
           controller.enqueue(encoder.encode(payload));
         };
 
-        // Send initial batch of existing messages
-        const initial = await listMessages({ runId, since: lastTimestamp || undefined });
+        // Send initial batch of existing messages (thread-scoped or run-scoped)
+        const initial = threadId
+          ? await listMessagesByThread({ threadId, since: lastTimestamp || undefined })
+          : await listMessages({ runId, since: lastTimestamp || undefined });
         for (const msg of initial) {
           send("message", JSON.stringify(msg), msg.timestamp);
           lastTimestamp = msg.timestamp;
         }
 
-        // Poll for new messages every 1 second
+        // Subscribe to real-time token stream from agent-responder
+        const unsubscribe = subscribe(runId, (event) => {
+          if (closed) return;
+          if (event.type === "thinking_start") {
+            send("thinking_start", "{}");
+          } else if (event.type === "token") {
+            send("token", JSON.stringify({ token: event.token }));
+          } else if (event.type === "thinking_end") {
+            send("thinking_end", "{}");
+          } else if (event.type === "stream_error") {
+            send("stream_error", JSON.stringify({ error: event.error }));
+          }
+        });
+
+        // Poll for new messages every 1 second (picks up saved messages from DynamoDB)
         const interval = setInterval(async () => {
           if (closed) return;
           try {
-            // Check if run is still active
-            const run = await getAgentRun({ runId });
-            const newMessages = await listMessages({ runId, since: lastTimestamp || undefined });
+            // Check if run is still active (skip for synthetic chat-* runIds)
+            const isSyntheticChat = runId.startsWith("chat-");
+            const run = isSyntheticChat ? null : await getAgentRun({ runId });
+            const newMessages = threadId
+              ? await listMessagesByThread({ threadId, since: lastTimestamp || undefined })
+              : await listMessages({ runId, since: lastTimestamp || undefined });
             for (const msg of newMessages) {
               send("message", JSON.stringify(msg), msg.timestamp);
               lastTimestamp = msg.timestamp;
             }
-            if (run && (run.status === "completed" || run.status === "failed")) {
+            if (!isSyntheticChat && run && (run.status === "completed" || run.status === "failed")) {
               send("close", JSON.stringify({ status: run.status }));
               clearInterval(interval);
+              unsubscribe();
               controller.close();
               closed = true;
             }
           } catch {
             clearInterval(interval);
+            unsubscribe();
             if (!closed) {
               controller.close();
               closed = true;
@@ -284,6 +556,7 @@ const app = new Elysia()
         // Clean up when client disconnects
         request.signal.addEventListener("abort", () => {
           clearInterval(interval);
+          unsubscribe();
           if (!closed) {
             closed = true;
           }
@@ -299,10 +572,204 @@ const app = new Elysia()
       },
     });
   })
-  // Catch-all 404
-  .onError(({ set }) => {
-    set.status = 404;
-    return { error: "Not found" };
+  // Agent thread endpoints
+  .post("/api/agents/:agentName/threads", async ({ params, body, set }) => {
+    const KNOWN_AGENTS = ["miso", "nori", "koji", "toro"];
+    if (!KNOWN_AGENTS.includes(params.agentName)) {
+      set.status = 404;
+      return { error: "Agent not found" };
+    }
+    const { projectId, title, mode } = body as { projectId: string; title?: string; mode?: AgentThreadMode };
+    if (!projectId) {
+      set.status = 400;
+      return { error: "projectId is required" };
+    }
+    const thread = await createThread({
+      agentName: params.agentName,
+      projectId,
+      title,
+      mode,
+    });
+    set.status = 201;
+    return thread;
+  })
+  .get("/api/agents/:agentName/threads", async ({ params, query }) => {
+    const projectId = query.projectId as string | undefined;
+    const includeArchived = query.includeArchived === "true";
+    const limit = query.limit ? parseInt(query.limit as string, 10) : 20;
+    const cursor = query.cursor as string | undefined;
+    try {
+      return await listThreadsByAgent({
+        agentName: params.agentName,
+        projectId: projectId || undefined,
+        includeArchived,
+        limit,
+        cursor: cursor || undefined,
+      });
+    } catch (err) {
+      console.error("[orchestrator] Failed to list threads (table may not exist):", err);
+      return { threads: [], nextCursor: null };
+    }
+  })
+  .patch("/api/agents/:agentName/threads/:threadId", async ({ params, body }) => {
+    const { title, status } = body as { title?: string; status?: AgentThreadStatus };
+    const updated = await updateThread({
+      agentName: params.agentName,
+      threadId: params.threadId,
+      title,
+      status,
+    });
+    if (!updated) {
+      return new Response(JSON.stringify({ error: "Thread not found" }), { status: 404 });
+    }
+    return updated;
+  })
+  // Thread messages endpoint (query by thread GSI)
+  .get("/api/threads/:threadId/messages", async ({ params }) => {
+    return await listMessagesByThread({ threadId: params.threadId });
+  })
+  // Agent memory endpoints
+  .get("/api/agents/:agentName/memories", async ({ params, query }) => {
+    const projectId = query.projectId as string | undefined;
+    if (!projectId) {
+      return new Response(JSON.stringify({ error: "projectId query parameter required" }), { status: 400 });
+    }
+    return await listMemories({ agentName: params.agentName, projectId });
+  })
+  .post("/api/agents/:agentName/memories", async ({ params, body, set }) => {
+    const { projectId, content } = body as { projectId: string; content: string };
+    if (!projectId || !content) {
+      set.status = 400;
+      return { error: "projectId and content are required" };
+    }
+    const memory = await createMemory({
+      agentName: params.agentName,
+      projectId,
+      content,
+      source: "manual",
+    });
+    set.status = 201;
+    return memory;
+  })
+  .delete("/api/agents/:agentName/memories/all", async ({ params, query }) => {
+    const projectId = query.projectId as string | undefined;
+    if (!projectId) {
+      return new Response(JSON.stringify({ error: "projectId query parameter required" }), { status: 400 });
+    }
+    await deleteMemoriesByAgentProject({ agentName: params.agentName, projectId });
+    return new Response(null, { status: 204 });
+  })
+  .delete("/api/agents/:agentName/memories/:createdAt", async ({ params, query }) => {
+    const projectId = query.projectId as string | undefined;
+    if (!projectId) {
+      return new Response(JSON.stringify({ error: "projectId query parameter required" }), { status: 400 });
+    }
+    await deleteMemory({
+      agentName: params.agentName,
+      projectId,
+      createdAt: params.createdAt,
+    });
+    return new Response(null, { status: 204 });
+  })
+  // Agent personality endpoints
+  .get("/api/agents/:agentName/personality", async ({ params }) => {
+    const personality = await getPersonality({ agentName: params.agentName });
+    if (!personality) {
+      return new Response(JSON.stringify({ error: "Personality not found" }), { status: 404 });
+    }
+    return personality;
+  })
+  .put("/api/agents/:agentName/personality", async ({ params, body }) => {
+    const { displayName, persona, traits, communicationStyle } = body as {
+      displayName: string;
+      persona: string;
+      traits: string[];
+      communicationStyle: string;
+    };
+    const personality = await putPersonality({
+      agentName: params.agentName,
+      displayName,
+      persona,
+      traits,
+      communicationStyle,
+    });
+    return personality;
+  })
+  .delete("/api/agents/:agentName/personality", async ({ params }) => {
+    await deletePersonality({ agentName: params.agentName });
+    return new Response(null, { status: 204 });
+  })
+  // Work session endpoints
+  .post("/api/agents/:agentName/work-sessions", async ({ params, body, set }) => {
+    const KNOWN_AGENTS = ["miso", "nori", "koji", "toro"];
+    if (!KNOWN_AGENTS.includes(params.agentName)) {
+      set.status = 404;
+      return { error: "Agent not found" };
+    }
+    const { projectId, threadId, prompt } = body as { projectId: string; threadId: string; prompt: string };
+    if (!projectId || !threadId || !prompt) {
+      set.status = 400;
+      return { error: "projectId, threadId, and prompt are required" };
+    }
+    try {
+      const result = await workSessionManager.startSession({
+        agentName: params.agentName,
+        projectId,
+        threadId,
+        prompt,
+      });
+      set.status = 201;
+      return result;
+    } catch (err) {
+      set.status = 500;
+      return { error: err instanceof Error ? err.message : String(err) };
+    }
+  })
+  .delete("/api/work-sessions/:runId", async ({ params, set }) => {
+    try {
+      await workSessionManager.endSession(params.runId);
+      return { status: "completed" };
+    } catch (err) {
+      set.status = 404;
+      return { error: err instanceof Error ? err.message : String(err) };
+    }
+  })
+  .get("/api/agents/:agentName/work-sessions", async ({ params }) => {
+    const sessions = workSessionManager.listSessions(params.agentName);
+    return sessions.map((s) => ({
+      runId: s.runId,
+      projectId: s.projectId,
+      threadId: s.threadId,
+      startedAt: s.startedAt,
+    }));
+  })
+  // Agent profile endpoints
+  .get("/api/agents/:agentName/profile", async ({ params }) => {
+    const personality = await getPersonality({ agentName: params.agentName });
+    if (personality) return personality;
+    const fallback = getDefaultPersonality(params.agentName);
+    if (fallback) return { ...fallback, updatedAt: new Date().toISOString() };
+    return new Response(JSON.stringify({ error: "Agent not found" }), { status: 404 });
+  })
+  .get("/api/agents/:agentName/stats", async ({ params }) => {
+    return await getAgentStatsByName({ agentName: params.agentName });
+  })
+  .get("/api/agents/:agentName/activity", async ({ params }) => {
+    return await getAgentActivityByName({ agentName: params.agentName });
+  })
+  .get("/api/agents/:agentName/runs", async ({ params, query }) => {
+    const limit = query.limit ? parseInt(query.limit as string, 10) : 20;
+    return await listRunsByAgentName({ agentName: params.agentName, limit });
+  })
+  // Catch-all error handler
+  .onError(({ set, error, code }) => {
+    console.error(`[orchestrator] Error (${code}):`, error);
+    if (code === "NOT_FOUND") {
+      set.status = 404;
+      return { error: "Not found" };
+    }
+    set.status = 500;
+    return { error: "Internal server error", message: String(error) };
   })
   .listen(PORT);
 
@@ -329,6 +796,11 @@ function shutdown(signal: string): void {
 
   // Stop the feature watcher (stops polling, does not cancel in-flight pipelines)
   watcher.stop();
+
+  // Clean up all active work sessions
+  workSessionManager.cleanup().catch((err) =>
+    console.error("[orchestrator] Work session cleanup error:", err)
+  );
 
   // Stop the Elysia server
   app.stop().then(() => {
