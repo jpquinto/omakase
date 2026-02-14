@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useInView } from "@/hooks/use-in-view";
+import { ScrollReveal } from "@/components/scroll-reveal";
 import {
   Plus,
   ArrowRight,
@@ -38,6 +40,9 @@ import {
   MessageSquare,
   Image,
   Play,
+  PanelTop,
+  Trash2,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -56,7 +61,6 @@ import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -69,53 +73,25 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import {
+  LiquidTabs,
+  LiquidTabsList,
+  LiquidTabsTrigger,
+  LiquidTabsContent,
+} from "@/components/ui/liquid-tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 // ============================================================================
 // Custom Hooks
 // ============================================================================
-
-/**
- * Observe whether an element is visible in the viewport.
- * Once triggered, `isInView` stays true (one-shot reveal).
- */
-function useInView(threshold = 0.1) {
-  const [isInView, setIsInView] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) setIsInView(true);
-      },
-      { threshold, rootMargin: "0px 0px -60px 0px" }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [threshold]);
-
-  return { ref, isInView };
-}
-
-/**
- * Track the overall page scroll progress as a 0-100 percentage.
- */
-function useScrollProgress() {
-  const [progress, setProgress] = useState(0);
-  useEffect(() => {
-    const onScroll = () => {
-      const scrollTop = document.documentElement.scrollTop;
-      const scrollHeight =
-        document.documentElement.scrollHeight -
-        document.documentElement.clientHeight;
-      setProgress(scrollHeight > 0 ? (scrollTop / scrollHeight) * 100 : 0);
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-  return progress;
-}
 
 /**
  * Apply a perspective tilt effect on mouse move for glass cards.
@@ -146,22 +122,37 @@ function useTilt(intensity = 8) {
 // Section Navigation
 // ============================================================================
 
-const SECTIONS = [
-  { id: "hero", label: "Introduction", icon: Sparkles },
-  { id: "colors", label: "Colors", icon: Palette },
-  { id: "typography", label: "Typography", icon: Type },
-  { id: "spacing", label: "Spacing", icon: Move },
-  { id: "glass", label: "Glass", icon: Layers },
-  { id: "buttons", label: "Buttons", icon: Box },
-  { id: "forms", label: "Forms", icon: Layout },
-  { id: "badges", label: "Badges", icon: Star },
-  { id: "navigation", label: "Navigation", icon: Globe },
-  { id: "cards", label: "Cards", icon: Folder },
-  { id: "data", label: "Data", icon: Table2 },
-  { id: "feedback", label: "Feedback", icon: MessageSquare },
-  { id: "icons", label: "Icons", icon: Image },
-  { id: "motion", label: "Motion", icon: Play },
+// Tab categories — each groups multiple sections
+const TABS = [
+  { id: "foundations", label: "Foundations", icon: Palette },
+  { id: "components", label: "Components", icon: Box },
+  { id: "patterns", label: "Patterns", icon: Layers },
 ] as const;
+
+// Sections within each tab (for the right-side nav)
+const TAB_SECTIONS: Record<string, { id: string; label: string; icon: typeof Palette }[]> = {
+  foundations: [
+    { id: "colors", label: "Colors", icon: Palette },
+    { id: "typography", label: "Typography", icon: Type },
+    { id: "spacing", label: "Spacing", icon: Move },
+    { id: "glass", label: "Glass", icon: Layers },
+  ],
+  components: [
+    { id: "buttons", label: "Buttons", icon: Box },
+    { id: "forms", label: "Forms", icon: Layout },
+    { id: "badges", label: "Badges", icon: Star },
+    { id: "navigation", label: "Navigation", icon: Globe },
+    { id: "modals", label: "Modals", icon: PanelTop },
+  ],
+  patterns: [
+    { id: "cards", label: "Cards", icon: Folder },
+    { id: "data", label: "Data", icon: Table2 },
+    { id: "feedback", label: "Feedback", icon: MessageSquare },
+    { id: "icons", label: "Icons", icon: Image },
+    { id: "motion", label: "Motion", icon: Play },
+    { id: "spotify", label: "Spotify", icon: Play },
+  ],
+};
 
 // ============================================================================
 // Reusable Section Components
@@ -199,14 +190,25 @@ function GlassCard({
   children: React.ReactNode;
   className?: string;
 }) {
-  const { ref, handleMouseMove, handleMouseLeave } = useTilt(5);
+  const { ref: tiltRef, handleMouseMove, handleMouseLeave } = useTilt(5);
+  const { ref: viewRef, isInView } = useInView(0.05);
+
+  const combinedRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      (tiltRef as React.RefObject<HTMLDivElement | null>).current = node;
+      (viewRef as React.RefObject<HTMLDivElement | null>).current = node;
+    },
+    [tiltRef, viewRef]
+  );
+
   return (
     <div
-      ref={ref}
+      ref={combinedRef}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       className={cn(
-        "glass rounded-oma-lg p-6 transition-transform duration-200 ease-out",
+        "glass rounded-oma-lg p-6 transition-all duration-700 ease-out",
+        isInView ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0",
         className
       )}
     >
@@ -1532,55 +1534,87 @@ function NavigationSection() {
         subtitle="Tabs, breadcrumbs, and sidebar patterns adapted for dark glass surfaces."
       />
 
-      {/* Tabs */}
+      {/* Liquid Tabs */}
       <GlassCard className="mb-8">
-        <SubHeading>Tabs</SubHeading>
-        <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="bg-oma-bg-surface">
-            <TabsTrigger
-              value="overview"
-              className="text-oma-text-muted data-[state=active]:bg-oma-bg-elevated data-[state=active]:text-oma-text"
-            >
-              Overview
-            </TabsTrigger>
-            <TabsTrigger
-              value="pipeline"
-              className="text-oma-text-muted data-[state=active]:bg-oma-bg-elevated data-[state=active]:text-oma-text"
-            >
-              Pipeline
-            </TabsTrigger>
-            <TabsTrigger
-              value="settings"
-              className="text-oma-text-muted data-[state=active]:bg-oma-bg-elevated data-[state=active]:text-oma-text"
-            >
-              Settings
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="overview" className="mt-4">
+        <SubHeading>Liquid Tabs</SubHeading>
+        <p className="mb-6 text-sm text-oma-text-muted">
+          A tab bar with a floating pill indicator that smoothly slides
+          between triggers. The pill uses a spring-like cubic-bezier for
+          an organic, liquidy feel.
+        </p>
+        <LiquidTabs defaultValue="overview">
+          <LiquidTabsList>
+            <LiquidTabsTrigger value="overview">Overview</LiquidTabsTrigger>
+            <LiquidTabsTrigger value="pipeline">Pipeline</LiquidTabsTrigger>
+            <LiquidTabsTrigger value="settings">Settings</LiquidTabsTrigger>
+          </LiquidTabsList>
+          <LiquidTabsContent value="overview" className="mt-4">
             <div className="glass-sm rounded-oma-sm p-4">
               <p className="text-sm text-oma-text-muted">
                 Overview panel content. This tab shows project summary,
                 key metrics, and recent activity.
               </p>
             </div>
-          </TabsContent>
-          <TabsContent value="pipeline" className="mt-4">
+          </LiquidTabsContent>
+          <LiquidTabsContent value="pipeline" className="mt-4">
             <div className="glass-sm rounded-oma-sm p-4">
               <p className="text-sm text-oma-text-muted">
                 Pipeline panel content. Monitor agent execution stages
                 and review output logs.
               </p>
             </div>
-          </TabsContent>
-          <TabsContent value="settings" className="mt-4">
+          </LiquidTabsContent>
+          <LiquidTabsContent value="settings" className="mt-4">
             <div className="glass-sm rounded-oma-sm p-4">
               <p className="text-sm text-oma-text-muted">
                 Settings panel content. Configure project parameters,
                 concurrency limits, and integrations.
               </p>
             </div>
-          </TabsContent>
-        </Tabs>
+          </LiquidTabsContent>
+        </LiquidTabs>
+      </GlassCard>
+
+      {/* Liquid Tabs — With Icons */}
+      <GlassCard className="mb-8">
+        <SubHeading>Tabs with Icons</SubHeading>
+        <LiquidTabs defaultValue="code">
+          <LiquidTabsList>
+            <LiquidTabsTrigger value="code">
+              <Code className="size-3.5" />
+              Code
+            </LiquidTabsTrigger>
+            <LiquidTabsTrigger value="terminal">
+              <Terminal className="size-3.5" />
+              Terminal
+            </LiquidTabsTrigger>
+            <LiquidTabsTrigger value="git">
+              <GitBranch className="size-3.5" />
+              Git
+            </LiquidTabsTrigger>
+          </LiquidTabsList>
+          <LiquidTabsContent value="code" className="mt-4">
+            <div className="glass-sm rounded-oma-sm p-4">
+              <p className="text-sm text-oma-text-muted">
+                Code editor panel with syntax highlighting and AI suggestions.
+              </p>
+            </div>
+          </LiquidTabsContent>
+          <LiquidTabsContent value="terminal" className="mt-4">
+            <div className="glass-sm rounded-oma-sm p-4">
+              <p className="text-sm text-oma-text-muted">
+                Integrated terminal with agent command execution output.
+              </p>
+            </div>
+          </LiquidTabsContent>
+          <LiquidTabsContent value="git" className="mt-4">
+            <div className="glass-sm rounded-oma-sm p-4">
+              <p className="text-sm text-oma-text-muted">
+                Git status, diff viewer, and branch management.
+              </p>
+            </div>
+          </LiquidTabsContent>
+        </LiquidTabs>
       </GlassCard>
 
       {/* Breadcrumbs */}
@@ -1831,6 +1865,120 @@ function CardsSection() {
 // Section 11: Data Display
 // ============================================================================
 
+// ---------------------------------------------------------------------------
+// Calendar Heatmap — GitHub-style contribution grid
+// ---------------------------------------------------------------------------
+
+/** Deterministic pseudo-random based on day index */
+function seededValue(day: number): number {
+  const x = Math.sin(day * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+/** Generate 52 weeks of mock data */
+function generateHeatmapData(): number[][] {
+  const weeks: number[][] = [];
+  for (let w = 0; w < 52; w++) {
+    const week: number[] = [];
+    for (let d = 0; d < 7; d++) {
+      const idx = w * 7 + d;
+      const r = seededValue(idx);
+      // ~25% empty, rest weighted toward lower values
+      if (r < 0.25) week.push(0);
+      else if (r < 0.55) week.push(1);
+      else if (r < 0.78) week.push(2);
+      else if (r < 0.92) week.push(3);
+      else week.push(4);
+    }
+    weeks.push(week);
+  }
+  return weeks;
+}
+
+const HEATMAP_DATA = generateHeatmapData();
+const MONTH_LABELS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+const DAY_LABELS = ["Mon", "", "Wed", "", "Fri", "", ""];
+
+const LEVEL_CLASSES = [
+  "bg-oma-bg-surface",                              // 0 — empty
+  "bg-oma-primary/20",                               // 1 — low
+  "bg-oma-primary/40",                               // 2 — medium
+  "bg-oma-primary/65",                               // 3 — high
+  "bg-oma-primary shadow-[0_0_6px_rgba(244,114,182,0.3)]", // 4 — max
+];
+
+function CalendarHeatmap() {
+  const totalContributions = HEATMAP_DATA.flat().reduce((a, b) => a + b, 0);
+
+  return (
+    <div className="space-y-3">
+      {/* Header with total */}
+      <div className="flex items-baseline justify-between">
+        <p className="text-xs text-oma-text-muted">
+          <span className="font-medium text-oma-text">{totalContributions}</span>{" "}
+          pipeline runs in the last year
+        </p>
+      </div>
+
+      {/* Grid */}
+      <div className="overflow-x-auto">
+        <div className="inline-flex gap-[3px]">
+          {/* Day-of-week labels */}
+          <div className="mr-1 flex flex-col gap-[3px] pt-[18px]">
+            {DAY_LABELS.map((label, i) => (
+              <div
+                key={i}
+                className="flex h-[11px] items-center text-[9px] leading-none text-oma-text-faint"
+              >
+                {label}
+              </div>
+            ))}
+          </div>
+
+          {/* Weeks */}
+          {HEATMAP_DATA.map((week, wi) => (
+            <div key={wi} className="flex flex-col gap-[3px]">
+              {/* Month label on the first week of each month */}
+              <div className="h-[14px]">
+                {wi % 4 === 0 && wi / 4 < 12 && (
+                  <span className="text-[9px] leading-none text-oma-text-faint">
+                    {MONTH_LABELS[Math.floor(wi / 4.33)]}
+                  </span>
+                )}
+              </div>
+              {week.map((level, di) => (
+                <div
+                  key={di}
+                  className={cn(
+                    "h-[11px] w-[11px] rounded-[2px] transition-all duration-150 hover:scale-150 hover:ring-1 hover:ring-oma-primary/40",
+                    LEVEL_CLASSES[level],
+                  )}
+                  title={`${level} runs`}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center justify-end gap-1.5">
+        <span className="text-[10px] text-oma-text-faint">Less</span>
+        {LEVEL_CLASSES.map((cls, i) => (
+          <div
+            key={i}
+            className={cn("h-[11px] w-[11px] rounded-[2px]", cls)}
+          />
+        ))}
+        <span className="text-[10px] text-oma-text-faint">More</span>
+      </div>
+    </div>
+  );
+}
+
 const TABLE_DATA = [
   {
     name: "Yuki Tanaka",
@@ -1907,6 +2055,16 @@ function DataSection() {
             </div>
           ))}
         </div>
+      </GlassCard>
+
+      {/* Calendar Heatmap */}
+      <GlassCard className="mb-8">
+        <SubHeading>Activity Heatmap</SubHeading>
+        <p className="mb-5 text-sm text-oma-text-muted">
+          GitHub-style contribution calendar showing agent pipeline activity
+          over the past year.
+        </p>
+        <CalendarHeatmap />
       </GlassCard>
 
       {/* Table */}
@@ -2160,7 +2318,289 @@ function FeedbackSection() {
 }
 
 // ============================================================================
-// Section 13: Icons & Decorative
+// Section 13: Modals & Dialogs
+// ============================================================================
+
+function ModalsSection() {
+  return (
+    <section id="modals" className="py-20">
+      <SectionHeader
+        title="Modals & Dialogs"
+        subtitle="Centered overlays for focused interactions — confirmations, forms, and detail views built on Radix Dialog."
+      />
+
+      {/* Basic modal */}
+      <GlassCard className="mb-8">
+        <SubHeading>Basic Dialog</SubHeading>
+        <p className="mb-6 text-sm text-oma-text-muted">
+          A simple centered modal with glass styling. Uses{" "}
+          <code className="font-mono text-oma-primary">DialogContent</code> from
+          shadcn/ui with Omakase overrides.
+        </p>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button className="bg-oma-primary text-white hover:bg-oma-primary-dim">
+              Open Dialog
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="glass-lg border-oma-glass-border bg-oma-bg-elevated shadow-oma-lg sm:max-w-md rounded-oma-lg">
+            <DialogHeader>
+              <DialogTitle className="font-serif text-xl text-oma-text">
+                Pipeline Complete
+              </DialogTitle>
+              <DialogDescription className="text-sm text-oma-text-muted">
+                All 4 agents finished successfully. A pull request has been
+                created and is ready for your review.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="my-2 rounded-oma border border-oma-glass-border bg-oma-bg-surface/50 p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-oma bg-oma-done/10">
+                  <CheckCircle className="size-5 text-oma-done" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-oma-text">
+                    PR #142 — Add user authentication
+                  </p>
+                  <p className="text-xs text-oma-text-subtle">
+                    4 files changed, 238 additions
+                  </p>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                className="border-oma-glass-border text-oma-text-muted hover:bg-white/[0.04] hover:text-oma-text"
+              >
+                Dismiss
+              </Button>
+              <Button className="bg-oma-primary text-white hover:bg-oma-primary-dim">
+                View PR
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </GlassCard>
+
+      {/* Danger / confirmation modal */}
+      <GlassCard className="mb-8">
+        <SubHeading>Confirmation Dialog</SubHeading>
+        <p className="mb-6 text-sm text-oma-text-muted">
+          Destructive action confirmations use red accents to signal severity.
+        </p>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button
+              variant="outline"
+              className="border-oma-error/30 text-oma-error hover:bg-oma-error/10 hover:text-oma-error"
+            >
+              <Trash2 className="mr-2 size-4" />
+              Delete Project
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="glass-lg border-oma-glass-border bg-oma-bg-elevated shadow-oma-lg sm:max-w-sm rounded-oma-lg">
+            <DialogHeader>
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-oma-error/10">
+                <AlertTriangle className="size-6 text-oma-error" />
+              </div>
+              <DialogTitle className="text-center font-serif text-xl text-oma-text">
+                Delete Project?
+              </DialogTitle>
+              <DialogDescription className="text-center text-sm text-oma-text-muted">
+                This will permanently delete{" "}
+                <span className="font-medium text-oma-text">omakase-core</span>{" "}
+                and all associated data. This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:flex-col">
+              <Button className="w-full bg-oma-error text-white hover:bg-oma-error/80">
+                Delete permanently
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full border-oma-glass-border text-oma-text-muted hover:bg-white/[0.04] hover:text-oma-text"
+              >
+                Cancel
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </GlassCard>
+
+      {/* Form modal */}
+      <GlassCard className="mb-8">
+        <SubHeading>Form Dialog</SubHeading>
+        <p className="mb-6 text-sm text-oma-text-muted">
+          Modals containing form inputs for creating or editing resources.
+        </p>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button className="bg-oma-indigo text-white hover:bg-oma-indigo-dim">
+              <Plus className="mr-2 size-4" />
+              New Feature
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="glass-lg border-oma-glass-border bg-oma-bg-elevated shadow-oma-lg sm:max-w-lg rounded-oma-lg">
+            <DialogHeader>
+              <DialogTitle className="font-serif text-xl text-oma-text">
+                Create Feature
+              </DialogTitle>
+              <DialogDescription className="text-sm text-oma-text-muted">
+                Define a new feature for the agent pipeline to implement.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div>
+                <Label
+                  htmlFor="modal-feat-name"
+                  className="mb-1.5 text-xs font-medium text-oma-text-muted"
+                >
+                  Feature Name
+                </Label>
+                <Input
+                  id="modal-feat-name"
+                  placeholder="e.g. User authentication"
+                  className="glass-sm border-oma-glass-border bg-transparent text-oma-text placeholder:text-oma-text-faint focus:border-oma-primary focus:ring-oma-primary/30"
+                />
+              </div>
+              <div>
+                <Label
+                  htmlFor="modal-feat-desc"
+                  className="mb-1.5 text-xs font-medium text-oma-text-muted"
+                >
+                  Description
+                </Label>
+                <Textarea
+                  id="modal-feat-desc"
+                  rows={3}
+                  placeholder="Describe what the feature should do..."
+                  className="glass-sm resize-none border-oma-glass-border bg-transparent text-oma-text placeholder:text-oma-text-faint focus:border-oma-primary focus:ring-oma-primary/30"
+                />
+              </div>
+              <div>
+                <Label
+                  htmlFor="modal-feat-priority"
+                  className="mb-1.5 text-xs font-medium text-oma-text-muted"
+                >
+                  Priority
+                </Label>
+                <Select>
+                  <SelectTrigger className="glass-sm border-oma-glass-border bg-transparent text-oma-text">
+                    <SelectValue placeholder="Select priority" />
+                  </SelectTrigger>
+                  <SelectContent className="glass-lg border-oma-glass-border bg-oma-bg-elevated">
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                className="border-oma-glass-border text-oma-text-muted hover:bg-white/[0.04] hover:text-oma-text"
+              >
+                Cancel
+              </Button>
+              <Button className="bg-oma-indigo text-white hover:bg-oma-indigo-dim">
+                Create Feature
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </GlassCard>
+
+      {/* Large detail modal */}
+      <GlassCard>
+        <SubHeading>Large Detail Modal</SubHeading>
+        <p className="mb-6 text-sm text-oma-text-muted">
+          A wider modal for displaying detailed content like agent logs or chat
+          panels. Uses{" "}
+          <code className="font-mono text-oma-primary">max-w-2xl</code> for a
+          672px container.
+        </p>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button
+              variant="outline"
+              className="border-oma-glass-border text-oma-text hover:bg-white/[0.04]"
+            >
+              <Eye className="mr-2 size-4" />
+              View Agent Details
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="glass-lg border-oma-glass-border bg-oma-bg-elevated shadow-oma-lg sm:max-w-2xl rounded-oma-lg">
+            <DialogHeader>
+              <DialogTitle className="font-serif text-xl text-oma-text">
+                Agent Run — Miso (Architect)
+              </DialogTitle>
+              <DialogDescription className="text-sm text-oma-text-muted">
+                Run #a7f3d2 started 4 minutes ago
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              {/* Agent status row */}
+              <div className="flex items-center gap-3 rounded-oma border border-oma-glass-border bg-oma-bg-surface/50 p-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-oma text-xl glass-sm">
+                  🍙
+                </span>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-oma-text">Miso</p>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block rounded-full bg-oma-indigo/20 px-2 py-0.5 text-[10px] font-medium text-oma-indigo">
+                      architect
+                    </span>
+                    <span className="flex items-center gap-1 text-[10px] text-oma-done">
+                      <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-oma-done" />
+                      running
+                    </span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-mono text-xs text-oma-text-subtle">
+                    4m 12s
+                  </p>
+                  <p className="text-[10px] text-oma-text-faint">elapsed</p>
+                </div>
+              </div>
+              {/* Log output preview */}
+              <div className="max-h-48 overflow-y-auto rounded-oma bg-oma-bg-deep p-4">
+                <pre className="font-mono text-xs leading-relaxed text-oma-text-muted">
+                  <span className="text-oma-text-faint">[14:02:31]</span>{" "}
+                  <span className="text-oma-jade">Analyzing feature requirements...</span>{"\n"}
+                  <span className="text-oma-text-faint">[14:02:33]</span>{" "}
+                  Reading existing codebase structure{"\n"}
+                  <span className="text-oma-text-faint">[14:02:45]</span>{" "}
+                  <span className="text-oma-jade">Identified 6 files to modify</span>{"\n"}
+                  <span className="text-oma-text-faint">[14:03:02]</span>{" "}
+                  Generating implementation plan...{"\n"}
+                  <span className="text-oma-text-faint">[14:03:18]</span>{" "}
+                  <span className="text-oma-primary">Plan ready — 4 steps, ~120 lines</span>
+                </pre>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                className="border-oma-glass-border text-oma-text-muted hover:bg-white/[0.04] hover:text-oma-text"
+              >
+                Close
+              </Button>
+              <Button className="bg-oma-primary text-white hover:bg-oma-primary-dim">
+                Open Full Logs
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </GlassCard>
+    </section>
+  );
+}
+
+// ============================================================================
+// Section 14: Icons & Decorative
 // ============================================================================
 
 const ICON_GRID = [
@@ -2366,6 +2806,62 @@ function MotionSection() {
               </p>
             </div>
           </div>
+        </div>
+      </GlassCard>
+
+      {/* Scroll Reveal demos */}
+      <GlassCard className="mb-8">
+        <SubHeading>Scroll Reveal</SubHeading>
+        <p className="mb-6 text-sm text-oma-text-muted">
+          Elements animate into view as you scroll. Powered by{" "}
+          <code className="font-mono text-oma-primary">&lt;ScrollReveal&gt;</code>{" "}
+          with IntersectionObserver. Supports staggered delays and multiple variants.
+        </p>
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {(
+            [
+              { variant: "fade-up", label: "Fade Up", color: "text-oma-primary" },
+              { variant: "fade-down", label: "Fade Down", color: "text-oma-secondary" },
+              { variant: "fade-left", label: "Fade Left", color: "text-oma-jade" },
+              { variant: "fade-right", label: "Fade Right", color: "text-oma-gold" },
+              { variant: "scale", label: "Scale", color: "text-oma-indigo" },
+              { variant: "blur", label: "Blur", color: "text-oma-info" },
+            ] as const
+          ).map((item, i) => (
+            <ScrollReveal key={item.variant} variant={item.variant} delay={i * 100}>
+              <div className="glass-sm flex h-28 flex-col items-center justify-center rounded-oma-sm">
+                <p className={cn("text-sm font-medium", item.color)}>
+                  {item.label}
+                </p>
+                <p className="mt-1 font-mono text-xs text-oma-text-faint">
+                  variant=&quot;{item.variant}&quot;
+                </p>
+              </div>
+            </ScrollReveal>
+          ))}
+        </div>
+      </GlassCard>
+
+      {/* Staggered list demo */}
+      <GlassCard className="mb-8">
+        <SubHeading>Staggered List</SubHeading>
+        <p className="mb-6 text-sm text-oma-text-muted">
+          Use incremental <code className="font-mono text-oma-primary">delay</code> props
+          to create staggered entrance sequences.
+        </p>
+        <div className="space-y-3">
+          {["Architect analyzes requirements", "Coder implements the feature", "Reviewer checks code quality", "Tester verifies correctness"].map(
+            (step, i) => (
+              <ScrollReveal key={step} variant="fade-left" delay={i * 150}>
+                <div className="glass-sm flex items-center gap-4 rounded-oma px-4 py-3">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-oma-primary/10 font-mono text-xs font-medium text-oma-primary">
+                    {i + 1}
+                  </span>
+                  <p className="text-sm text-oma-text">{step}</p>
+                </div>
+              </ScrollReveal>
+            )
+          )}
         </div>
       </GlassCard>
 
@@ -2583,67 +3079,302 @@ function MotionSection() {
 }
 
 // ============================================================================
-// Navigation Components
+// Main Page Component
 // ============================================================================
 
-function DesktopNav({ activeSection }: { activeSection: string }) {
+// ---------------------------------------------------------------------------
+// Right-side section nav — shows sections for the active tab
+// ---------------------------------------------------------------------------
+
+function SectionNav({ sections, activeSection }: {
+  sections: { id: string; label: string; icon: typeof Palette }[];
+  activeSection: string;
+}) {
   return (
-    <nav className="fixed left-0 top-1/2 z-50 hidden -translate-y-1/2 xl:block">
-      <div className="glass-lg ml-4 rounded-oma-lg p-2">
-        <ul className="space-y-1">
-          {SECTIONS.map((section) => {
-            const Icon = section.icon;
-            const isActive = activeSection === section.id;
-            return (
-              <li key={section.id}>
-                <a
-                  href={`#${section.id}`}
-                  className={cn(
-                    "group relative flex items-center gap-2 rounded-oma-sm px-3 py-2 text-xs font-medium transition-all",
-                    isActive
-                      ? "glass-active text-oma-text"
-                      : "text-oma-text-faint hover:bg-white/[0.04] hover:text-oma-text-muted"
-                  )}
-                >
-                  <Icon className="size-3.5 shrink-0" />
-                  <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-300 group-hover:max-w-[100px] group-hover:opacity-100">
-                    {section.label}
-                  </span>
-                  {isActive && (
-                    <span className="absolute inset-0 animate-oma-glow-pulse rounded-full" />
-                  )}
-                </a>
-              </li>
-            );
-          })}
-        </ul>
+    <div className="glass-lg rounded-oma-lg p-2">
+      <ul className="space-y-1">
+        {sections.map((section) => {
+          const Icon = section.icon;
+          const isActive = activeSection === section.id;
+          return (
+            <li key={section.id}>
+              <a
+                href={`#${section.id}`}
+                className={cn(
+                  "relative flex items-center justify-end gap-2 rounded-oma-sm px-3 py-2 text-xs font-medium transition-all duration-200",
+                  isActive
+                    ? "text-oma-text"
+                    : "text-oma-text-faint hover:bg-white/[0.04] hover:text-oma-text-muted"
+                )}
+              >
+                {isActive && (
+                  <>
+                    <span className="absolute inset-0 rounded-oma-sm bg-white/[0.06]" />
+                    <span className="absolute inset-[1px] rounded-oma-sm bg-white/[0.04] backdrop-blur-sm" />
+                    <span className="absolute inset-0 rounded-oma-sm border border-white/[0.08]" />
+                  </>
+                )}
+                <span className="relative whitespace-nowrap text-right">
+                  {section.label}
+                </span>
+                <Icon className="relative size-3.5 shrink-0" />
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function CategorySidebar({ activeTab, onTabChange }: {
+  activeTab: string;
+  onTabChange: (tab: string) => void;
+}) {
+  return (
+    <div className="glass-lg rounded-oma-lg p-1.5">
+      <ul className="flex flex-col items-center gap-1">
+        {TABS.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <li key={tab.id}>
+              <button
+                onClick={() => onTabChange(tab.id)}
+                className={cn(
+                  "relative flex flex-col items-center gap-1.5 rounded-oma-sm px-2 py-3 text-[10px] font-medium tracking-widest uppercase transition-all duration-200",
+                  isActive
+                    ? "text-oma-primary"
+                    : "text-oma-text-faint hover:bg-white/[0.04] hover:text-oma-text-muted"
+                )}
+              >
+                {isActive && (
+                  <>
+                    <span className="absolute inset-0 rounded-oma-sm bg-oma-primary/[0.08]" />
+                    <span className="absolute inset-[1px] rounded-oma-sm bg-oma-primary/[0.05] backdrop-blur-sm" />
+                    <span className="absolute inset-0 rounded-oma-sm border border-oma-primary/[0.15]" />
+                  </>
+                )}
+                <Icon className="relative size-3.5 shrink-0" />
+                <span className="relative" style={{ writingMode: "vertical-rl" }}>{tab.label}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function RightSideNav({ activeTab, onTabChange, sections, activeSection }: {
+  activeTab: string;
+  onTabChange: (tab: string) => void;
+  sections: { id: string; label: string; icon: typeof Palette }[];
+  activeSection: string;
+}) {
+  return (
+    <nav className="fixed right-0 top-1/2 z-50 hidden -translate-y-1/2 xl:flex">
+      <div className="mr-4 flex items-start gap-2">
+        <SectionNav sections={sections} activeSection={activeSection} />
+        <CategorySidebar activeTab={activeTab} onTabChange={onTabChange} />
       </div>
     </nav>
   );
 }
 
-function MobileNav({ activeSection }: { activeSection: string }) {
+// ---------------------------------------------------------------------------
+// Tab content panels — each renders its sections with scroll observation
+// ---------------------------------------------------------------------------
+
+function FoundationsPanel({ onSectionChange }: { onSectionChange: (id: string) => void }) {
+  const observe = useSectionObserver(onSectionChange);
   return (
-    <nav className="oma-scroll sticky top-0 z-50 xl:hidden">
-      <div className="glass-lg border-b border-oma-glass-border px-4 py-2">
-        <div className="oma-scroll flex gap-1 overflow-x-auto">
-          {SECTIONS.map((section) => (
-            <a
-              key={section.id}
-              href={`#${section.id}`}
-              className={cn(
-                "shrink-0 rounded-oma-sm px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-all",
-                activeSection === section.id
-                  ? "glass-active text-oma-text"
-                  : "text-oma-text-faint hover:text-oma-text-muted"
-              )}
-            >
-              {section.label}
-            </a>
-          ))}
+    <div className="scroll-smooth">
+      <div ref={observe("colors")}><ColorsSection /></div>
+      <div ref={observe("typography")}><TypographySection /></div>
+      <div ref={observe("spacing")}><SpacingSection /></div>
+      <div ref={observe("glass")}><GlassSection /></div>
+    </div>
+  );
+}
+
+function ComponentsPanel({ onSectionChange }: { onSectionChange: (id: string) => void }) {
+  const observe = useSectionObserver(onSectionChange);
+  return (
+    <div className="scroll-smooth">
+      <div ref={observe("buttons")}><ButtonsSection /></div>
+      <div ref={observe("forms")}><FormsSection /></div>
+      <div ref={observe("badges")}><BadgesSection /></div>
+      <div ref={observe("navigation")}><NavigationSection /></div>
+      <div ref={observe("modals")}><ModalsSection /></div>
+    </div>
+  );
+}
+
+function SpotifySection() {
+  return (
+    <section id="spotify" className="py-20">
+      <SectionHeader
+        title="Spotify Now Playing"
+        subtitle="A compact media player widget that lives in the navbar header, showing the currently playing Spotify track with album art, progress, and equalizer animation."
+      />
+
+      <GlassCard className="mb-8">
+        <SubHeading>Live Preview</SubHeading>
+        <p className="mb-6 text-sm text-oma-text-muted">
+          The component below is live — if Spotify is connected and playing, you&apos;ll see your current track.
+          Otherwise, connect Spotify via <code className="font-mono text-oma-primary">/api/auth/spotify</code>.
+        </p>
+        <div className="flex items-center justify-center rounded-oma-lg bg-oma-bg-deep p-8">
+          <div className="flex items-center gap-6">
+            {/* Simulated navbar context */}
+            <div className="flex h-14 items-center gap-4 rounded-oma-lg border border-oma-glass-border bg-oma-bg/80 px-6 backdrop-blur-xl">
+              <span className="text-xs font-medium uppercase tracking-widest text-oma-text-subtle">Dashboard</span>
+              <div className="h-6 w-px bg-oma-glass-border" />
+              <SpotifyNowPlayingPreview />
+              <div className="h-6 w-px bg-oma-glass-border" />
+              <span className="font-jp text-xs text-oma-text-faint">おまかせ</span>
+            </div>
+          </div>
+        </div>
+      </GlassCard>
+
+      <GlassCard className="mb-8">
+        <SubHeading>Component States</SubHeading>
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+          {/* Not connected */}
+          <div className="rounded-oma-lg border border-oma-glass-border bg-oma-bg-deep p-4">
+            <p className="mb-3 text-xs font-medium text-oma-text-subtle">Not Connected</p>
+            <div className="flex items-center gap-2 rounded-oma px-3 py-1.5 text-xs text-oma-text-subtle transition-all duration-300 hover:bg-white/[0.04] hover:text-oma-text">
+              <svg viewBox="0 0 24 24" className="size-3.5 text-[#1DB954] opacity-50" fill="currentColor">
+                <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
+              </svg>
+              <span>Connect Spotify</span>
+            </div>
+          </div>
+
+          {/* Idle */}
+          <div className="rounded-oma-lg border border-oma-glass-border bg-oma-bg-deep p-4">
+            <p className="mb-3 text-xs font-medium text-oma-text-subtle">Connected — Idle</p>
+            <div className="flex items-center gap-2 rounded-oma px-3 py-1.5 text-xs text-oma-text-faint">
+              <svg viewBox="0 0 24 24" className="size-3.5 opacity-30" fill="currentColor">
+                <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
+              </svg>
+              <span>Not playing</span>
+            </div>
+          </div>
+
+          {/* Playing (static demo) */}
+          <div className="rounded-oma-lg border border-oma-glass-border bg-oma-bg-deep p-4">
+            <p className="mb-3 text-xs font-medium text-oma-text-subtle">Playing</p>
+            <div className="glass-sm relative flex items-center gap-2.5 rounded-oma-lg px-2 py-1.5">
+              <div className="relative size-8 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-oma-primary to-oma-indigo">
+                <div className="flex size-full animate-[spin_8s_linear_infinite] items-center justify-center text-xs text-white/80">
+                  &#9835;
+                </div>
+              </div>
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <div className="flex items-center gap-1.5">
+                  <div className="flex items-end gap-[2px]">
+                    <span className="inline-block w-[2px] animate-[equalizer_0.8s_ease-in-out_infinite] rounded-full bg-[#1DB954]" style={{ height: "8px" }} />
+                    <span className="inline-block w-[2px] animate-[equalizer_0.8s_ease-in-out_infinite_0.2s] rounded-full bg-[#1DB954]" style={{ height: "12px" }} />
+                    <span className="inline-block w-[2px] animate-[equalizer_0.8s_ease-in-out_infinite_0.4s] rounded-full bg-[#1DB954]" style={{ height: "6px" }} />
+                  </div>
+                  <span className="text-[11px] font-semibold text-oma-text">Tokyo Drifting</span>
+                </div>
+                <span className="text-[10px] text-oma-text-subtle">Glass Animals</span>
+              </div>
+              <div className="absolute inset-x-2 -bottom-px h-[2px] overflow-hidden rounded-full bg-oma-bg-surface/50">
+                <div className="h-full w-[65%] rounded-full bg-[#1DB954]/60" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </GlassCard>
+
+      <GlassCard>
+        <SubHeading>Setup</SubHeading>
+        <div className="space-y-3 text-sm text-oma-text-muted">
+          <p>1. Create a Spotify app at <code className="font-mono text-oma-primary">developer.spotify.com</code></p>
+          <p>2. Set redirect URI to <code className="font-mono text-oma-primary">http://localhost:3000/api/auth/spotify/callback</code></p>
+          <p>3. Add <code className="font-mono text-oma-primary">SPOTIFY_CLIENT_ID</code>, <code className="font-mono text-oma-primary">SPOTIFY_CLIENT_SECRET</code>, <code className="font-mono text-oma-primary">SPOTIFY_REDIRECT_URI</code> to <code className="font-mono text-oma-primary">.env</code></p>
+          <p>4. Visit <code className="font-mono text-oma-primary">/api/auth/spotify</code> to connect your account</p>
+        </div>
+      </GlassCard>
+    </section>
+  );
+}
+
+function SpotifyNowPlayingPreview() {
+  return (
+    <div className="glass-sm relative flex items-center gap-2.5 rounded-oma-lg px-2 py-1.5">
+      <div className="relative size-8 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-oma-gold to-oma-secondary">
+        <div className="flex size-full animate-[spin_8s_linear_infinite] items-center justify-center text-xs text-white/80">
+          &#9835;
         </div>
       </div>
-    </nav>
+      <div className="flex min-w-0 max-w-[140px] flex-col gap-0.5">
+        <div className="flex items-center gap-1.5">
+          <div className="flex items-end gap-[2px]">
+            <span className="inline-block w-[2px] animate-[equalizer_0.8s_ease-in-out_infinite] rounded-full bg-[#1DB954]" style={{ height: "8px" }} />
+            <span className="inline-block w-[2px] animate-[equalizer_0.8s_ease-in-out_infinite_0.2s] rounded-full bg-[#1DB954]" style={{ height: "12px" }} />
+            <span className="inline-block w-[2px] animate-[equalizer_0.8s_ease-in-out_infinite_0.4s] rounded-full bg-[#1DB954]" style={{ height: "6px" }} />
+          </div>
+          <span className="text-[11px] font-semibold text-oma-text">Heat Waves</span>
+        </div>
+        <span className="text-[10px] text-oma-text-subtle">Glass Animals</span>
+      </div>
+      <div className="absolute inset-x-2 -bottom-px h-[2px] overflow-hidden rounded-full bg-oma-bg-surface/50">
+        <div className="h-full w-[42%] rounded-full bg-[#1DB954]/60 transition-[width] duration-1000 ease-linear" />
+      </div>
+    </div>
+  );
+}
+
+function PatternsPanel({ onSectionChange }: { onSectionChange: (id: string) => void }) {
+  const observe = useSectionObserver(onSectionChange);
+  return (
+    <div className="scroll-smooth">
+      <div ref={observe("cards")}><CardsSection /></div>
+      <div ref={observe("data")}><DataSection /></div>
+      <div ref={observe("feedback")}><FeedbackSection /></div>
+      <div ref={observe("icons")}><IconsSection /></div>
+      <div ref={observe("motion")}><MotionSection /></div>
+      <div ref={observe("spotify")}><SpotifySection /></div>
+    </div>
+  );
+}
+
+/** Returns a ref-callback factory that tracks which section is in view */
+function useSectionObserver(onSectionChange: (id: string) => void) {
+  const observersRef = useRef<Map<string, IntersectionObserver>>(new Map());
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      observersRef.current.forEach((obs) => obs.disconnect());
+    };
+  }, []);
+
+  return useCallback(
+    (id: string) => (node: HTMLDivElement | null) => {
+      // Disconnect any previous observer for this id
+      observersRef.current.get(id)?.disconnect();
+
+      if (!node) return;
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) onSectionChange(id);
+          });
+        },
+        { rootMargin: "-30% 0px -30% 0px", threshold: 0 }
+      );
+      observer.observe(node);
+      observersRef.current.set(id, observer);
+    },
+    [onSectionChange],
   );
 }
 
@@ -2652,135 +3383,52 @@ function MobileNav({ activeSection }: { activeSection: string }) {
 // ============================================================================
 
 export default function StyleSystemPage() {
-  const [activeSection, setActiveSection] = useState("hero");
-  const scrollProgress = useScrollProgress();
+  const [activeTab, setActiveTab] = useState("foundations");
+  const [activeSection, setActiveSection] = useState("");
 
-  /**
-   * Track which section is currently in view using IntersectionObserver.
-   * We attach a ref-callback to each section wrapper so the observer
-   * fires as the user scrolls through the page.
-   */
-  const observerCallback = (id: string) => (node: HTMLDivElement | null) => {
-    if (!node) return;
+  // Reset active section when tab changes
+  const handleTabChange = useCallback((tab: string) => {
+    setActiveTab(tab);
+    const firstSection = TAB_SECTIONS[tab]?.[0];
+    if (firstSection) setActiveSection(firstSection.id);
+  }, []);
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setActiveSection(id);
-          }
-        });
-      },
-      { rootMargin: "-40% 0px -40% 0px", threshold: 0 }
-    );
+  const sections = TAB_SECTIONS[activeTab] ?? [];
 
-    observer.observe(node);
-
-    // Cleanup: disconnect when the node is removed from the DOM.
-    // We leverage the MutationObserver pattern indirectly -- React will call
-    // this callback with null on unmount, but IntersectionObserver has
-    // already been set up. For a client-only page with no dynamic
-    // section mounting/unmounting, this is acceptable.
-  };
+  // Determine which panel to render
+  const PanelComponent = activeTab === "foundations"
+    ? FoundationsPanel
+    : activeTab === "components"
+      ? ComponentsPanel
+      : PatternsPanel;
 
   return (
     <div className="-m-8 min-h-screen bg-oma-bg-deep font-sans text-oma-text">
-      {/* Scroll progress bar */}
-      <div className="fixed left-0 top-0 z-50 h-0.5 w-full">
-        <div
-          className="h-full bg-gradient-to-r from-oma-primary via-oma-secondary to-oma-gold transition-all duration-150"
-          style={{ width: `${scrollProgress}%` }}
-        />
-      </div>
+      <div className="mx-auto max-w-6xl px-6 md:px-12 xl:px-8">
+        {/* Hero */}
+        <HeroSection />
 
-      {/* Mobile horizontal scroll nav */}
-      <MobileNav activeSection={activeSection} />
-
-      {/* Desktop floating sidebar nav */}
-      <DesktopNav activeSection={activeSection} />
-
-      {/* Main content with scroll-smooth */}
-      <div className="oma-scroll scroll-smooth">
-        <div className="mx-auto max-w-6xl px-6 md:px-12 xl:px-8">
-          {/* Section 1: Hero */}
-          <div ref={observerCallback("hero")}>
-            <HeroSection />
-          </div>
-
-          {/* Section 2: Colors */}
-          <div ref={observerCallback("colors")}>
-            <ColorsSection />
-          </div>
-
-          {/* Section 3: Typography */}
-          <div ref={observerCallback("typography")}>
-            <TypographySection />
-          </div>
-
-          {/* Section 4: Spacing & Layout */}
-          <div ref={observerCallback("spacing")}>
-            <SpacingSection />
-          </div>
-
-          {/* Section 5: Glass / Surfaces */}
-          <div ref={observerCallback("glass")}>
-            <GlassSection />
-          </div>
-
-          {/* Section 6: Buttons */}
-          <div ref={observerCallback("buttons")}>
-            <ButtonsSection />
-          </div>
-
-          {/* Section 7: Form Elements */}
-          <div ref={observerCallback("forms")}>
-            <FormsSection />
-          </div>
-
-          {/* Section 8: Badges & Tags */}
-          <div ref={observerCallback("badges")}>
-            <BadgesSection />
-          </div>
-
-          {/* Section 9: Navigation */}
-          <div ref={observerCallback("navigation")}>
-            <NavigationSection />
-          </div>
-
-          {/* Section 10: Cards & Containers */}
-          <div ref={observerCallback("cards")}>
-            <CardsSection />
-          </div>
-
-          {/* Section 11: Data Display */}
-          <div ref={observerCallback("data")}>
-            <DataSection />
-          </div>
-
-          {/* Section 12: Feedback */}
-          <div ref={observerCallback("feedback")}>
-            <FeedbackSection />
-          </div>
-
-          {/* Section 13: Icons & Decorative */}
-          <div ref={observerCallback("icons")}>
-            <IconsSection />
-          </div>
-
-          {/* Section 14: Motion & Animation */}
-          <div ref={observerCallback("motion")}>
-            <MotionSection />
-          </div>
-
-          {/* Footer */}
-          <footer className="border-t border-oma-glass-border py-16 text-center">
-            <p className="font-jp text-lg text-oma-text-subtle">おまかせ</p>
-            <p className="mt-2 text-sm text-oma-text-faint">
-              Omakase Design System &mdash; Built with trust, glass, and
-              intention.
-            </p>
-          </footer>
+        {/* Content */}
+        <div className="mt-4">
+          <PanelComponent onSectionChange={setActiveSection} />
         </div>
+
+        {/* Right-side navigation: section nav + category tabs */}
+        <RightSideNav
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          sections={sections}
+          activeSection={activeSection}
+        />
+
+        {/* Footer */}
+        <footer className="border-t border-oma-glass-border py-16 text-center">
+          <p className="font-jp text-lg text-oma-text-subtle">おまかせ</p>
+          <p className="mt-2 text-sm text-oma-text-faint">
+            Omakase Design System &mdash; Built with trust, glass, and
+            intention.
+          </p>
+        </footer>
       </div>
     </div>
   );
