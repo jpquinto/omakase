@@ -27,6 +27,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { SpotifyNowPlaying } from "@/components/spotify-now-playing";
+import { WeatherWidget } from "@/components/weather-widget";
 import type { AgentRunRole } from "@omakase/db";
 
 const NAV_ITEMS = [
@@ -532,10 +533,8 @@ export default function AppLayout({
           </div>
 
           <div className="flex items-center gap-3">
+            <WeatherWidget />
             <SpotifyNowPlaying />
-            <div className="hidden text-xs text-oma-text-faint sm:block">
-              <span className="font-jp">おまかせ</span>
-            </div>
           </div>
         </header>
 

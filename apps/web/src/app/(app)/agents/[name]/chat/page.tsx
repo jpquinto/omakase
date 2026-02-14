@@ -74,7 +74,7 @@ export default function AgentChatPage() {
   const prevStreamLen = useRef(0);
 
   // Welcome screen state
-  const [pendingNewConversation, setPendingNewConversation] = useState(false);
+  const [pendingNewConversation, setPendingNewConversation] = useState(!threadFromUrl);
   const [welcomeDismissed, setWelcomeDismissed] = useState(false);
   const [welcomeMounted, setWelcomeMounted] = useState(false);
   const welcomeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -95,13 +95,11 @@ export default function AgentChatPage() {
     }
   }, [threadFromUrl, selectedThreadId]);
 
-  // Auto-select: most recent thread or stay on welcome
+  // Default to welcome screen (new conversation) unless URL specifies a thread
   useEffect(() => {
-    if (threadFromUrl) return; // URL already specified
-    if (threads.length > 0 && !selectedThreadId && !pendingNewConversation) {
-      updateThreadUrl(threads[0].threadId);
-    }
-  }, [threads, selectedThreadId, threadFromUrl, pendingNewConversation, updateThreadUrl]);
+    if (threadFromUrl) return; // URL already specified a thread
+    // Don't auto-select — stay on the welcome/new conversation screen
+  }, [threadFromUrl]);
 
   // Sync title value when thread changes
   useEffect(() => {
@@ -112,6 +110,10 @@ export default function AgentChatPage() {
 
   // Reset welcome state when thread changes
   useEffect(() => {
+    if (selectedThreadId) {
+      // Navigated to an existing thread — exit welcome/new conversation mode
+      setPendingNewConversation(false);
+    }
     setWelcomeDismissed(false);
   }, [selectedThreadId]);
 
@@ -213,6 +215,12 @@ export default function AgentChatPage() {
     }
   };
 
+  const handleNewConversation = useCallback(() => {
+    updateThreadUrl(null);
+    setPendingNewConversation(true);
+    setWelcomeDismissed(false);
+  }, [updateThreadUrl]);
+
   const handleCreateThread = useCallback(async () => {
     try {
       const thread = await createThread(undefined, pendingMode);
@@ -290,6 +298,7 @@ export default function AgentChatPage() {
         onToggleGameMenu={() => setGameMenuOpen(!gameMenuOpen)}
         onLaunchQuiz={handleLaunchQuiz}
         variant="fullscreen"
+        onNewConversation={handleNewConversation}
       />
 
       <ChatMessageArea
