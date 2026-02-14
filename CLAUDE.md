@@ -81,7 +81,7 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on push/PR to main:
 
 ### Frontend (`apps/web/`)
 
-Next.js 15 App Router with React 19, Tailwind CSS v4 (neobrutalism design), and Auth0 v4 authentication.
+Next.js 15 App Router with React 19, Tailwind CSS v4 (Liquid Glass design system), and Auth0 v4 authentication. For full design system details, see [STYLE_GUIDE.md](STYLE_GUIDE.md).
 
 **Route groups:**
 - `(public)/` -- Landing page, unauthenticated routes
@@ -163,6 +163,28 @@ TypeScript type definitions (`Feature`, `Project`, `Agent`, `User`, `Ticket`, `A
 AWS CDK stack creating: VPC (2 AZs), ECS Cluster, ALB, ECR repository, Orchestrator Fargate service, Agent task definition, IAM roles, Secrets Manager, CloudWatch log groups.
 
 See `infra/lib/omakase-stack.ts` for the full resource definition.
+
+## Design System (Liquid Glass)
+
+For the complete style reference, see [STYLE_GUIDE.md](STYLE_GUIDE.md). Interactive showcase at `/style-system`.
+
+**When writing frontend code, follow these rules:**
+
+- **Fonts:** Instrument Serif (`font-serif`) for headings, Outfit (`font-sans`) for body, JetBrains Mono (`font-mono`) for code, Noto Serif JP (`font-jp`) for Japanese text
+- **Colors:** Use `oma-*` tokens — primary: Sakura `#f472b6`, secondary: Beni `#f87171`, accents: Gold `#fbbf24`, Jade `#6ee7b7`, Indigo `#818cf8`
+- **Backgrounds:** `bg-oma-bg` (main), `bg-oma-bg-elevated` (cards), `bg-oma-bg-surface` (interactive)
+- **Text:** `text-oma-text` (primary), `text-oma-text-muted` (secondary), `text-oma-text-subtle` (tertiary)
+- **Glass surfaces:** Use `.glass`, `.glass-sm`, `.glass-lg` utility classes — never set `backdrop-filter` manually
+- **Tinted glass:** `.glass-primary` (pink), `.glass-secondary` (red), `.glass-gold`
+- **Borders:** `border-oma-glass-border` (subtle), `border-oma-glass-border-bright` (prominent)
+- **Radii:** `rounded-oma` (12px default), `rounded-oma-lg` (16px cards), `rounded-oma-full` (pills)
+- **Shadows:** `shadow-oma-sm`, `shadow-oma`, `shadow-oma-lg`; glows: `glow-primary`, `glow-gold`
+- **Animations:** `animate-oma-fade-up` for reveals, `animate-oma-scale-in` for pop-ins, `animate-oma-blur-in` for soft entrances
+- **Semantic colors:** `oma-success` (green), `oma-warning` (gold), `oma-error` (red), `oma-info` (blue)
+- **Status colors:** `oma-pending`, `oma-progress`, `oma-done`, `oma-fail`
+- **Icons:** Lucide React exclusively (`lucide-react`)
+- **Components:** shadcn/ui in `src/components/ui/`, use `cn()` from `src/lib/utils.ts` for class merging
+- **Theme:** Dark mode default, light mode via `.light` class (next-themes)
 
 ## Key Patterns
 
