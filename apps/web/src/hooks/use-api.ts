@@ -104,3 +104,196 @@ export function useAgentLogs(projectId: string, featureId?: string) {
     5000,
   );
 }
+
+// ---------------------------------------------------------------------------
+// Agent-specific hooks
+//
+// These power the agent profile pages (/agents and /agents/[name]).
+// ---------------------------------------------------------------------------
+
+export function useAgentProfile(agentName: string | undefined) {
+  return usePollingQuery<{
+    agentName: string;
+    displayName: string;
+    persona: string;
+    traits: string[];
+    communicationStyle: string;
+    updatedAt: string;
+  }>(
+    agentName ? `/api/agents/${agentName}/profile` : null,
+    60000,
+  );
+}
+
+export function useAgentStats(agentName: string | undefined) {
+  return usePollingQuery<{
+    totalRuns: number;
+    successRate: number;
+    avgDurationMs: number;
+    lastRunAt: string | null;
+  }>(
+    agentName ? `/api/agents/${agentName}/stats` : null,
+    30000,
+  );
+}
+
+export function useAgentActivity(agentName: string | undefined) {
+  return usePollingQuery<{ date: string; count: number }[]>(
+    agentName ? `/api/agents/${agentName}/activity` : null,
+    60000,
+  );
+}
+
+export function useAgentRuns(agentName: string | undefined) {
+  return usePollingQuery<Array<{
+    id: string;
+    agentId: string;
+    projectId: string;
+    featureId: string;
+    role: string;
+    status: string;
+    outputSummary?: string;
+    errorMessage?: string;
+    startedAt: string;
+    completedAt?: string;
+    durationMs?: number;
+  }>>(
+    agentName ? `/api/agents/${agentName}/runs` : null,
+    30000,
+  );
+}
+
+export function useAgentMemories(agentName: string | undefined) {
+  return usePollingQuery<Array<{
+    id: string;
+    agentName: string;
+    projectId: string;
+    content: string;
+    source: string;
+    createdAt: string;
+  }>>(
+    agentName ? `/api/agents/${agentName}/memories?projectId=all` : null,
+    60000,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mutation hooks
+//
+// These do not use polling — they return a stable async function that performs
+// a single API call via `apiFetch`. The caller is responsible for triggering
+// a refetch of any dependent queries after a mutation succeeds.
+// ---------------------------------------------------------------------------
+
+/** Create a new feature within a project. */
+export function useCreateFeature() {
+  return useCallback(
+    async (
+      projectId: string,
+      data: {
+        name: string;
+        description?: string;
+        priority?: number;
+        category?: string;
+      },
+    ) => {
+      return apiFetch<Feature>(`/api/projects/${projectId}/features`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    [],
+  );
+}
+
+/** Update an existing feature (partial update). */
+export function useUpdateFeature() {
+  return useCallback(
+    async (
+      featureId: string,
+      data: {
+        name?: string;
+        description?: string;
+        priority?: number;
+        status?: string;
+        category?: string;
+      },
+    ) => {
+      await apiFetch<void>(`/api/features/${featureId}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      });
+    },
+    [],
+  );
+}
+
+/** Delete a feature by its ID. */
+export function useDeleteFeature() {
+  return useCallback(async (featureId: string) => {
+    await apiFetch<void>(`/api/features/${featureId}`, {
+      method: "DELETE",
+    });
+  }, []);
+}
+
+/** Bulk import multiple features into a project. */
+export function useBulkImportFeatures() {
+  return useCallback(
+    async (
+      projectId: string,
+      features: Array<{
+        name: string;
+        description?: string;
+        priority?: number;
+        category?: string;
+      }>,
+    ) => {
+      return apiFetch<{ created: number; skipped: number }>(
+        `/api/projects/${projectId}/features/bulk`,
+        {
+          method: "POST",
+          body: JSON.stringify({ features }),
+        },
+      );
+    },
+    [],
+  );
+}
+
+/** Add a dependency between two features (featureId depends on dependsOnId). */
+export function useAddDependency() {
+  return useCallback(
+    async (featureId: string, dependsOnId: string) => {
+      await apiFetch<void>(`/api/features/${featureId}/dependencies`, {
+        method: "POST",
+        body: JSON.stringify({ dependsOnId }),
+      });
+    },
+    [],
+  );
+}
+
+/** Remove a dependency between two features. */
+export function useRemoveDependency() {
+  return useCallback(
+    async (featureId: string, dependsOnId: string) => {
+      await apiFetch<void>(
+        `/api/features/${featureId}/dependencies/${dependsOnId}`,
+        {
+          method: "DELETE",
+        },
+      );
+    },
+    [],
+  );
+}
+
+/** Disconnect a project from its Linear integration. */
+export function useDisconnectLinear() {
+  return useCallback(async (projectId: string) => {
+    await apiFetch<void>(`/api/projects/${projectId}/linear-token`, {
+      method: "DELETE",
+    });
+  }, []);
+}
