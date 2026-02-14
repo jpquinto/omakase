@@ -39,6 +39,7 @@ export function useAgentChat(runId: string | null, options?: UseAgentChatOptions
   const eventSourceRef = useRef<EventSource | null>(null);
   const lastTimestampRef = useRef<string>("");
   const hasConnectedRef = useRef(false);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const threadId = options?.threadId;
   const mode = options?.mode ?? "chat";
@@ -67,6 +68,10 @@ export function useAgentChat(runId: string | null, options?: UseAgentChatOptions
 
     es.onopen = () => {
       hasConnectedRef.current = true;
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
       setIsConnected(true);
       setError(null);
     };
@@ -111,9 +116,16 @@ export function useAgentChat(runId: string | null, options?: UseAgentChatOptions
 
     es.onerror = () => {
       setIsConnected(false);
-      // Only show error if we previously had a successful connection
-      if (hasConnectedRef.current) {
-        setError(new Error("Connection lost. Reconnecting..."));
+      // Delay showing error — EventSource auto-reconnects, so if it
+      // recovers quickly the user never sees the message.
+      if (hasConnectedRef.current && !reconnectTimerRef.current) {
+        reconnectTimerRef.current = setTimeout(() => {
+          reconnectTimerRef.current = null;
+          // Only show if still disconnected after the grace period
+          if (eventSourceRef.current?.readyState !== EventSource.OPEN) {
+            setError(new Error("Connection lost. Reconnecting..."));
+          }
+        }, 5000);
       }
     };
 
@@ -121,6 +133,10 @@ export function useAgentChat(runId: string | null, options?: UseAgentChatOptions
       es.close();
       eventSourceRef.current = null;
       hasConnectedRef.current = false;
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
       setIsConnected(false);
     };
   }, [effectiveRunId, threadId]);
