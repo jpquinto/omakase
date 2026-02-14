@@ -8,12 +8,14 @@
  *
  * Environment variables:
  *   PORT                    - HTTP server port (default: 8080)
- *   ECS_CLUSTER             - ECS cluster name or ARN (required)
- *   ECS_TASK_DEFINITION     - ECS task definition family or ARN (required)
- *   ECS_SUBNETS             - Comma-separated VPC subnet IDs (required)
- *   ECS_SECURITY_GROUP      - Security group ID for Fargate tasks (required)
+ *   EXECUTION_MODE          - "ecs" for Fargate tasks, "local" for subprocesses (default: "ecs")
+ *   ECS_CLUSTER             - ECS cluster name or ARN (required when EXECUTION_MODE=ecs)
+ *   ECS_TASK_DEFINITION     - ECS task definition family or ARN (required when EXECUTION_MODE=ecs)
+ *   ECS_SUBNETS             - Comma-separated VPC subnet IDs (required when EXECUTION_MODE=ecs)
+ *   ECS_SECURITY_GROUP      - Security group ID for Fargate tasks (required when EXECUTION_MODE=ecs)
  *   ECS_CONTAINER_NAME      - Container name in the task definition (default: "agent")
  *   AWS_REGION              - AWS region for ECS client (default: "us-east-1")
+ *   LOCAL_WORKSPACE_ROOT    - Root dir for local agent workspaces (default: "/tmp/omakase-agents")
  *   GITHUB_TOKEN            - GitHub PAT for PR creation (optional)
  *   POLL_INTERVAL_MS        - Feature watcher poll interval in ms (default: 30000)
  */
@@ -27,15 +29,19 @@ import {
   getFeatureStats,
   listActiveAgents,
   getAgentLogs,
+  getAgentRun,
   createFromLinear,
   getByLinearIssueId,
   updateFromLinear,
   getByLinearTeamId,
   updateProject,
+  createMessage,
+  listMessages,
 } from "@omakase/dynamodb";
+import type { AgentMessageSender, AgentMessageType, AgentRunRole } from "@omakase/db";
 
 import { FeatureWatcher, type FeatureWatcherConfig } from "./feature-watcher.js";
-import type { EcsConfig } from "./pipeline.js";
+import type { EcsConfig, ExecutionMode } from "./pipeline.js";
 
 // ---------------------------------------------------------------------------
 // Environment configuration
@@ -53,14 +59,20 @@ function requireEnv(name: string): string {
 }
 
 const PORT = parseInt(process.env["PORT"] ?? "8080", 10);
-const ECS_CLUSTER = requireEnv("ECS_CLUSTER");
-const ECS_TASK_DEFINITION = requireEnv("ECS_TASK_DEFINITION");
-const ECS_SUBNETS = requireEnv("ECS_SUBNETS").split(",").map((s) => s.trim());
-const ECS_SECURITY_GROUP = requireEnv("ECS_SECURITY_GROUP");
-const ECS_CONTAINER_NAME = process.env["ECS_CONTAINER_NAME"] ?? "agent";
+const EXECUTION_MODE = (process.env["EXECUTION_MODE"] ?? "ecs") as ExecutionMode;
 const AWS_REGION = process.env["AWS_REGION"] ?? "us-east-1";
 const GITHUB_TOKEN = process.env["GITHUB_TOKEN"];
 const POLL_INTERVAL_MS = parseInt(process.env["POLL_INTERVAL_MS"] ?? "30000", 10);
+const LOCAL_WORKSPACE_ROOT = process.env["LOCAL_WORKSPACE_ROOT"] ?? "/tmp/omakase-agents";
+
+// ECS configuration -- only required when running in ECS mode
+const ECS_CLUSTER = EXECUTION_MODE === "ecs" ? requireEnv("ECS_CLUSTER") : "";
+const ECS_TASK_DEFINITION = EXECUTION_MODE === "ecs" ? requireEnv("ECS_TASK_DEFINITION") : "";
+const ECS_SUBNETS = EXECUTION_MODE === "ecs"
+  ? requireEnv("ECS_SUBNETS").split(",").map((s) => s.trim())
+  : [];
+const ECS_SECURITY_GROUP = EXECUTION_MODE === "ecs" ? requireEnv("ECS_SECURITY_GROUP") : "";
+const ECS_CONTAINER_NAME = process.env["ECS_CONTAINER_NAME"] ?? "agent";
 
 // ---------------------------------------------------------------------------
 // Client initialization
@@ -80,6 +92,8 @@ const watcherConfig: FeatureWatcherConfig = {
   pollIntervalMs: POLL_INTERVAL_MS,
   ecsConfig,
   githubToken: GITHUB_TOKEN,
+  executionMode: EXECUTION_MODE,
+  localWorkspaceRoot: EXECUTION_MODE === "local" ? LOCAL_WORKSPACE_ROOT : undefined,
 };
 
 const watcher = new FeatureWatcher(ecsClient, watcherConfig);
@@ -178,6 +192,113 @@ const app = new Elysia()
     }
     return project;
   })
+  // Agent chat endpoints
+  .post("/api/agent-runs/:runId/messages", async ({ params, body, set }) => {
+    const { content, sender, role, type } = body as {
+      content: string;
+      sender: AgentMessageSender;
+      role?: AgentRunRole | null;
+      type?: AgentMessageType;
+    };
+    if (!content) {
+      set.status = 400;
+      return { error: "content is required" };
+    }
+    const run = await getAgentRun({ runId: params.runId });
+    if (!run) {
+      set.status = 404;
+      return { error: "Agent run not found" };
+    }
+    if (sender === "user" && (run.status === "completed" || run.status === "failed")) {
+      set.status = 409;
+      return { error: "Agent run is no longer active" };
+    }
+    const message = await createMessage({
+      runId: params.runId,
+      featureId: run.featureId,
+      projectId: run.projectId,
+      sender: sender ?? "user",
+      role: role ?? run.role,
+      content,
+      type: type ?? "message",
+    });
+    set.status = 201;
+    return message;
+  })
+  .get("/api/agent-runs/:runId/messages", async ({ params, query }) => {
+    const since = query.since as string | undefined;
+    const sender = query.sender as AgentMessageSender | undefined;
+    return await listMessages({ runId: params.runId, since, sender });
+  })
+  .get("/api/agent-runs/:runId/messages/stream", async ({ params, request }) => {
+    const runId = params.runId;
+    const lastEventId = request.headers.get("Last-Event-ID");
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder();
+        let lastTimestamp = lastEventId ?? "";
+        let closed = false;
+
+        const send = (event: string, data: string, id?: string) => {
+          let payload = "";
+          if (event !== "message") payload += `event: ${event}\n`;
+          if (id) payload += `id: ${id}\n`;
+          payload += `data: ${data}\n\n`;
+          controller.enqueue(encoder.encode(payload));
+        };
+
+        // Send initial batch of existing messages
+        const initial = await listMessages({ runId, since: lastTimestamp || undefined });
+        for (const msg of initial) {
+          send("message", JSON.stringify(msg), msg.timestamp);
+          lastTimestamp = msg.timestamp;
+        }
+
+        // Poll for new messages every 1 second
+        const interval = setInterval(async () => {
+          if (closed) return;
+          try {
+            // Check if run is still active
+            const run = await getAgentRun({ runId });
+            const newMessages = await listMessages({ runId, since: lastTimestamp || undefined });
+            for (const msg of newMessages) {
+              send("message", JSON.stringify(msg), msg.timestamp);
+              lastTimestamp = msg.timestamp;
+            }
+            if (run && (run.status === "completed" || run.status === "failed")) {
+              send("close", JSON.stringify({ status: run.status }));
+              clearInterval(interval);
+              controller.close();
+              closed = true;
+            }
+          } catch {
+            clearInterval(interval);
+            if (!closed) {
+              controller.close();
+              closed = true;
+            }
+          }
+        }, 1000);
+
+        // Clean up when client disconnects
+        request.signal.addEventListener("abort", () => {
+          clearInterval(interval);
+          if (!closed) {
+            closed = true;
+          }
+        });
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
+  })
   // Catch-all 404
   .onError(({ set }) => {
     set.status = 404;
@@ -186,7 +307,12 @@ const app = new Elysia()
   .listen(PORT);
 
 console.log(`[orchestrator] Elysia server listening on port ${PORT}`);
-console.log(`[orchestrator] ECS cluster: ${ECS_CLUSTER}`);
+console.log(`[orchestrator] Execution mode: ${EXECUTION_MODE}`);
+if (EXECUTION_MODE === "ecs") {
+  console.log(`[orchestrator] ECS cluster: ${ECS_CLUSTER}`);
+} else {
+  console.log(`[orchestrator] Local workspace root: ${LOCAL_WORKSPACE_ROOT}`);
+}
 console.log(`[orchestrator] Poll interval: ${POLL_INTERVAL_MS}ms`);
 
 // Start the feature watcher after the HTTP server is ready

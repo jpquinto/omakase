@@ -20,7 +20,9 @@ import {
 import {
   updateAgentStatus as dbUpdateAgentStatus,
   completeAgentRun as dbCompleteAgentRun,
+  listMessages,
 } from "@omakase/dynamodb";
+import type { AgentMessage } from "@omakase/db";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -100,6 +102,12 @@ export class AgentMonitor {
   /** Tracks whether a cancellation has been requested. */
   private cancelled = false;
 
+  /** Accumulated user messages received during this monitoring session. */
+  private _pendingUserMessages: AgentMessage[] = [];
+
+  /** Timestamp of last message poll. */
+  private lastMessagePoll = "";
+
   constructor(options: AgentMonitorOptions) {
     this.taskArn = options.taskArn;
     this.ecsCluster = options.ecsCluster;
@@ -176,6 +184,11 @@ export class AgentMonitor {
         lastStatusUpdate = now;
       }
 
+      // Poll for user messages at each status update interval
+      if (shouldUpdate) {
+        await this.pollUserMessages();
+      }
+
       // Check if the task has stopped
       if (taskStatus.lastStatus === "STOPPED") {
         const success = taskStatus.exitCode === 0;
@@ -218,6 +231,41 @@ export class AgentMonitor {
    */
   cancel(): void {
     this.cancelled = true;
+  }
+
+  /**
+   * Get user messages accumulated during this monitoring session.
+   * Useful for passing context between pipeline steps.
+   */
+  get pendingUserMessages(): AgentMessage[] {
+    return this._pendingUserMessages;
+  }
+
+  /**
+   * Poll DynamoDB for new user messages sent to this agent run.
+   * Accumulated messages are stored in `_pendingUserMessages`.
+   */
+  private async pollUserMessages(): Promise<void> {
+    try {
+      const newMessages = await listMessages({
+        runId: this.agentRunId,
+        since: this.lastMessagePoll || undefined,
+        sender: "user",
+      });
+      if (newMessages.length > 0) {
+        this._pendingUserMessages.push(...newMessages);
+        this.lastMessagePoll = newMessages[newMessages.length - 1]!.timestamp;
+        console.log(
+          `[agent-monitor] ${newMessages.length} new user message(s) for run ${this.agentRunId}`
+        );
+      }
+    } catch (error: unknown) {
+      // Message polling is best-effort
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(
+        `[agent-monitor] Failed to poll messages for run ${this.agentRunId}: ${message}`
+      );
+    }
   }
 
   // -------------------------------------------------------------------------

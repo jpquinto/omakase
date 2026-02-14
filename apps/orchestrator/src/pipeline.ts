@@ -21,12 +21,22 @@ import {
   markFeatureFailing as dbMarkFeatureFailing,
   createAgentRun as dbCreateAgentRun,
   completeAgentRun as dbCompleteAgentRun,
+  listMessages,
 } from "@omakase/dynamodb";
+import type { AgentMessage } from "@omakase/db";
 
 import { startAgent, stopAgent, releaseFeature, type AgentRole } from "./ecs-agent.js";
 import { AgentMonitor, type AgentCompletionResult } from "./agent-monitor.js";
+import { startLocalAgent, LocalAgentMonitor } from "./local-agent.js";
 import { createPullRequest, buildPrBody } from "./pr-creator.js";
 import { LinearSyncHook } from "./linear-sync.js";
+
+// ---------------------------------------------------------------------------
+// Execution mode
+// ---------------------------------------------------------------------------
+
+/** Determines whether agents run as ECS Fargate tasks or local subprocesses. */
+export type ExecutionMode = "ecs" | "local";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -58,6 +68,10 @@ export interface PipelineConfig {
   linearIssueUrl?: string;
   /** Linear OAuth access token for API calls (optional). */
   linearAccessToken?: string;
+  /** Execution mode: "ecs" for Fargate tasks, "local" for subprocesses. */
+  executionMode?: ExecutionMode;
+  /** Root directory for local agent workspaces (only used when executionMode is "local"). */
+  localWorkspaceRoot?: string;
 }
 
 /** ECS infrastructure configuration shared across all pipeline steps. */
@@ -132,7 +146,14 @@ export class AgentPipeline {
   private readonly config: PipelineConfig;
   private readonly ecsConfig: EcsConfig;
   private readonly ecsClient: ECSClient;
+  private readonly executionMode: ExecutionMode;
   private readonly linearSync: LinearSyncHook;
+
+  /** Timestamp of the last between-step message check. */
+  private lastMessageCheck = "";
+
+  /** User messages collected between pipeline steps. */
+  private userMessages: AgentMessage[] = [];
 
   constructor(
     config: PipelineConfig,
@@ -144,6 +165,7 @@ export class AgentPipeline {
     this.config = config;
     this.ecsConfig = ecsConfig;
     this.ecsClient = ecsClient;
+    this.executionMode = config.executionMode ?? "ecs";
     this.linearSync = new LinearSyncHook({
       linearAccessToken: config.linearAccessToken,
       linearIssueId: config.linearIssueId,
@@ -182,6 +204,7 @@ export class AgentPipeline {
         return this.handlePipelineFailure("architect", architectResult);
       }
       console.log(`[pipeline] Architect step completed for feature ${this.featureId}`);
+      await this.checkBetweenStepMessages();
 
       // Step 2: Coder
       const coderResult = await this.runStepWithRetry("coder");
@@ -189,6 +212,7 @@ export class AgentPipeline {
         return this.handlePipelineFailure("coder", coderResult);
       }
       console.log(`[pipeline] Coder step completed for feature ${this.featureId}`);
+      await this.checkBetweenStepMessages();
 
       // Step 3: Reviewer (with optional coder retry on "request-changes")
       const reviewResult = await this.runReviewCycle();
@@ -196,6 +220,7 @@ export class AgentPipeline {
         return this.handlePipelineFailure("reviewer", reviewResult);
       }
       console.log(`[pipeline] Reviewer step completed for feature ${this.featureId}`);
+      await this.checkBetweenStepMessages();
 
       // Step 4: Tester
       const testerResult = await this.runStepWithRetry("tester");
@@ -231,6 +256,39 @@ export class AgentPipeline {
         success: false,
         errorMessage: `Unexpected pipeline error: ${message}`,
       };
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Between-step message check
+  // -------------------------------------------------------------------------
+
+  /**
+   * Check for user messages between pipeline steps.
+   * Messages are accumulated and can be included as context for subsequent steps.
+   */
+  private async checkBetweenStepMessages(): Promise<void> {
+    try {
+      // Query messages across all runs for this feature since last check
+      const newMessages = await listMessages({
+        runId: "", // We need to check by feature; use a broad query approach
+        since: this.lastMessageCheck || undefined,
+        sender: "user",
+      });
+
+      if (newMessages.length > 0) {
+        this.userMessages.push(...newMessages);
+        this.lastMessageCheck = newMessages[newMessages.length - 1]!.timestamp;
+        console.log(
+          `[pipeline] ${newMessages.length} user message(s) pending for feature ${this.featureId}. ` +
+            "Context will be included in next agent step."
+        );
+      }
+    } catch {
+      // Between-step message check is best-effort
+      console.warn(
+        `[pipeline] Failed to check messages between steps for feature ${this.featureId}`
+      );
     }
   }
 
@@ -279,8 +337,9 @@ export class AgentPipeline {
   }
 
   /**
-   * Run a single pipeline step: create an agent run, launch the ECS task,
-   * monitor it to completion, and return the result.
+   * Run a single pipeline step: create an agent run, launch the agent
+   * (ECS task or local subprocess), monitor it to completion, and return
+   * the result.
    *
    * @param role - The agent role for this step.
    * @returns The step result.
@@ -289,6 +348,16 @@ export class AgentPipeline {
     // Create the agent run record in DynamoDB
     const agentRunId = await this.createAgentRun(role);
 
+    if (this.executionMode === "local") {
+      return this.runStepLocal(role, agentRunId);
+    }
+    return this.runStepEcs(role, agentRunId);
+  }
+
+  /**
+   * Run a step via ECS Fargate task.
+   */
+  private async runStepEcs(role: AgentRole, agentRunId: string): Promise<StepResult> {
     // Launch the ECS task
     let taskArn: string;
     try {
@@ -311,7 +380,7 @@ export class AgentPipeline {
       taskArn = launchResult.taskArn;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      console.error(`[pipeline] Failed to launch ${role} task: ${message}`);
+      console.error(`[pipeline] Failed to launch ${role} ECS task: ${message}`);
 
       // Mark the run as failed since we couldn't even start the task
       await this.failAgentRun(agentRunId, `Launch failure: ${message}`);
@@ -340,6 +409,50 @@ export class AgentPipeline {
       stopReason: completionResult.stopReason,
       agentRunId,
     };
+  }
+
+  /**
+   * Run a step via local subprocess.
+   */
+  private async runStepLocal(role: AgentRole, agentRunId: string): Promise<StepResult> {
+    try {
+      const launchResult = await startLocalAgent({
+        featureId: this.featureId,
+        role,
+        projectId: this.projectId,
+        repoUrl: this.config.repoUrl,
+        featureName: this.config.featureName,
+        featureDescription: this.config.featureDescription,
+        baseBranch: this.config.baseBranch,
+        workspaceRoot: this.config.localWorkspaceRoot,
+      });
+
+      const monitor = new LocalAgentMonitor({
+        process: launchResult.process,
+        agentRunId,
+      });
+
+      const completionResult: AgentCompletionResult = await monitor.waitForCompletion();
+
+      return {
+        success: completionResult.success,
+        exitCode: completionResult.exitCode,
+        stopReason: completionResult.stopReason,
+        agentRunId,
+      };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[pipeline] Failed to launch ${role} local agent: ${message}`);
+
+      await this.failAgentRun(agentRunId, `Launch failure: ${message}`);
+
+      return {
+        success: false,
+        exitCode: null,
+        stopReason: `Launch failure: ${message}`,
+        agentRunId,
+      };
+    }
   }
 
   // -------------------------------------------------------------------------

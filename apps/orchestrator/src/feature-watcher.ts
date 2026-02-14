@@ -24,6 +24,7 @@ import {
   AgentPipeline,
   type PipelineConfig,
   type EcsConfig,
+  type ExecutionMode,
 } from "./pipeline.js";
 
 // ---------------------------------------------------------------------------
@@ -62,6 +63,10 @@ export interface FeatureWatcherConfig {
   ecsConfig: EcsConfig;
   /** GitHub token for PR creation (optional). */
   githubToken?: string;
+  /** Execution mode: "ecs" for Fargate tasks, "local" for subprocesses (default: "ecs"). */
+  executionMode?: ExecutionMode;
+  /** Root directory for local agent workspaces (only used when executionMode is "local"). */
+  localWorkspaceRoot?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -87,6 +92,8 @@ export class FeatureWatcher {
   private readonly pollIntervalMs: number;
   private readonly ecsConfig: EcsConfig;
   private readonly githubToken: string | undefined;
+  private readonly executionMode: ExecutionMode;
+  private readonly localWorkspaceRoot: string | undefined;
 
   /** The polling timer handle, or null if stopped. */
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -104,6 +111,8 @@ export class FeatureWatcher {
     this.ecsClient = ecsClient;
     this.ecsConfig = config.ecsConfig;
     this.githubToken = config.githubToken;
+    this.executionMode = config.executionMode ?? "ecs";
+    this.localWorkspaceRoot = config.localWorkspaceRoot;
     this.pollIntervalMs = config.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
     this.concurrency = new ConcurrencyManager();
   }
@@ -295,6 +304,8 @@ export class FeatureWatcher {
       linearIssueId: feature.linearIssueId,
       linearIssueUrl: feature.linearIssueUrl,
       linearAccessToken: project.linearAccessToken,
+      executionMode: this.executionMode,
+      localWorkspaceRoot: this.localWorkspaceRoot,
     };
 
     const pipeline = new AgentPipeline(
