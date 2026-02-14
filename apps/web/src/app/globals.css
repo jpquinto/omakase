@@ -9,7 +9,7 @@
 @theme {
   /* --- Typography --- */
   --font-serif: var(--font-instrument-serif), "Instrument Serif", "Georgia", serif;
-  --font-sans: var(--font-outfit), "Outfit", system-ui, sans-serif;
+  --font-sans: var(--font-instrument-serif), "Instrument Serif", "Georgia", serif;
   --font-jp: var(--font-noto-jp), "Noto Serif JP", serif;
   --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
 
@@ -307,7 +307,7 @@ body {
   margin: 0;
   background-color: var(--color-oma-bg);
   color: var(--color-oma-text);
-  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+  font-family: var(--font-instrument-serif), "Instrument Serif", "Georgia", serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
