@@ -10,7 +10,7 @@
  */
 
 import { apiFetch } from "@/lib/api-client";
-import type { Feature, Project } from "@omakase/db";
+import type { Feature, FeatureStatus, Project } from "@omakase/db";
 
 // -----------------------------------------------------------------------
 // TypeScript interfaces for Linear webhook payloads
@@ -96,6 +96,44 @@ function mapLinearPriority(linearPriority: number): number {
     4: 4, // Low        -> P4 Low
   };
   return mapping[linearPriority] ?? 5;
+}
+
+// -----------------------------------------------------------------------
+// Status Mapping (Linear -> Omakase)
+// -----------------------------------------------------------------------
+
+/**
+ * Map a Linear workflow state to an Omakase feature status.
+ *
+ * Linear states have both a `type` (category: unstarted, started,
+ * completed, cancelled) and a human-readable `name`. We match on
+ * the type first (more reliable), then fall back to well-known names.
+ *
+ * Returns `null` when the state cannot be mapped, signalling that no
+ * status update should be applied.
+ */
+function mapLinearStateToFeatureStatus(
+  state: LinearState,
+): FeatureStatus | null {
+  // Match on the workflow state type (most reliable).
+  switch (state.type) {
+    case "unstarted":
+      return "pending";
+    case "started":
+      return "in_progress";
+    case "completed":
+      return "passing";
+    case "cancelled":
+      return "failing";
+  }
+
+  // Fall back to well-known state names for non-standard types.
+  const nameLower = state.name.toLowerCase();
+  if (nameLower === "todo" || nameLower === "backlog") return "pending";
+  if (nameLower === "in progress") return "in_progress";
+  if (nameLower === "done") return "passing";
+
+  return null;
 }
 
 // -----------------------------------------------------------------------
@@ -213,6 +251,25 @@ export async function handleIssueUpdated(
       priority: mapLinearPriority(event.priority),
     }),
   });
+
+  // Reverse status sync: if the Linear state changed, update the
+  // Omakase feature status to match.
+  if (event.state) {
+    const mappedStatus = mapLinearStateToFeatureStatus(event.state);
+
+    if (mappedStatus && mappedStatus !== feature.status) {
+      await apiFetch(`/api/features/${feature.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: mappedStatus }),
+      });
+
+      console.log(
+        `[Linear Sync] Status updated: ${event.identifier} ` +
+          `"${feature.status}" -> "${mappedStatus}" ` +
+          `(Linear state: "${event.state.name}" / type: "${event.state.type}")`,
+      );
+    }
+  }
 
   console.log(
     `[Linear Sync] Issue updated: ${event.identifier} "${event.title}" ` +

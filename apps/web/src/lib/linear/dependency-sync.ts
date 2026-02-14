@@ -12,6 +12,9 @@
  * orchestrator API. Removing the relation removes the dependency.
  */
 
+import { apiFetch } from "@/lib/api-client";
+import type { Feature } from "@omakase/db";
+
 // -----------------------------------------------------------------------
 // TypeScript Interfaces
 // -----------------------------------------------------------------------
@@ -79,35 +82,43 @@ export async function handleRelationCreated(
     return;
   }
 
-  // TODO: Replace with actual orchestrator API calls.
-  //
-  // Example:
-  //   import { apiFetch } from "@/lib/api-client";
-  //
-  //   // Resolve both issues to Omakase features.
-  //   const blockingFeature = await apiFetch(
-  //     `/api/features/by-linear-issue/${event.issue.identifier}`,
-  //   );
-  //   const blockedFeature = await apiFetch(
-  //     `/api/features/by-linear-issue/${event.relatedIssue.identifier}`,
-  //   );
-  //
-  //   if (!blockingFeature || !blockedFeature) {
-  //     console.log("[Linear Dependency Sync] One or both issues not tracked -- skipping.");
-  //     return;
-  //   }
-  //
-  //   await apiFetch("/api/features/dependencies", {
-  //     method: "POST",
-  //     body: JSON.stringify({
-  //       featureId: blockedFeature.id,
-  //       dependsOnFeatureId: blockingFeature.id,
-  //     }),
-  //   });
+  // Resolve both Linear issues to their corresponding Omakase features.
+  // Either lookup may 404 if the issue has not been ingested.
+  let blockingFeature: Feature;
+  try {
+    blockingFeature = await apiFetch<Feature>(
+      `/api/features/by-linear-issue/${event.issue.identifier}`,
+    );
+  } catch {
+    console.log(
+      `[Linear Dependency Sync] Blocking issue ${event.issue.identifier} ` +
+        `not tracked in Omakase -- skipping.`,
+    );
+    return;
+  }
+
+  let blockedFeature: Feature;
+  try {
+    blockedFeature = await apiFetch<Feature>(
+      `/api/features/by-linear-issue/${event.relatedIssue.identifier}`,
+    );
+  } catch {
+    console.log(
+      `[Linear Dependency Sync] Blocked issue ${event.relatedIssue.identifier} ` +
+        `not tracked in Omakase -- skipping.`,
+    );
+    return;
+  }
+
+  await apiFetch(`/api/features/${blockedFeature.id}/dependencies`, {
+    method: "POST",
+    body: JSON.stringify({ dependsOnId: blockingFeature.id }),
+  });
 
   console.log(
-    `[Linear Dependency Sync] Relation created: ` +
-      `${event.issue.identifier} blocks ${event.relatedIssue.identifier}.`,
+    `[Linear Dependency Sync] Dependency created: ` +
+      `feature ${blockedFeature.id} now depends on ${blockingFeature.id} ` +
+      `(${event.issue.identifier} blocks ${event.relatedIssue.identifier}).`,
   );
 }
 
@@ -131,32 +142,41 @@ export async function handleRelationRemoved(
     return;
   }
 
-  // TODO: Replace with actual orchestrator API calls.
-  //
-  // Example:
-  //   import { apiFetch } from "@/lib/api-client";
-  //
-  //   const blockingFeature = await apiFetch(
-  //     `/api/features/by-linear-issue/${event.issue.identifier}`,
-  //   );
-  //   const blockedFeature = await apiFetch(
-  //     `/api/features/by-linear-issue/${event.relatedIssue.identifier}`,
-  //   );
-  //
-  //   if (!blockingFeature || !blockedFeature) {
-  //     return;
-  //   }
-  //
-  //   await apiFetch(`/api/features/dependencies`, {
-  //     method: "DELETE",
-  //     body: JSON.stringify({
-  //       featureId: blockedFeature.id,
-  //       dependsOnFeatureId: blockingFeature.id,
-  //     }),
-  //   });
+  // Resolve both Linear issues to their corresponding Omakase features.
+  let blockingFeature: Feature;
+  try {
+    blockingFeature = await apiFetch<Feature>(
+      `/api/features/by-linear-issue/${event.issue.identifier}`,
+    );
+  } catch {
+    console.log(
+      `[Linear Dependency Sync] Blocking issue ${event.issue.identifier} ` +
+        `not tracked in Omakase -- skipping removal.`,
+    );
+    return;
+  }
+
+  let blockedFeature: Feature;
+  try {
+    blockedFeature = await apiFetch<Feature>(
+      `/api/features/by-linear-issue/${event.relatedIssue.identifier}`,
+    );
+  } catch {
+    console.log(
+      `[Linear Dependency Sync] Blocked issue ${event.relatedIssue.identifier} ` +
+        `not tracked in Omakase -- skipping removal.`,
+    );
+    return;
+  }
+
+  await apiFetch(
+    `/api/features/${blockedFeature.id}/dependencies/${blockingFeature.id}`,
+    { method: "DELETE" },
+  );
 
   console.log(
-    `[Linear Dependency Sync] Relation removed: ` +
-      `${event.issue.identifier} no longer blocks ${event.relatedIssue.identifier}.`,
+    `[Linear Dependency Sync] Dependency removed: ` +
+      `feature ${blockedFeature.id} no longer depends on ${blockingFeature.id} ` +
+      `(${event.issue.identifier} no longer blocks ${event.relatedIssue.identifier}).`,
   );
 }
