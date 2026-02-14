@@ -4,6 +4,8 @@ automaker/
 temp/
 temp-docs/
 
+**/.next
+
 nul
 issues/
 

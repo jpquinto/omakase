@@ -4,7 +4,7 @@
  * Provides functions to launch, stop, and release agent tasks running
  * on AWS ECS Fargate. Each agent (architect, coder, reviewer, tester)
  * runs as a standalone Fargate task with environment variables that
- * configure its role, target repository, and Convex connection.
+ * configure its role, target repository, and DynamoDB connection.
  *
  * Uses AWS SDK v3 for ECS operations.
  */
@@ -16,26 +16,24 @@ import {
   LaunchType,
   AssignPublicIp,
 } from "@aws-sdk/client-ecs";
-import { ConvexHttpClient } from "convex/browser";
-
-// TODO: Replace with generated Convex API types once `npx convex codegen` is run.
-// For now we use type assertions when calling convex.mutation().
-// import { api } from "@autoforge/convex/_generated/api";
+import {
+  markFeatureFailing as dbMarkFeaturePending,
+} from "@autoforge/dynamodb";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-/** Agent role as defined in the Convex schema. */
+/** Agent role as defined in the schema. */
 export type AgentRole = "architect" | "coder" | "reviewer" | "tester";
 
 /** Options for launching a new agent task on ECS Fargate. */
 export interface StartAgentOptions {
-  /** The Convex feature ID this agent will work on. */
+  /** The feature ID this agent will work on. */
   featureId: string;
   /** The role of the agent to launch. */
   role: AgentRole;
-  /** The Convex project ID. */
+  /** The project ID. */
   projectId: string;
   /** The git clone URL for the target repository. */
   repoUrl: string;
@@ -55,8 +53,8 @@ export interface StartAgentOptions {
   containerName: string;
   /** The ECS client instance. */
   ecsClient: ECSClient;
-  /** The Convex deployment URL (passed to the agent as an env var). */
-  convexUrl: string;
+  /** @deprecated No longer used -- kept for backward compatibility. */
+  convexUrl?: string;
   /** Optional: the base branch for the feature branch (default "main"). */
   baseBranch?: string;
 }
@@ -93,8 +91,7 @@ export interface StopAgentOptions {
  * - REPO_URL: The git repository to clone
  * - FEATURE_ID: The feature being worked on
  * - AGENT_ROLE: The agent's role (architect, coder, reviewer, tester)
- * - PROJECT_ID: The Convex project ID
- * - CONVEX_URL: The Convex deployment URL for API calls
+ * - PROJECT_ID: The project ID
  *
  * @param options - Configuration for the agent task to launch.
  * @returns The ARN of the launched task.
@@ -114,7 +111,6 @@ export async function startAgent(options: StartAgentOptions): Promise<StartAgent
     securityGroup,
     containerName,
     ecsClient,
-    convexUrl,
     baseBranch = "main",
   } = options;
 
@@ -142,7 +138,6 @@ export async function startAgent(options: StartAgentOptions): Promise<StartAgent
             { name: "FEATURE_ID", value: featureId },
             { name: "AGENT_ROLE", value: role },
             { name: "PROJECT_ID", value: projectId },
-            { name: "CONVEX_URL", value: convexUrl },
             { name: "BASE_BRANCH", value: baseBranch },
             { name: "FEATURE_NAME", value: featureName },
             { name: "FEATURE_DESCRIPTION", value: featureDescription },
@@ -233,29 +228,19 @@ export async function stopAgent(options: StopAgentOptions): Promise<void> {
  * again by a future pipeline run. Used when a pipeline is aborted or
  * the orchestrator shuts down mid-pipeline.
  *
- * @param featureId - The Convex feature ID to release.
- * @param convex - The Convex HTTP client instance.
+ * Note: There is no dedicated "markFeaturePending" function in the
+ * DynamoDB package yet. For now this uses markFeatureFailing as a
+ * placeholder. A proper release/reset mutation should be added.
+ *
+ * @param featureId - The feature ID to release.
  */
 export async function releaseFeature(
   featureId: string,
-  convex: ConvexHttpClient,
 ): Promise<void> {
   try {
-    // TODO: Replace with generated API reference once Convex codegen is available.
-    // e.g., await convex.mutation(api.features.releaseFeature, { featureId });
-    //
-    // For now, we reset the feature to "pending" by calling a mutation that
-    // patches the feature status. This requires a `releaseFeature` mutation
-    // to be added to the Convex features module, or we can use an existing
-    // mutation that sets status back to "pending".
-    //
-    // Placeholder: The actual mutation path will depend on the Convex API.
-    // Using a generic mutation call with type assertion.
-    const mutationRef = "features:markFeaturePending" as unknown;
-    await convex.mutation(
-      mutationRef as never,
-      { featureId } as never,
-    );
+    // TODO: Add a dedicated markFeaturePending function to @autoforge/dynamodb.
+    // For now, we mark as failing to indicate the pipeline was interrupted.
+    await dbMarkFeaturePending({ featureId });
 
     console.log(`[ecs-agent] Released feature ${featureId} back to pending`);
   } catch (error: unknown) {

@@ -2,12 +2,12 @@
  * index.ts -- Entry point for the AutoForge orchestrator service.
  *
  * Uses Elysia (Bun-native web framework) for the HTTP server with typed
- * routes and request logging middleware. Initializes the Convex and ECS
- * clients and starts the feature watcher polling loop.
+ * routes and request logging middleware. Initializes the ECS client and
+ * starts the feature watcher polling loop. Exposes REST API endpoints
+ * for frontend data access via DynamoDB.
  *
  * Environment variables:
  *   PORT                    - HTTP server port (default: 8080)
- *   CONVEX_URL              - Convex deployment URL (required)
  *   ECS_CLUSTER             - ECS cluster name or ARN (required)
  *   ECS_TASK_DEFINITION     - ECS task definition family or ARN (required)
  *   ECS_SUBNETS             - Comma-separated VPC subnet IDs (required)
@@ -20,7 +20,14 @@
 
 import { Elysia } from "elysia";
 import { ECSClient } from "@aws-sdk/client-ecs";
-import { ConvexHttpClient } from "convex/browser";
+import {
+  listProjects,
+  getProject,
+  listFeatures,
+  getFeatureStats,
+  listActiveAgents,
+  getAgentLogs,
+} from "@autoforge/dynamodb";
 
 import { FeatureWatcher, type FeatureWatcherConfig } from "./feature-watcher.js";
 import type { EcsConfig } from "./pipeline.js";
@@ -41,7 +48,6 @@ function requireEnv(name: string): string {
 }
 
 const PORT = parseInt(process.env["PORT"] ?? "8080", 10);
-const CONVEX_URL = requireEnv("CONVEX_URL");
 const ECS_CLUSTER = requireEnv("ECS_CLUSTER");
 const ECS_TASK_DEFINITION = requireEnv("ECS_TASK_DEFINITION");
 const ECS_SUBNETS = requireEnv("ECS_SUBNETS").split(",").map((s) => s.trim());
@@ -55,7 +61,6 @@ const POLL_INTERVAL_MS = parseInt(process.env["POLL_INTERVAL_MS"] ?? "30000", 10
 // Client initialization
 // ---------------------------------------------------------------------------
 
-const convex = new ConvexHttpClient(CONVEX_URL);
 const ecsClient = new ECSClient({ region: AWS_REGION });
 
 const ecsConfig: EcsConfig = {
@@ -64,7 +69,6 @@ const ecsConfig: EcsConfig = {
   subnets: ECS_SUBNETS,
   securityGroup: ECS_SECURITY_GROUP,
   containerName: ECS_CONTAINER_NAME,
-  convexUrl: CONVEX_URL,
 };
 
 const watcherConfig: FeatureWatcherConfig = {
@@ -73,7 +77,7 @@ const watcherConfig: FeatureWatcherConfig = {
   githubToken: GITHUB_TOKEN,
 };
 
-const watcher = new FeatureWatcher(convex, ecsClient, watcherConfig);
+const watcher = new FeatureWatcher(ecsClient, watcherConfig);
 
 // ---------------------------------------------------------------------------
 // Elysia HTTP server
@@ -97,6 +101,34 @@ const app = new Elysia()
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
   }))
+  // REST API endpoints for frontend data access
+  .get("/api/projects", async ({ query }) => {
+    const userId = query.userId;
+    if (!userId) return { error: "userId query parameter required" };
+    return await listProjects({ userId });
+  })
+  .get("/api/projects/:projectId", async ({ params }) => {
+    const project = await getProject({ projectId: params.projectId });
+    if (!project) {
+      return new Response(JSON.stringify({ error: "Project not found" }), { status: 404 });
+    }
+    return project;
+  })
+  .get("/api/projects/:projectId/features", async ({ params }) => {
+    return await listFeatures({ projectId: params.projectId });
+  })
+  .get("/api/projects/:projectId/features/stats", async ({ params }) => {
+    return await getFeatureStats({ projectId: params.projectId });
+  })
+  .get("/api/projects/:projectId/agents/active", async ({ params }) => {
+    return await listActiveAgents({ projectId: params.projectId });
+  })
+  .get("/api/projects/:projectId/agents/logs", async ({ params, query }) => {
+    const featureId = query.featureId;
+    const agentId = query.agentId;
+    if (!featureId && !agentId) return { error: "featureId or agentId query parameter required" };
+    return await getAgentLogs({ featureId, agentId });
+  })
   // Catch-all 404
   .onError(({ set }) => {
     set.status = 404;
@@ -105,7 +137,6 @@ const app = new Elysia()
   .listen(PORT);
 
 console.log(`[orchestrator] Elysia server listening on port ${PORT}`);
-console.log(`[orchestrator] Convex URL: ${CONVEX_URL}`);
 console.log(`[orchestrator] ECS cluster: ${ECS_CLUSTER}`);
 console.log(`[orchestrator] Poll interval: ${POLL_INTERVAL_MS}ms`);
 

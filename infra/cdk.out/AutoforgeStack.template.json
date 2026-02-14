@@ -1,0 +1,1812 @@
+{
+ "Description": "AutoForge ECS infrastructure - orchestrator and agent services",
+ "Resources": {
+  "AutoforgeVpc21157266": {
+   "Type": "AWS::EC2::VPC",
+   "Properties": {
+    "CidrBlock": "10.0.0.0/16",
+    "EnableDnsHostnames": true,
+    "EnableDnsSupport": true,
+    "InstanceTenancy": "default",
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "AutoforgeStack/AutoforgeVpc"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AutoforgeVpc/Resource"
+   }
+  },
+  "AutoforgeVpcPublicSubnet1SubnetF32A4EB1": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": "us-west-2a",
+    "CidrBlock": "10.0.0.0/24",
+    "MapPublicIpOnLaunch": true,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Public"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Public"
+     },
+     {
+      "Key": "Name",
+      "Value": "AutoforgeStack/AutoforgeVpc/PublicSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AutoforgeVpc21157266"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AutoforgeVpc/PublicSubnet1/Subnet"
+   }
+  },
+  "AutoforgeVpcPublicSubnet1RouteTableE4A8C177": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "AutoforgeStack/AutoforgeVpc/PublicSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AutoforgeVpc21157266"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AutoforgeVpc/PublicSubnet1/RouteTable"
+   }
+  },
+  "AutoforgeVpcPublicSubnet1RouteTableAssociation3B1A6495": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "AutoforgeVpcPublicSubnet1RouteTableE4A8C177"
+    },
+    "SubnetId": {
+     "Ref": "AutoforgeVpcPublicSubnet1SubnetF32A4EB1"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AutoforgeVpc/PublicSubnet1/RouteTableAssociation"
+   }
+  },
+  "AutoforgeVpcPublicSubnet1DefaultRoute1532D321": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "GatewayId": {
+     "Ref": "AutoforgeVpcIGW2FE81645"
+    },
+    "RouteTableId": {
+     "Ref": "AutoforgeVpcPublicSubnet1RouteTableE4A8C177"
+    }
+   },
+   "DependsOn": [
+    "AutoforgeVpcVPCGW355CBF17"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AutoforgeVpc/PublicSubnet1/DefaultRoute"
+   }
+  },
+  "AutoforgeVpcPublicSubnet1EIP1B32DD2B": {
+   "Type": "AWS::EC2::EIP",
+   "Properties": {
+    "Domain": "vpc",
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "AutoforgeStack/AutoforgeVpc/PublicSubnet1"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AutoforgeVpc/PublicSubnet1/EIP"
+   }
+  },
+  "AutoforgeVpcPublicSubnet1NATGateway7FD76EAA": {
+   "Type": "AWS::EC2::NatGateway",
+   "Properties": {
+    "AllocationId": {
+     "Fn::GetAtt": [
+      "AutoforgeVpcPublicSubnet1EIP1B32DD2B",
+      "AllocationId"
+     ]
+    },
+    "SubnetId": {
+     "Ref": "AutoforgeVpcPublicSubnet1SubnetF32A4EB1"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "AutoforgeStack/AutoforgeVpc/PublicSubnet1"
+     }
+    ]
+   },
+   "DependsOn": [
+    "AutoforgeVpcPublicSubnet1DefaultRoute1532D321",
+    "AutoforgeVpcPublicSubnet1RouteTableAssociation3B1A6495"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AutoforgeVpc/PublicSubnet1/NATGateway"
+   }
+  },
+  "AutoforgeVpcPublicSubnet2SubnetE38F9613": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": "us-west-2b",
+    "CidrBlock": "10.0.1.0/24",
+    "MapPublicIpOnLaunch": true,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Public"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Public"
+     },
+     {
+      "Key": "Name",
+      "Value": "AutoforgeStack/AutoforgeVpc/PublicSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AutoforgeVpc21157266"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AutoforgeVpc/PublicSubnet2/Subnet"
+   }
+  },
+  "AutoforgeVpcPublicSubnet2RouteTableED005AAD": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "AutoforgeStack/AutoforgeVpc/PublicSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AutoforgeVpc21157266"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AutoforgeVpc/PublicSubnet2/RouteTable"
+   }
+  },
+  "AutoforgeVpcPublicSubnet2RouteTableAssociationBD16E27D": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "AutoforgeVpcPublicSubnet2RouteTableED005AAD"
+    },
+    "SubnetId": {
+     "Ref": "AutoforgeVpcPublicSubnet2SubnetE38F9613"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AutoforgeVpc/PublicSubnet2/RouteTableAssociation"
+   }
+  },
+  "AutoforgeVpcPublicSubnet2DefaultRouteC91D0023": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "GatewayId": {
+     "Ref": "AutoforgeVpcIGW2FE81645"
+    },
+    "RouteTableId": {
+     "Ref": "AutoforgeVpcPublicSubnet2RouteTableED005AAD"
+    }
+   },
+   "DependsOn": [
+    "AutoforgeVpcVPCGW355CBF17"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AutoforgeVpc/PublicSubnet2/DefaultRoute"
+   }
+  },
+  "AutoforgeVpcPrivateSubnet1Subnet66EF29B9": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": "us-west-2a",
+    "CidrBlock": "10.0.2.0/24",
+    "MapPublicIpOnLaunch": false,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Private"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Private"
+     },
+     {
+      "Key": "Name",
+      "Value": "AutoforgeStack/AutoforgeVpc/PrivateSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AutoforgeVpc21157266"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AutoforgeVpc/PrivateSubnet1/Subnet"
+   }
+  },
+  "AutoforgeVpcPrivateSubnet1RouteTable95AC3124": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "AutoforgeStack/AutoforgeVpc/PrivateSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AutoforgeVpc21157266"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AutoforgeVpc/PrivateSubnet1/RouteTable"
+   }
+  },
+  "AutoforgeVpcPrivateSubnet1RouteTableAssociationB9FF68D8": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "AutoforgeVpcPrivateSubnet1RouteTable95AC3124"
+    },
+    "SubnetId": {
+     "Ref": "AutoforgeVpcPrivateSubnet1Subnet66EF29B9"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AutoforgeVpc/PrivateSubnet1/RouteTableAssociation"
+   }
+  },
+  "AutoforgeVpcPrivateSubnet1DefaultRoute939C50A0": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "NatGatewayId": {
+     "Ref": "AutoforgeVpcPublicSubnet1NATGateway7FD76EAA"
+    },
+    "RouteTableId": {
+     "Ref": "AutoforgeVpcPrivateSubnet1RouteTable95AC3124"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AutoforgeVpc/PrivateSubnet1/DefaultRoute"
+   }
+  },
+  "AutoforgeVpcPrivateSubnet2Subnet4F191307": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": "us-west-2b",
+    "CidrBlock": "10.0.3.0/24",
+    "MapPublicIpOnLaunch": false,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Private"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Private"
+     },
+     {
+      "Key": "Name",
+      "Value": "AutoforgeStack/AutoforgeVpc/PrivateSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AutoforgeVpc21157266"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AutoforgeVpc/PrivateSubnet2/Subnet"
+   }
+  },
+  "AutoforgeVpcPrivateSubnet2RouteTable1963EF37": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "AutoforgeStack/AutoforgeVpc/PrivateSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AutoforgeVpc21157266"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AutoforgeVpc/PrivateSubnet2/RouteTable"
+   }
+  },
+  "AutoforgeVpcPrivateSubnet2RouteTableAssociationEB7043DB": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "AutoforgeVpcPrivateSubnet2RouteTable1963EF37"
+    },
+    "SubnetId": {
+     "Ref": "AutoforgeVpcPrivateSubnet2Subnet4F191307"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AutoforgeVpc/PrivateSubnet2/RouteTableAssociation"
+   }
+  },
+  "AutoforgeVpcPrivateSubnet2DefaultRouteAC618DB9": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "NatGatewayId": {
+     "Ref": "AutoforgeVpcPublicSubnet1NATGateway7FD76EAA"
+    },
+    "RouteTableId": {
+     "Ref": "AutoforgeVpcPrivateSubnet2RouteTable1963EF37"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AutoforgeVpc/PrivateSubnet2/DefaultRoute"
+   }
+  },
+  "AutoforgeVpcIGW2FE81645": {
+   "Type": "AWS::EC2::InternetGateway",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "AutoforgeStack/AutoforgeVpc"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AutoforgeVpc/IGW"
+   }
+  },
+  "AutoforgeVpcVPCGW355CBF17": {
+   "Type": "AWS::EC2::VPCGatewayAttachment",
+   "Properties": {
+    "InternetGatewayId": {
+     "Ref": "AutoforgeVpcIGW2FE81645"
+    },
+    "VpcId": {
+     "Ref": "AutoforgeVpc21157266"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AutoforgeVpc/VPCGW"
+   }
+  },
+  "AutoforgeClusterA4E119D3": {
+   "Type": "AWS::ECS::Cluster",
+   "Properties": {
+    "ClusterName": "autoforge",
+    "ClusterSettings": [
+     {
+      "Name": "containerInsights",
+      "Value": "enabled"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AutoforgeCluster/Resource"
+   }
+  },
+  "OrchestratorLogGroupE3FD5A7F": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": "/autoforge/orchestrator",
+    "RetentionInDays": 30
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/OrchestratorLogGroup/Resource"
+   }
+  },
+  "AgentsLogGroup0DE3C993": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": "/autoforge/agents",
+    "RetentionInDays": 30
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AgentsLogGroup/Resource"
+   }
+  },
+  "AlbSecurityGroup86A59E99": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "AutoForge ALB - allows HTTP/HTTPS inbound",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "SecurityGroupIngress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow HTTP from anywhere",
+      "FromPort": 80,
+      "IpProtocol": "tcp",
+      "ToPort": 80
+     },
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow HTTPS from anywhere",
+      "FromPort": 443,
+      "IpProtocol": "tcp",
+      "ToPort": 443
+     }
+    ],
+    "VpcId": {
+     "Ref": "AutoforgeVpc21157266"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AlbSecurityGroup/Resource"
+   }
+  },
+  "EcsSecurityGroup44008BF1": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "AutoForge ECS tasks - allows traffic from ALB only",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "AutoforgeVpc21157266"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/EcsSecurityGroup/Resource"
+   }
+  },
+  "EcsSecurityGroupfromAutoforgeStackAlbSecurityGroup401BB44F80803A741C89": {
+   "Type": "AWS::EC2::SecurityGroupIngress",
+   "Properties": {
+    "Description": "Allow traffic from ALB on container port",
+    "FromPort": 8080,
+    "GroupId": {
+     "Fn::GetAtt": [
+      "EcsSecurityGroup44008BF1",
+      "GroupId"
+     ]
+    },
+    "IpProtocol": "tcp",
+    "SourceSecurityGroupId": {
+     "Fn::GetAtt": [
+      "AlbSecurityGroup86A59E99",
+      "GroupId"
+     ]
+    },
+    "ToPort": 8080
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/EcsSecurityGroup/from AutoforgeStackAlbSecurityGroup401BB44F:8080"
+   }
+  },
+  "AutoforgeAlb2B30F3D1": {
+   "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+   "Properties": {
+    "LoadBalancerAttributes": [
+     {
+      "Key": "deletion_protection.enabled",
+      "Value": "false"
+     }
+    ],
+    "Scheme": "internet-facing",
+    "SecurityGroups": [
+     {
+      "Fn::GetAtt": [
+       "AlbSecurityGroup86A59E99",
+       "GroupId"
+      ]
+     }
+    ],
+    "Subnets": [
+     {
+      "Ref": "AutoforgeVpcPublicSubnet1SubnetF32A4EB1"
+     },
+     {
+      "Ref": "AutoforgeVpcPublicSubnet2SubnetE38F9613"
+     }
+    ],
+    "Type": "application"
+   },
+   "DependsOn": [
+    "AutoforgeVpcPublicSubnet1DefaultRoute1532D321",
+    "AutoforgeVpcPublicSubnet1RouteTableAssociation3B1A6495",
+    "AutoforgeVpcPublicSubnet2DefaultRouteC91D0023",
+    "AutoforgeVpcPublicSubnet2RouteTableAssociationBD16E27D"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AutoforgeAlb/Resource"
+   }
+  },
+  "AutoforgeAlbHttpListener1302427E": {
+   "Type": "AWS::ElasticLoadBalancingV2::Listener",
+   "Properties": {
+    "DefaultActions": [
+     {
+      "TargetGroupArn": {
+       "Ref": "AutoforgeAlbHttpListenerOrchestratorTargetGroupE2CAF933"
+      },
+      "Type": "forward"
+     }
+    ],
+    "LoadBalancerArn": {
+     "Ref": "AutoforgeAlb2B30F3D1"
+    },
+    "Port": 80,
+    "Protocol": "HTTP"
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AutoforgeAlb/HttpListener/Resource"
+   }
+  },
+  "AutoforgeAlbHttpListenerOrchestratorTargetGroupE2CAF933": {
+   "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+   "Properties": {
+    "HealthCheckIntervalSeconds": 30,
+    "HealthCheckPath": "/health",
+    "HealthCheckTimeoutSeconds": 5,
+    "HealthyThresholdCount": 2,
+    "Matcher": {
+     "HttpCode": "200"
+    },
+    "Port": 8080,
+    "Protocol": "HTTP",
+    "TargetGroupAttributes": [
+     {
+      "Key": "stickiness.enabled",
+      "Value": "false"
+     }
+    ],
+    "TargetType": "ip",
+    "UnhealthyThresholdCount": 3,
+    "VpcId": {
+     "Ref": "AutoforgeVpc21157266"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AutoforgeAlb/HttpListener/OrchestratorTargetGroup/Resource"
+   }
+  },
+  "AgentRepositoryCEF64969": {
+   "Type": "AWS::ECR::Repository",
+   "Properties": {
+    "ImageScanningConfiguration": {
+     "ScanOnPush": true
+    },
+    "LifecyclePolicy": {
+     "LifecyclePolicyText": "{\"rules\":[{\"rulePriority\":1,\"description\":\"Keep only the last 10 images\",\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":10},\"action\":{\"type\":\"expire\"}}]}"
+    },
+    "RepositoryName": "autoforge-agent"
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AgentRepository/Resource"
+   }
+  },
+  "ApiKeysSecret5A58C5CD": {
+   "Type": "AWS::SecretsManager::Secret",
+   "Properties": {
+    "Description": "API keys used by AutoForge agents (e.g. ANTHROPIC_API_KEY)",
+    "GenerateSecretString": {},
+    "Name": "autoforge/api-keys"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/ApiKeysSecret/Resource"
+   }
+  },
+  "TaskExecutionRole250D2532": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+       ]
+      ]
+     }
+    ],
+    "RoleName": "autoforge-task-execution"
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/TaskExecutionRole/Resource"
+   }
+  },
+  "TaskExecutionRoleDefaultPolicyA84DD1B0": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:BatchGetImage"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "AgentRepositoryCEF64969",
+         "Arn"
+        ]
+       }
+      },
+      {
+       "Action": "ecr:GetAuthorizationToken",
+       "Effect": "Allow",
+       "Resource": "*"
+      },
+      {
+       "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "OrchestratorLogGroupE3FD5A7F",
+         "Arn"
+        ]
+       }
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Ref": "ApiKeysSecret5A58C5CD"
+       }
+      },
+      {
+       "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "AgentsLogGroup0DE3C993",
+         "Arn"
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "TaskExecutionRoleDefaultPolicyA84DD1B0",
+    "Roles": [
+     {
+      "Ref": "TaskExecutionRole250D2532"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/TaskExecutionRole/DefaultPolicy/Resource"
+   }
+  },
+  "OrchestratorTaskRole4A62488A": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "RoleName": "autoforge-orchestrator-task"
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/OrchestratorTaskRole/Resource"
+   }
+  },
+  "OrchestratorTaskRoleDefaultPolicy4E83994D": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "ecs:RunTask",
+        "ecs:StopTask",
+        "ecs:DescribeTasks"
+       ],
+       "Condition": {
+        "ArnEquals": {
+         "ecs:cluster": {
+          "Fn::GetAtt": [
+           "AutoforgeClusterA4E119D3",
+           "Arn"
+          ]
+         }
+        }
+       },
+       "Effect": "Allow",
+       "Resource": "*",
+       "Sid": "EcsAgentManagement"
+      },
+      {
+       "Action": "iam:PassRole",
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "TaskExecutionRole250D2532",
+         "Arn"
+        ]
+       },
+       "Sid": "PassRoleForAgentTasks"
+      },
+      {
+       "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "OrchestratorLogGroupE3FD5A7F",
+         "Arn"
+        ]
+       }
+      },
+      {
+       "Action": "iam:PassRole",
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "AgentTaskRoleAB8558E5",
+         "Arn"
+        ]
+       },
+       "Sid": "PassAgentTaskRole"
+      },
+      {
+       "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:Query",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:Scan"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        "arn:aws:dynamodb:us-west-2:211125619133:table/autoforge-*",
+        "arn:aws:dynamodb:us-west-2:211125619133:table/autoforge-*/index/*"
+       ],
+       "Sid": "DynamoDbReadWrite"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "OrchestratorTaskRoleDefaultPolicy4E83994D",
+    "Roles": [
+     {
+      "Ref": "OrchestratorTaskRole4A62488A"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/OrchestratorTaskRole/DefaultPolicy/Resource"
+   }
+  },
+  "AgentTaskRoleAB8558E5": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "RoleName": "autoforge-agent-task"
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AgentTaskRole/Resource"
+   }
+  },
+  "AgentTaskRoleDefaultPolicyD9D35507": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "AgentsLogGroup0DE3C993",
+         "Arn"
+        ]
+       }
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Ref": "ApiKeysSecret5A58C5CD"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "AgentTaskRoleDefaultPolicyD9D35507",
+    "Roles": [
+     {
+      "Ref": "AgentTaskRoleAB8558E5"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AgentTaskRole/DefaultPolicy/Resource"
+   }
+  },
+  "OrchestratorTaskDef2BBFA66F": {
+   "Type": "AWS::ECS::TaskDefinition",
+   "Properties": {
+    "ContainerDefinitions": [
+     {
+      "Environment": [
+       {
+        "Name": "ENV",
+        "Value": "production"
+       },
+       {
+        "Name": "PORT",
+        "Value": "8080"
+       },
+       {
+        "Name": "ECS_CLUSTER_ARN",
+        "Value": {
+         "Fn::GetAtt": [
+          "AutoforgeClusterA4E119D3",
+          "Arn"
+         ]
+        }
+       },
+       {
+        "Name": "AGENT_TASK_DEF_ARN",
+        "Value": {
+         "Ref": "AgentTaskDef41623489"
+        }
+       },
+       {
+        "Name": "AGENT_SUBNET_IDS",
+        "Value": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Ref": "AutoforgeVpcPrivateSubnet1Subnet66EF29B9"
+           },
+           ",",
+           {
+            "Ref": "AutoforgeVpcPrivateSubnet2Subnet4F191307"
+           }
+          ]
+         ]
+        }
+       },
+       {
+        "Name": "AGENT_SECURITY_GROUP_ID",
+        "Value": {
+         "Fn::GetAtt": [
+          "EcsSecurityGroup44008BF1",
+          "GroupId"
+         ]
+        }
+       },
+       {
+        "Name": "DYNAMODB_TABLE_PREFIX",
+        "Value": "autoforge-"
+       }
+      ],
+      "Essential": true,
+      "HealthCheck": {
+       "Command": [
+        "CMD-SHELL",
+        "curl -f http://localhost:8080/health || exit 1"
+       ],
+       "Interval": 30,
+       "Retries": 3,
+       "StartPeriod": 60,
+       "Timeout": 5
+      },
+      "Image": {
+       "Fn::Join": [
+        "",
+        [
+         {
+          "Fn::Select": [
+           4,
+           {
+            "Fn::Split": [
+             ":",
+             {
+              "Fn::GetAtt": [
+               "AgentRepositoryCEF64969",
+               "Arn"
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         ".dkr.ecr.",
+         {
+          "Fn::Select": [
+           3,
+           {
+            "Fn::Split": [
+             ":",
+             {
+              "Fn::GetAtt": [
+               "AgentRepositoryCEF64969",
+               "Arn"
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         ".",
+         {
+          "Ref": "AWS::URLSuffix"
+         },
+         "/",
+         {
+          "Ref": "AgentRepositoryCEF64969"
+         },
+         ":latest"
+        ]
+       ]
+      },
+      "LogConfiguration": {
+       "LogDriver": "awslogs",
+       "Options": {
+        "awslogs-group": {
+         "Ref": "OrchestratorLogGroupE3FD5A7F"
+        },
+        "awslogs-stream-prefix": "orchestrator",
+        "awslogs-region": "us-west-2"
+       }
+      },
+      "Name": "OrchestratorContainer",
+      "PortMappings": [
+       {
+        "ContainerPort": 8080,
+        "Protocol": "tcp"
+       }
+      ],
+      "Secrets": [
+       {
+        "Name": "ANTHROPIC_API_KEY",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Ref": "ApiKeysSecret5A58C5CD"
+           },
+           ":ANTHROPIC_API_KEY::"
+          ]
+         ]
+        }
+       }
+      ]
+     }
+    ],
+    "Cpu": "1024",
+    "ExecutionRoleArn": {
+     "Fn::GetAtt": [
+      "TaskExecutionRole250D2532",
+      "Arn"
+     ]
+    },
+    "Family": "AutoforgeStackOrchestratorTaskDef34ABFFF7",
+    "Memory": "2048",
+    "NetworkMode": "awsvpc",
+    "RequiresCompatibilities": [
+     "FARGATE"
+    ],
+    "TaskRoleArn": {
+     "Fn::GetAtt": [
+      "OrchestratorTaskRole4A62488A",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/OrchestratorTaskDef/Resource"
+   }
+  },
+  "OrchestratorService5871F41E": {
+   "Type": "AWS::ECS::Service",
+   "Properties": {
+    "Cluster": {
+     "Ref": "AutoforgeClusterA4E119D3"
+    },
+    "DeploymentConfiguration": {
+     "Alarms": {
+      "AlarmNames": [],
+      "Enable": false,
+      "Rollback": false
+     },
+     "MaximumPercent": 200,
+     "MinimumHealthyPercent": 50
+    },
+    "DesiredCount": 1,
+    "EnableECSManagedTags": false,
+    "HealthCheckGracePeriodSeconds": 60,
+    "LaunchType": "FARGATE",
+    "LoadBalancers": [
+     {
+      "ContainerName": "OrchestratorContainer",
+      "ContainerPort": 8080,
+      "TargetGroupArn": {
+       "Ref": "AutoforgeAlbHttpListenerOrchestratorTargetGroupE2CAF933"
+      }
+     }
+    ],
+    "NetworkConfiguration": {
+     "AwsvpcConfiguration": {
+      "AssignPublicIp": "DISABLED",
+      "SecurityGroups": [
+       {
+        "Fn::GetAtt": [
+         "EcsSecurityGroup44008BF1",
+         "GroupId"
+        ]
+       }
+      ],
+      "Subnets": [
+       {
+        "Ref": "AutoforgeVpcPrivateSubnet1Subnet66EF29B9"
+       },
+       {
+        "Ref": "AutoforgeVpcPrivateSubnet2Subnet4F191307"
+       }
+      ]
+     }
+    },
+    "TaskDefinition": {
+     "Ref": "OrchestratorTaskDef2BBFA66F"
+    }
+   },
+   "DependsOn": [
+    "AutoforgeAlbHttpListenerOrchestratorTargetGroupE2CAF933",
+    "AutoforgeAlbHttpListener1302427E",
+    "OrchestratorTaskRoleDefaultPolicy4E83994D",
+    "OrchestratorTaskRole4A62488A"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/OrchestratorService/Service"
+   }
+  },
+  "AgentTaskDef41623489": {
+   "Type": "AWS::ECS::TaskDefinition",
+   "Properties": {
+    "ContainerDefinitions": [
+     {
+      "Environment": [
+       {
+        "Name": "ENV",
+        "Value": "production"
+       }
+      ],
+      "Essential": true,
+      "Image": {
+       "Fn::Join": [
+        "",
+        [
+         {
+          "Fn::Select": [
+           4,
+           {
+            "Fn::Split": [
+             ":",
+             {
+              "Fn::GetAtt": [
+               "AgentRepositoryCEF64969",
+               "Arn"
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         ".dkr.ecr.",
+         {
+          "Fn::Select": [
+           3,
+           {
+            "Fn::Split": [
+             ":",
+             {
+              "Fn::GetAtt": [
+               "AgentRepositoryCEF64969",
+               "Arn"
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         ".",
+         {
+          "Ref": "AWS::URLSuffix"
+         },
+         "/",
+         {
+          "Ref": "AgentRepositoryCEF64969"
+         },
+         ":latest"
+        ]
+       ]
+      },
+      "LogConfiguration": {
+       "LogDriver": "awslogs",
+       "Options": {
+        "awslogs-group": {
+         "Ref": "AgentsLogGroup0DE3C993"
+        },
+        "awslogs-stream-prefix": "agent",
+        "awslogs-region": "us-west-2"
+       }
+      },
+      "Name": "AgentContainer",
+      "Secrets": [
+       {
+        "Name": "ANTHROPIC_API_KEY",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Ref": "ApiKeysSecret5A58C5CD"
+           },
+           ":ANTHROPIC_API_KEY::"
+          ]
+         ]
+        }
+       }
+      ]
+     }
+    ],
+    "Cpu": "1024",
+    "ExecutionRoleArn": {
+     "Fn::GetAtt": [
+      "TaskExecutionRole250D2532",
+      "Arn"
+     ]
+    },
+    "Family": "autoforge-agent",
+    "Memory": "2048",
+    "NetworkMode": "awsvpc",
+    "RequiresCompatibilities": [
+     "FARGATE"
+    ],
+    "TaskRoleArn": {
+     "Fn::GetAtt": [
+      "AgentTaskRoleAB8558E5",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AgentTaskDef/Resource"
+   }
+  },
+  "UsersTable9725E9C8": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "id",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "auth0Id",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "email",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "GlobalSecondaryIndexes": [
+     {
+      "IndexName": "by_auth0Id",
+      "KeySchema": [
+       {
+        "AttributeName": "auth0Id",
+        "KeyType": "HASH"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "by_email",
+      "KeySchema": [
+       {
+        "AttributeName": "email",
+        "KeyType": "HASH"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     }
+    ],
+    "KeySchema": [
+     {
+      "AttributeName": "id",
+      "KeyType": "HASH"
+     }
+    ],
+    "TableName": "autoforge-users"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/UsersTable/Resource"
+   }
+  },
+  "ProjectsTableAA0A2089": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "id",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "status",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "createdAt",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "GlobalSecondaryIndexes": [
+     {
+      "IndexName": "by_status",
+      "KeySchema": [
+       {
+        "AttributeName": "status",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "createdAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     }
+    ],
+    "KeySchema": [
+     {
+      "AttributeName": "id",
+      "KeyType": "HASH"
+     }
+    ],
+    "TableName": "autoforge-projects"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/ProjectsTable/Resource"
+   }
+  },
+  "FeaturesTable52D06210": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "id",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "projectId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "createdAt",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "status",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "linearIssueId",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "GlobalSecondaryIndexes": [
+     {
+      "IndexName": "by_project",
+      "KeySchema": [
+       {
+        "AttributeName": "projectId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "createdAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "by_project_status",
+      "KeySchema": [
+       {
+        "AttributeName": "projectId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "status",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "by_linearIssueId",
+      "KeySchema": [
+       {
+        "AttributeName": "linearIssueId",
+        "KeyType": "HASH"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     }
+    ],
+    "KeySchema": [
+     {
+      "AttributeName": "id",
+      "KeyType": "HASH"
+     }
+    ],
+    "TableName": "autoforge-features"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/FeaturesTable/Resource"
+   }
+  },
+  "AgentsTable78E0948F": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "id",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "projectId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "createdAt",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "status",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "GlobalSecondaryIndexes": [
+     {
+      "IndexName": "by_project",
+      "KeySchema": [
+       {
+        "AttributeName": "projectId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "createdAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "by_project_status",
+      "KeySchema": [
+       {
+        "AttributeName": "projectId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "status",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     }
+    ],
+    "KeySchema": [
+     {
+      "AttributeName": "id",
+      "KeyType": "HASH"
+     }
+    ],
+    "TableName": "autoforge-agents"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AgentsTable/Resource"
+   }
+  },
+  "AgentRunsTableB0DA56A7": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "id",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "projectId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "startedAt",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "featureId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "agentId",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "GlobalSecondaryIndexes": [
+     {
+      "IndexName": "by_project",
+      "KeySchema": [
+       {
+        "AttributeName": "projectId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "startedAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "by_feature",
+      "KeySchema": [
+       {
+        "AttributeName": "featureId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "startedAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "by_agent",
+      "KeySchema": [
+       {
+        "AttributeName": "agentId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "startedAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     }
+    ],
+    "KeySchema": [
+     {
+      "AttributeName": "id",
+      "KeyType": "HASH"
+     }
+    ],
+    "TableName": "autoforge-agent-runs"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/AgentRunsTable/Resource"
+   }
+  },
+  "TicketsTableB76A19AF": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "id",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "projectId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "syncedAt",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "linearIssueId",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "GlobalSecondaryIndexes": [
+     {
+      "IndexName": "by_project",
+      "KeySchema": [
+       {
+        "AttributeName": "projectId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "syncedAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "by_linearIssueId",
+      "KeySchema": [
+       {
+        "AttributeName": "linearIssueId",
+        "KeyType": "HASH"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     }
+    ],
+    "KeySchema": [
+     {
+      "AttributeName": "id",
+      "KeyType": "HASH"
+     }
+    ],
+    "TableName": "autoforge-tickets"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/TicketsTable/Resource"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/31S0W7bMAz8lr4rWucBxV6zbCsCFJ1hF30daJn12MiSIVIJAkH/PthO7GwPfeLd6UQcDix08eWrvr+DE29Me9hYanSqBcxBwYl/JzSFTq+DUbs391ruVBkbS6aOjUMZtRVVPgq+QGNx1Vdty+wNgZB3i3kEP/blOJ5BHkHwBGdVBjqC4Lp47wSDw8UwJ7mwrQiYPz06UTWaGEjOj8HHYcrwobB3XUDmrNCwTjsbWTCMriv8CaGDMT4fvuMbObqG/1/xToAchhvt8rfGcCQzFzLDrKzvWKcn3y2xrjgrtMBCxnpoG7DgDLnuWOi0HQZLZmrvyUP7bXqb0/7Db33Egu7iueKb9xcIHcqS4YaOjQSdKhw8k/gwNb6yrBhNQOEeHHQYdKonfik4oGRF0OtU+fkUpll6S2baNKOs2rOD3reNTsvRTCBnVSH7GObefkUZomTlfIv6nT8di0J/ftD3d+9MtAnRCfWoq3n+BVUipuzOAgAA"
+   },
+   "Metadata": {
+    "aws:cdk:path": "AutoforgeStack/CDKMetadata/Default"
+   }
+  }
+ },
+ "Outputs": {
+  "AlbDnsName": {
+   "Description": "Application Load Balancer DNS name",
+   "Value": {
+    "Fn::GetAtt": [
+     "AutoforgeAlb2B30F3D1",
+     "DNSName"
+    ]
+   }
+  },
+  "EcrRepositoryUri": {
+   "Description": "ECR repository URI for docker push",
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      {
+       "Fn::Select": [
+        4,
+        {
+         "Fn::Split": [
+          ":",
+          {
+           "Fn::GetAtt": [
+            "AgentRepositoryCEF64969",
+            "Arn"
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      ".dkr.ecr.",
+      {
+       "Fn::Select": [
+        3,
+        {
+         "Fn::Split": [
+          ":",
+          {
+           "Fn::GetAtt": [
+            "AgentRepositoryCEF64969",
+            "Arn"
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      ".",
+      {
+       "Ref": "AWS::URLSuffix"
+      },
+      "/",
+      {
+       "Ref": "AgentRepositoryCEF64969"
+      }
+     ]
+    ]
+   }
+  },
+  "ClusterName": {
+   "Description": "ECS cluster name",
+   "Value": {
+    "Ref": "AutoforgeClusterA4E119D3"
+   }
+  },
+  "AgentTaskDefArn": {
+   "Description": "Agent task definition ARN for RunTask calls",
+   "Value": {
+    "Ref": "AgentTaskDef41623489"
+   }
+  },
+  "ApiKeysSecretArn": {
+   "Description": "Secrets Manager ARN for API keys",
+   "Value": {
+    "Ref": "ApiKeysSecret5A58C5CD"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

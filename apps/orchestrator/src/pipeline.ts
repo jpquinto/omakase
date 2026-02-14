@@ -16,14 +16,16 @@
  */
 
 import { ECSClient } from "@aws-sdk/client-ecs";
-import { ConvexHttpClient } from "convex/browser";
+import {
+  markFeaturePassing as dbMarkFeaturePassing,
+  markFeatureFailing as dbMarkFeatureFailing,
+  createAgentRun as dbCreateAgentRun,
+  completeAgentRun as dbCompleteAgentRun,
+} from "@autoforge/dynamodb";
 
 import { startAgent, stopAgent, releaseFeature, type AgentRole } from "./ecs-agent.js";
 import { AgentMonitor, type AgentCompletionResult } from "./agent-monitor.js";
 import { createPullRequest, buildPrBody } from "./pr-creator.js";
-
-// TODO: Replace with generated Convex API types once `npx convex codegen` is run.
-// import { api } from "@autoforge/convex/_generated/api";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -31,9 +33,9 @@ import { createPullRequest, buildPrBody } from "./pr-creator.js";
 
 /** Configuration for running the agent pipeline. */
 export interface PipelineConfig {
-  /** The Convex feature ID to implement. */
+  /** The feature ID to implement. */
   featureId: string;
-  /** The Convex project ID. */
+  /** The project ID. */
   projectId: string;
   /** The feature name (used in PR titles and logs). */
   featureName: string;
@@ -63,8 +65,6 @@ export interface EcsConfig {
   securityGroup: string;
   /** The container name within the task definition. */
   containerName: string;
-  /** The Convex deployment URL. */
-  convexUrl: string;
 }
 
 /** The result of executing the full pipeline. */
@@ -87,7 +87,7 @@ interface StepResult {
   exitCode: number | null;
   /** The ECS stop reason. */
   stopReason: string | null;
-  /** The Convex agent run ID for this step. */
+  /** The agent run ID for this step. */
   agentRunId: string;
 }
 
@@ -125,20 +125,17 @@ export class AgentPipeline {
   private readonly config: PipelineConfig;
   private readonly ecsConfig: EcsConfig;
   private readonly ecsClient: ECSClient;
-  private readonly convex: ConvexHttpClient;
 
   constructor(
     config: PipelineConfig,
     ecsConfig: EcsConfig,
     ecsClient: ECSClient,
-    convex: ConvexHttpClient,
   ) {
     this.featureId = config.featureId;
     this.projectId = config.projectId;
     this.config = config;
     this.ecsConfig = ecsConfig;
     this.ecsClient = ecsClient;
-    this.convex = convex;
   }
 
   /**
@@ -269,7 +266,7 @@ export class AgentPipeline {
    * @returns The step result.
    */
   private async runStep(role: AgentRole): Promise<StepResult> {
-    // Create the agent run record in Convex
+    // Create the agent run record in DynamoDB
     const agentRunId = await this.createAgentRun(role);
 
     // Launch the ECS task
@@ -288,7 +285,7 @@ export class AgentPipeline {
         securityGroup: this.ecsConfig.securityGroup,
         containerName: this.ecsConfig.containerName,
         ecsClient: this.ecsClient,
-        convexUrl: this.ecsConfig.convexUrl,
+        convexUrl: "", // Deprecated: agents no longer use Convex
         baseBranch: this.config.baseBranch,
       });
       taskArn = launchResult.taskArn;
@@ -312,7 +309,6 @@ export class AgentPipeline {
       taskArn,
       ecsCluster: this.ecsConfig.cluster,
       ecsClient: this.ecsClient,
-      convex: this.convex,
       agentRunId,
     });
 
@@ -433,17 +429,11 @@ export class AgentPipeline {
   }
 
   /**
-   * Mark the feature as passing in Convex.
+   * Mark the feature as passing in DynamoDB.
    */
   private async markFeaturePassing(): Promise<void> {
     try {
-      // TODO: Replace with generated Convex API types.
-      // e.g., await this.convex.mutation(api.features.markFeaturePassing, { featureId: this.featureId });
-      const mutationRef = "features:markFeaturePassing" as unknown;
-      await this.convex.mutation(
-        mutationRef as never,
-        { featureId: this.featureId } as never,
-      );
+      await dbMarkFeaturePassing({ featureId: this.featureId });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(
@@ -453,17 +443,11 @@ export class AgentPipeline {
   }
 
   /**
-   * Mark the feature as failing in Convex.
+   * Mark the feature as failing in DynamoDB.
    */
   private async markFeatureFailing(): Promise<void> {
     try {
-      // TODO: Replace with generated Convex API types.
-      // e.g., await this.convex.mutation(api.features.markFeatureFailing, { featureId: this.featureId });
-      const mutationRef = "features:markFeatureFailing" as unknown;
-      await this.convex.mutation(
-        mutationRef as never,
-        { featureId: this.featureId } as never,
-      );
+      await dbMarkFeatureFailing({ featureId: this.featureId });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(
@@ -473,33 +457,24 @@ export class AgentPipeline {
   }
 
   // -------------------------------------------------------------------------
-  // Convex helpers
+  // DynamoDB helpers
   // -------------------------------------------------------------------------
 
   /**
-   * Create an agent run record in Convex for tracking a pipeline step.
+   * Create an agent run record in DynamoDB for tracking a pipeline step.
    *
    * @param role - The agent role for this step.
-   * @returns The Convex agent run document ID.
+   * @returns The agent run document ID.
    */
   private async createAgentRun(role: AgentRole): Promise<string> {
     try {
-      // TODO: Replace with generated Convex API types.
-      // e.g., return await this.convex.mutation(api.agentRuns.createAgentRun, { ... });
-      const mutationRef = "agentRuns:createAgentRun" as unknown;
-      const runId = await this.convex.mutation(
-        mutationRef as never,
-        {
-          // TODO: agentId should come from an agents table entry for this project.
-          // For now, we pass a placeholder. The Convex mutation expects an Id<"agents">,
-          // so this will need to be resolved once agents are pre-created per project.
-          agentId: `placeholder-${role}` as never,
-          projectId: this.projectId,
-          featureId: this.featureId,
-          role,
-        } as never,
-      );
-      return runId as string;
+      const runId = await dbCreateAgentRun({
+        agentId: `placeholder-${role}`,
+        projectId: this.projectId,
+        featureId: this.featureId,
+        role,
+      });
+      return runId;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(
@@ -511,25 +486,19 @@ export class AgentPipeline {
   }
 
   /**
-   * Mark an agent run as failed in Convex with an error message.
+   * Mark an agent run as failed in DynamoDB with an error message.
    *
-   * @param agentRunId - The Convex agent run document ID.
+   * @param agentRunId - The agent run document ID.
    * @param errorMessage - Description of the failure.
    */
   private async failAgentRun(agentRunId: string, errorMessage: string): Promise<void> {
     try {
-      // TODO: Replace with generated Convex API types.
-      // e.g., await this.convex.mutation(api.agentRuns.completeAgentRun, { ... });
-      const mutationRef = "agentRuns:completeAgentRun" as unknown;
-      await this.convex.mutation(
-        mutationRef as never,
-        {
-          runId: agentRunId,
-          status: "failed",
-          outputSummary: errorMessage,
-          errorMessage,
-        } as never,
-      );
+      await dbCompleteAgentRun({
+        runId: agentRunId,
+        status: "failed",
+        outputSummary: errorMessage,
+        errorMessage,
+      });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       console.warn(

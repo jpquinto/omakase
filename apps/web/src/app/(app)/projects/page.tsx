@@ -4,11 +4,10 @@ import Link from "next/link";
 import { useState } from "react";
 
 // ---------------------------------------------------------------------------
-// Mock data representing projects. Will be replaced with Convex useQuery once
-// the backend is fully wired:
-//   import { useQuery } from "convex/react";
-//   import { api } from "@autoforge/convex/convex/_generated/api";
-//   const projects = useQuery(api.projects.list);
+// Mock data representing projects. Will be replaced with orchestrator API
+// hooks once the backend is fully wired:
+//   import { useProjects } from "@/hooks/use-api";
+//   const { data: projects } = useProjects(userId);
 // ---------------------------------------------------------------------------
 
 interface MockProject {

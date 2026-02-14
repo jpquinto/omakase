@@ -2,7 +2,8 @@
  * Ticket ingestion handlers for Linear issue webhook events.
  *
  * When Linear issues are created or updated, these handlers synchronise
- * the relevant data into AutoForge features stored in Convex.
+ * the relevant data into AutoForge features stored in DynamoDB via the
+ * orchestrator API.
  *
  * Only issues that carry the configured trigger label (e.g. "autoforge")
  * are ingested -- all other issues are silently ignored.
@@ -123,8 +124,8 @@ function toIssueEvent(data: Record<string, unknown>): LinearIssueEvent {
  * Handle an Issue.create event from Linear.
  *
  * If the issue carries the trigger label, a corresponding feature is
- * created in the Convex database with fields mapped from the Linear
- * issue.
+ * created in DynamoDB (via the orchestrator API) with fields mapped
+ * from the Linear issue.
  */
 export async function handleIssueCreated(
   data: Record<string, unknown>,
@@ -137,19 +138,21 @@ export async function handleIssueCreated(
 
   const labelNames = event.labels.map((l) => l.name);
 
-  // TODO: Replace with an actual Convex mutation call.
+  // TODO: Replace with an actual orchestrator API call.
   //
   // Example:
-  //   import { fetchMutation } from "convex/nextjs";
-  //   import { api } from "@convex/_generated/api";
-  //   await fetchMutation(api.features.createFromLinear, {
-  //     projectId,        // Resolve from event.team?.id or a lookup table
-  //     name: event.title,
-  //     description: event.description ?? "",
-  //     priority: mapLinearPriority(event.priority),
-  //     category: labelNames.filter(l => l.toLowerCase() !== TRIGGER_LABEL.toLowerCase()).join(", ") || undefined,
-  //     linearIssueId: event.identifier,
-  //     linearIssueUrl: event.url,
+  //   import { apiFetch } from "@/lib/api-client";
+  //   await apiFetch("/api/features", {
+  //     method: "POST",
+  //     body: JSON.stringify({
+  //       projectId,        // Resolve from event.team?.id or a lookup table
+  //       name: event.title,
+  //       description: event.description ?? "",
+  //       priority: mapLinearPriority(event.priority),
+  //       category: labelNames.filter(l => l.toLowerCase() !== TRIGGER_LABEL.toLowerCase()).join(", ") || undefined,
+  //       linearIssueId: event.identifier,
+  //       linearIssueUrl: event.url,
+  //     }),
   //   });
 
   console.log(
@@ -169,16 +172,13 @@ export async function handleIssueUpdated(
 ): Promise<void> {
   const event = toIssueEvent(data);
 
-  // TODO: Replace with an actual Convex mutation call.
+  // TODO: Replace with an actual orchestrator API call.
   //
   // Example:
-  //   import { fetchMutation, fetchQuery } from "convex/nextjs";
-  //   import { api } from "@convex/_generated/api";
+  //   import { apiFetch } from "@/lib/api-client";
   //
   //   // Look up the feature by its Linear issue identifier.
-  //   const feature = await fetchQuery(api.features.getByLinearIssueId, {
-  //     linearIssueId: event.identifier,
-  //   });
+  //   const feature = await apiFetch(`/api/features/by-linear-issue/${event.identifier}`);
   //
   //   if (!feature) {
   //     // The issue may not have been ingested (e.g. label was added later).
@@ -189,11 +189,13 @@ export async function handleIssueUpdated(
   //     return;
   //   }
   //
-  //   await fetchMutation(api.features.updateFromLinear, {
-  //     featureId: feature._id,
-  //     name: event.title,
-  //     description: event.description ?? "",
-  //     priority: mapLinearPriority(event.priority),
+  //   await apiFetch(`/api/features/${feature.id}`, {
+  //     method: "PATCH",
+  //     body: JSON.stringify({
+  //       name: event.title,
+  //       description: event.description ?? "",
+  //       priority: mapLinearPriority(event.priority),
+  //     }),
   //   });
 
   console.log(

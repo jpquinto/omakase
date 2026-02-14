@@ -1,55 +1,260 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 /* ============================================================================
-   AutoForge Neobrutalism Design System
-   Ported from the existing UI with Tailwind CSS v4 @theme tokens
+   Omakase Design System — Liquid Glass
+   A Japanese-inspired glassmorphism design language with light/dark modes.
    ============================================================================ */
 
 @theme {
-  /* --- Status Colors --- */
-  --color-neo-pending: #fbbf24;
-  --color-neo-progress: #22d3ee;
-  --color-neo-done: #4ade80;
-  --color-neo-fail: #f87171;
+  /* --- Typography --- */
+  --font-serif: var(--font-instrument-serif), "Instrument Serif", "Georgia", serif;
+  --font-sans: var(--font-outfit), "Outfit", system-ui, sans-serif;
+  --font-jp: var(--font-noto-jp), "Noto Serif JP", serif;
+  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
 
-  /* --- Surface Colors --- */
-  --color-neo-bg: #fffef5;
-  --color-neo-card: #ffffff;
-  --color-neo-border: #000000;
-  --color-neo-muted: #f5f5f4;
+  /* --- Omakase Colors (static, theme-independent) --- */
 
-  /* --- Brand Colors --- */
-  --color-neo-primary: #6366f1;
-  --color-neo-primary-foreground: #ffffff;
-  --color-neo-accent: #f59e0b;
-  --color-neo-destructive: #ef4444;
+  /* Primary: Sakura (桜) — soft cherry blossom pink */
+  --color-oma-primary: #f472b6;
+  --color-oma-primary-soft: #f9a8d4;
+  --color-oma-primary-dim: #ec4899;
+  --color-oma-primary-foreground: #ffffff;
 
-  /* --- Text Colors --- */
-  --color-neo-foreground: #0a0a0a;
-  --color-neo-muted-foreground: #737373;
+  /* Secondary: Beni (紅) — refined Japanese red */
+  --color-oma-secondary: #f87171;
+  --color-oma-secondary-soft: #fca5a5;
+  --color-oma-secondary-dim: #ef4444;
 
-  /* --- Shadow Offsets (neobrutalism hard shadows) --- */
-  --shadow-neo-sm: 2px 2px 0px #000000;
-  --shadow-neo: 4px 4px 0px #000000;
-  --shadow-neo-lg: 6px 6px 0px #000000;
+  /* Accent: Gold (金) */
+  --color-oma-gold: #fbbf24;
+  --color-oma-gold-soft: #f59e0b;
+  --color-oma-gold-dim: #d97706;
 
-  /* --- Border Width --- */
-  --border-neo: 2px;
+  /* Accent: Jade (翡翠) */
+  --color-oma-jade: #6ee7b7;
+  --color-oma-jade-soft: #34d399;
+  --color-oma-jade-dim: #10b981;
+
+  /* Accent: Indigo (藍) */
+  --color-oma-indigo: #818cf8;
+  --color-oma-indigo-soft: #a5b4fc;
+  --color-oma-indigo-dim: #6366f1;
+
+  /* Semantic */
+  --color-oma-success: #4ade80;
+  --color-oma-warning: #fbbf24;
+  --color-oma-error: #f87171;
+  --color-oma-info: #38bdf8;
+
+  /* Status */
+  --color-oma-pending: #fbbf24;
+  --color-oma-progress: #38bdf8;
+  --color-oma-done: #4ade80;
+  --color-oma-fail: #f87171;
+
+  /* --- Radii --- */
+  --radius-oma-sm: 8px;
+  --radius-oma: 12px;
+  --radius-oma-lg: 16px;
+  --radius-oma-xl: 24px;
+  --radius-oma-full: 9999px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
 
   /* --- Animations --- */
-  --animate-slide-in: slide-in 0.2s ease-out;
-  --animate-pulse-neo: pulse-neo 2s ease-in-out infinite;
-  --animate-shimmer: shimmer 2s ease-in-out infinite;
+  --animate-oma-fade-up: oma-fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-oma-glass-shimmer: oma-glass-shimmer 3s ease-in-out infinite;
+  --animate-oma-float: oma-float 6s ease-in-out infinite;
+  --animate-oma-breathe: oma-breathe 4s ease-in-out infinite;
+  --animate-oma-glow-pulse: oma-glow-pulse 3s ease-in-out infinite;
+  --animate-oma-slide-in-right: oma-slide-in-right 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-oma-scale-in: oma-scale-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-oma-blur-in: oma-blur-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+
+  /* --- Shadows --- */
+  --shadow-oma-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-oma: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-oma-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-oma-glow-primary: 0 0 24px rgba(244, 114, 182, 0.2);
+  --shadow-oma-glow-secondary: 0 0 24px rgba(248, 113, 113, 0.15);
+  --shadow-oma-glow-gold: 0 0 24px rgba(251, 191, 36, 0.15);
+}
+
+/* ============================================================================
+   Dark Theme (default) — CSS custom properties on :root / .dark
+   ============================================================================ */
+
+:root {
+  /* Omakase backgrounds */
+  --color-oma-bg-deep: #060609;
+  --color-oma-bg: #0b0b12;
+  --color-oma-bg-elevated: #12131f;
+  --color-oma-bg-surface: #181a2a;
+
+  /* Omakase text */
+  --color-oma-text: #e2e8f0;
+  --color-oma-text-muted: #94a3b8;
+  --color-oma-text-subtle: #64748b;
+  --color-oma-text-faint: #475569;
+
+  /* Glass borders */
+  --color-oma-glass-border: rgba(255, 255, 255, 0.08);
+  --color-oma-glass-border-bright: rgba(255, 255, 255, 0.16);
+
+  /* shadcn semantic tokens */
+  --color-background: #0b0b12;
+  --color-foreground: #e2e8f0;
+  --color-primary: #f472b6;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #181a2a;
+  --color-secondary-foreground: #e2e8f0;
+  --color-accent: #12131f;
+  --color-accent-foreground: #e2e8f0;
+  --color-muted: #181a2a;
+  --color-muted-foreground: #94a3b8;
+  --color-destructive: #f87171;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-input: rgba(255, 255, 255, 0.08);
+  --color-ring: #f472b6;
+  --color-card: #12131f;
+  --color-card-foreground: #e2e8f0;
+  --color-popover: #12131f;
+  --color-popover-foreground: #e2e8f0;
+
+  color-scheme: dark;
+}
+
+/* ============================================================================
+   Light Theme
+   ============================================================================ */
+
+.light {
+  /* Omakase backgrounds */
+  --color-oma-bg-deep: #f8f6f3;
+  --color-oma-bg: #faf9f7;
+  --color-oma-bg-elevated: #ffffff;
+  --color-oma-bg-surface: #f1eeeb;
+
+  /* Omakase text */
+  --color-oma-text: #1a1a2e;
+  --color-oma-text-muted: #64748b;
+  --color-oma-text-subtle: #94a3b8;
+  --color-oma-text-faint: #cbd5e1;
+
+  /* Glass borders */
+  --color-oma-glass-border: rgba(0, 0, 0, 0.06);
+  --color-oma-glass-border-bright: rgba(0, 0, 0, 0.12);
+
+  /* shadcn semantic tokens */
+  --color-background: #faf9f7;
+  --color-foreground: #1a1a2e;
+  --color-primary: #ec4899;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #f1eeeb;
+  --color-secondary-foreground: #1a1a2e;
+  --color-accent: #f8f6f3;
+  --color-accent-foreground: #1a1a2e;
+  --color-muted: #f1eeeb;
+  --color-muted-foreground: #64748b;
+  --color-destructive: #ef4444;
+  --color-border: rgba(0, 0, 0, 0.08);
+  --color-input: rgba(0, 0, 0, 0.08);
+  --color-ring: #ec4899;
+  --color-card: #ffffff;
+  --color-card-foreground: #1a1a2e;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #1a1a2e;
+
+  color-scheme: light;
 }
 
 /* ============================================================================
    Keyframes
    ============================================================================ */
 
-@keyframes slide-in {
+@keyframes oma-fade-up {
   from {
     opacity: 0;
-    transform: translateX(-10px);
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes oma-glass-shimmer {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes oma-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes oma-breathe {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes oma-spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes oma-pulse-ring {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(0.8);
+    opacity: 0.6;
+  }
+}
+
+@keyframes oma-glow-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(244, 114, 182, 0.15),
+      0 0 40px rgba(244, 114, 182, 0.05);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(244, 114, 182, 0.25),
+      0 0 60px rgba(244, 114, 182, 0.1);
+  }
+}
+
+@keyframes oma-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
   }
   to {
     opacity: 1;
@@ -57,15 +262,25 @@
   }
 }
 
-@keyframes pulse-neo {
-  0%,
-  100% {
-    opacity: 1;
-    box-shadow: 4px 4px 0px #000000;
+@keyframes oma-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
   }
-  50% {
-    opacity: 0.85;
-    box-shadow: 2px 2px 0px #000000;
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes oma-blur-in {
+  from {
+    opacity: 0;
+    filter: blur(10px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
   }
 }
 
@@ -75,26 +290,6 @@
   }
   100% {
     background-position: -200% center;
-  }
-}
-
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes pop-in {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
   }
 }
 
@@ -110,56 +305,193 @@
 
 body {
   margin: 0;
-  background-color: var(--color-neo-bg);
-  color: var(--color-neo-foreground);
+  background-color: var(--color-oma-bg);
+  color: var(--color-oma-text);
   font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* ============================================================================
-   Neobrutalism Utility Classes
+   Omakase Liquid Glass Utility Classes
    ============================================================================ */
 
 @layer utilities {
-  .neo-border {
-    border: 2px solid #000000;
+  /* --- Glass Surfaces (dark mode) --- */
+  .glass {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--color-oma-glass-border);
   }
 
-  .neo-shadow {
-    box-shadow: 4px 4px 0px #000000;
+  .glass-sm {
+    background: rgba(255, 255, 255, 0.02);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--color-oma-glass-border);
   }
 
-  .neo-shadow-sm {
-    box-shadow: 2px 2px 0px #000000;
+  .glass-lg {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(32px);
+    -webkit-backdrop-filter: blur(32px);
+    border: 1px solid var(--color-oma-glass-border-bright);
   }
 
-  .neo-shadow-lg {
-    box-shadow: 6px 6px 0px #000000;
+  .light .glass {
+    background: rgba(255, 255, 255, 0.6);
+    border-color: var(--color-oma-glass-border);
   }
 
-  .neo-card {
-    border: 2px solid #000000;
-    box-shadow: 4px 4px 0px #000000;
-    background-color: #ffffff;
+  .light .glass-sm {
+    background: rgba(255, 255, 255, 0.4);
+    border-color: var(--color-oma-glass-border);
   }
 
-  .neo-btn {
-    border: 2px solid #000000;
-    box-shadow: 4px 4px 0px #000000;
-    font-weight: 700;
-    transition: transform 0.1s ease, box-shadow 0.1s ease;
+  .light .glass-lg {
+    background: rgba(255, 255, 255, 0.75);
+    border-color: var(--color-oma-glass-border-bright);
   }
 
-  .neo-btn:hover {
-    transform: translate(-1px, -1px);
-    box-shadow: 5px 5px 0px #000000;
+  .glass-hover:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--color-oma-glass-border-bright);
   }
 
-  .neo-btn:active {
-    transform: translate(2px, 2px);
-    box-shadow: 1px 1px 0px #000000;
+  .light .glass-hover:hover {
+    background: rgba(255, 255, 255, 0.8);
+  }
+
+  .glass-active {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--color-oma-glass-border-bright);
+  }
+
+  /* --- Glass with Color Tints --- */
+  .glass-primary {
+    background: rgba(244, 114, 182, 0.08);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(244, 114, 182, 0.15);
+  }
+
+  .light .glass-primary {
+    background: rgba(244, 114, 182, 0.06);
+    border-color: rgba(244, 114, 182, 0.12);
+  }
+
+  .glass-secondary {
+    background: rgba(248, 113, 113, 0.06);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(248, 113, 113, 0.12);
+  }
+
+  .glass-gold {
+    background: rgba(251, 191, 36, 0.06);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(251, 191, 36, 0.12);
+  }
+
+  /* --- Gradient Borders (liquid glass edge effect) --- */
+  .glass-edge {
+    position: relative;
+  }
+
+  .glass-edge::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.15),
+      rgba(255, 255, 255, 0.03),
+      rgba(255, 255, 255, 0.08)
+    );
+    -webkit-mask: linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  .light .glass-edge::before {
+    background: linear-gradient(
+      135deg,
+      rgba(0, 0, 0, 0.08),
+      rgba(0, 0, 0, 0.02),
+      rgba(0, 0, 0, 0.05)
+    );
+  }
+
+  /* --- Glow Effects --- */
+  .glow-primary {
+    box-shadow: 0 0 24px rgba(244, 114, 182, 0.2),
+      0 0 48px rgba(244, 114, 182, 0.05);
+  }
+
+  .glow-secondary {
+    box-shadow: 0 0 24px rgba(248, 113, 113, 0.15),
+      0 0 48px rgba(248, 113, 113, 0.05);
+  }
+
+  .glow-gold {
+    box-shadow: 0 0 24px rgba(251, 191, 36, 0.15),
+      0 0 48px rgba(251, 191, 36, 0.05);
+  }
+
+  .light .glow-primary {
+    box-shadow: 0 0 20px rgba(236, 72, 153, 0.12),
+      0 0 40px rgba(236, 72, 153, 0.04);
+  }
+
+  /* --- Japanese Decorative --- */
+  .oma-enso {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    border: 3px solid rgba(255, 255, 255, 0.12);
+    border-top-color: rgba(255, 255, 255, 0.25);
+    border-right-color: rgba(255, 255, 255, 0.04);
+    transform: rotate(-30deg);
+  }
+
+  .light .oma-enso {
+    border-color: rgba(0, 0, 0, 0.08);
+    border-top-color: rgba(0, 0, 0, 0.15);
+    border-right-color: rgba(0, 0, 0, 0.03);
+  }
+
+  .oma-wave-pattern {
+    background-image: radial-gradient(
+        circle at 50% 150%,
+        transparent 65%,
+        rgba(255, 255, 255, 0.03) 65%,
+        rgba(255, 255, 255, 0.03) 70%,
+        transparent 70%
+      ),
+      radial-gradient(
+        circle at 0% 150%,
+        transparent 65%,
+        rgba(255, 255, 255, 0.03) 65%,
+        rgba(255, 255, 255, 0.03) 70%,
+        transparent 70%
+      ),
+      radial-gradient(
+        circle at 100% 150%,
+        transparent 65%,
+        rgba(255, 255, 255, 0.03) 65%,
+        rgba(255, 255, 255, 0.03) 70%,
+        transparent 70%
+      );
+    background-size: 40px 20px;
+    background-position: 0 0, 20px 0, -20px 0;
   }
 }
 
@@ -177,10 +509,18 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #d4d4d4;
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a3a3a3;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.light ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
 }

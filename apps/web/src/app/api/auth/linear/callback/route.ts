@@ -12,7 +12,7 @@ import { cookies } from "next/headers";
  *    to prevent CSRF attacks.
  * 2. Exchange the authorisation `code` for an access token via the Linear
  *    token endpoint.
- * 3. Store the access token in Convex (placeholder mutation).
+ * 3. Store the access token via the orchestrator API (placeholder).
  * 4. Redirect the user to /projects with a success indicator.
  *
  * Required environment variables:
@@ -102,17 +102,19 @@ export async function GET(request: NextRequest) {
   const tokenData: LinearTokenResponse = await tokenResponse.json();
 
   // ------------------------------------------------------------------
-  // 3. Store the access token in Convex
+  // 3. Store the access token via the orchestrator API
   // ------------------------------------------------------------------
-  // TODO: Replace with an actual Convex mutation call to persist the
+  // TODO: Replace with an actual orchestrator API call to persist the
   // Linear access token against the current project/user.
   //
   // Example:
-  //   import { fetchMutation } from "convex/nextjs";
-  //   import { api } from "@convex/_generated/api";
-  //   await fetchMutation(api.projects.setLinearAccessToken, {
-  //     projectId,
-  //     linearAccessToken: tokenData.access_token,
+  //   import { apiFetch } from "@/lib/api-client";
+  //   await apiFetch("/api/projects/linear-token", {
+  //     method: "POST",
+  //     body: JSON.stringify({
+  //       projectId,
+  //       linearAccessToken: tokenData.access_token,
+  //     }),
   //   });
   //
   console.log("[Linear OAuth] Access token obtained successfully. Scope:", tokenData.scope);

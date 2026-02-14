@@ -1,12 +1,31 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import { AuthProvider } from "@/providers/auth-provider";
-import { ConvexClientProvider } from "@/providers/convex-provider";
+import {
+  Instrument_Serif,
+  Outfit,
+  Noto_Serif_JP,
+} from "next/font/google";
+import { ThemeProvider } from "@/providers/theme-provider";
 import "./globals.css";
 
-const inter = Inter({
+const instrumentSerif = Instrument_Serif({
   subsets: ["latin"],
+  variable: "--font-instrument-serif",
   display: "swap",
+  weight: "400",
+  style: ["normal", "italic"],
+});
+
+const outfit = Outfit({
+  subsets: ["latin"],
+  variable: "--font-outfit",
+  display: "swap",
+});
+
+const notoSerifJP = Noto_Serif_JP({
+  subsets: ["latin"],
+  variable: "--font-noto-jp",
+  display: "swap",
+  weight: ["400", "700"],
 });
 
 export const metadata: Metadata = {
@@ -20,11 +39,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
-        <AuthProvider>
-          <ConvexClientProvider>{children}</ConvexClientProvider>
-        </AuthProvider>
+    <html lang="en" suppressHydrationWarning>
+      <body
+        className={`${instrumentSerif.variable} ${outfit.variable} ${notoSerifJP.variable}`}
+      >
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );

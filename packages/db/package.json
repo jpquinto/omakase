@@ -12,15 +12,9 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "generate": "bun drizzle-kit generate",
-    "migrate": "bun drizzle-kit migrate"
-  },
-  "dependencies": {
-    "drizzle-orm": "^0.44.0"
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "drizzle-kit": "^0.31.0",
     "typescript": "^5.7.0",
     "@types/bun": "^1.2.0"
   }

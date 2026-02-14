@@ -1,9 +1,9 @@
 /**
- * agent-monitor.ts -- Monitors ECS Fargate tasks and reports status to Convex.
+ * agent-monitor.ts -- Monitors ECS Fargate tasks and reports status to DynamoDB.
  *
  * The AgentMonitor polls ECS for the current status of a running agent task
  * and translates ECS task states into the agent_runs status values stored
- * in Convex. It also enforces a configurable timeout to prevent runaway
+ * in DynamoDB. It also enforces a configurable timeout to prevent runaway
  * agents from consuming resources indefinitely.
  *
  * Status mapping:
@@ -17,16 +17,16 @@ import {
   ECSClient,
   DescribeTasksCommand,
 } from "@aws-sdk/client-ecs";
-import { ConvexHttpClient } from "convex/browser";
-
-// TODO: Replace with generated Convex API types once `npx convex codegen` is run.
-// import { api } from "@autoforge/convex/_generated/api";
+import {
+  updateAgentStatus as dbUpdateAgentStatus,
+  completeAgentRun as dbCompleteAgentRun,
+} from "@autoforge/dynamodb";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-/** The status values for an agent run as defined in the Convex schema. */
+/** The status values for an agent run as defined in the schema. */
 type AgentRunStatus =
   | "started"
   | "thinking"
@@ -44,7 +44,7 @@ export interface AgentCompletionResult {
   exitCode: number | null;
   /** The ECS stop reason, if available. */
   stopReason: string | null;
-  /** The final status written to Convex. */
+  /** The final status written to DynamoDB. */
   finalStatus: AgentRunStatus;
 }
 
@@ -56,9 +56,7 @@ export interface AgentMonitorOptions {
   ecsCluster: string;
   /** The ECS client for polling task status. */
   ecsClient: ECSClient;
-  /** The Convex HTTP client for status updates. */
-  convex: ConvexHttpClient;
-  /** The Convex agent_runs document ID to update. */
+  /** The agent_runs document ID to update. */
   agentRunId: string;
   /** Timeout in milliseconds (default: 30 minutes). */
   timeoutMs?: number;
@@ -85,7 +83,7 @@ const DEFAULT_STATUS_UPDATE_INTERVAL_MS = 5 * 1000; // 5 seconds
  *
  * The monitor runs two overlapping concerns:
  * 1. Poll ECS every `pollIntervalMs` to check whether the task has stopped.
- * 2. Update Convex every `statusUpdateIntervalMs` with the mapped status.
+ * 2. Update DynamoDB every `statusUpdateIntervalMs` with the mapped status.
  *
  * The monitor resolves when the task reaches the STOPPED state or when
  * the timeout is exceeded (in which case it marks the run as failed).
@@ -94,7 +92,6 @@ export class AgentMonitor {
   private readonly taskArn: string;
   private readonly ecsCluster: string;
   private readonly ecsClient: ECSClient;
-  private readonly convex: ConvexHttpClient;
   private readonly agentRunId: string;
   private readonly timeoutMs: number;
   private readonly pollIntervalMs: number;
@@ -107,7 +104,6 @@ export class AgentMonitor {
     this.taskArn = options.taskArn;
     this.ecsCluster = options.ecsCluster;
     this.ecsClient = options.ecsClient;
-    this.convex = options.convex;
     this.agentRunId = options.agentRunId;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
@@ -118,7 +114,7 @@ export class AgentMonitor {
   /**
    * Wait for the ECS task to reach a terminal state (STOPPED).
    *
-   * Polls ECS at the configured interval and updates Convex with the
+   * Polls ECS at the configured interval and updates DynamoDB with the
    * current status. Returns when the task stops or the timeout expires.
    *
    * @returns The completion result including exit code and final status.
@@ -135,7 +131,7 @@ export class AgentMonitor {
         console.error(
           `[agent-monitor] Task ${this.taskArn} timed out after ${Math.round(elapsed / 1000)}s`
         );
-        await this.updateConvexStatus("failed");
+        await this.updateStatus("failed");
         return {
           success: false,
           exitCode: null,
@@ -153,7 +149,7 @@ export class AgentMonitor {
           `[agent-monitor] Task ${this.taskArn} not found in ECS. ` +
             "It may have been deregistered. Treating as failed."
         );
-        await this.updateConvexStatus("failed");
+        await this.updateStatus("failed");
         return {
           success: false,
           exitCode: null,
@@ -168,14 +164,14 @@ export class AgentMonitor {
         taskStatus.exitCode,
       );
 
-      // Update Convex at the configured interval (or on status change)
+      // Update DynamoDB at the configured interval (or on status change)
       const now = Date.now();
       const shouldUpdate =
         mappedStatus !== lastReportedStatus ||
         now - lastStatusUpdate >= this.statusUpdateIntervalMs;
 
       if (shouldUpdate) {
-        await this.updateConvexStatus(mappedStatus);
+        await this.updateStatus(mappedStatus);
         lastReportedStatus = mappedStatus;
         lastStatusUpdate = now;
       }
@@ -192,7 +188,7 @@ export class AgentMonitor {
         );
 
         // Final status update with completion info
-        await this.completeConvexRun(finalStatus, taskStatus.stopReason);
+        await this.completeRun(finalStatus, taskStatus.stopReason);
 
         return {
           success,
@@ -207,7 +203,7 @@ export class AgentMonitor {
     }
 
     // Cancelled -- treat as failed
-    await this.updateConvexStatus("failed");
+    await this.updateStatus("failed");
     return {
       success: false,
       exitCode: null,
@@ -299,7 +295,7 @@ export class AgentMonitor {
       case "DEACTIVATING":
         // While running, we use "coding" as a generic active state.
         // The agent itself may update its own status to "thinking",
-        // "testing", or "reviewing" via Convex from within the container.
+        // "testing", or "reviewing" via DynamoDB from within the container.
         return "coding";
 
       case "STOPPED":
@@ -315,58 +311,46 @@ export class AgentMonitor {
   }
 
   /**
-   * Update the agent run status in Convex.
+   * Update the agent run status in DynamoDB.
    *
    * @param status - The new status to set.
    */
-  private async updateConvexStatus(status: AgentRunStatus): Promise<void> {
+  private async updateStatus(status: AgentRunStatus): Promise<void> {
     try {
-      // TODO: Replace with generated Convex API types.
-      // e.g., await this.convex.mutation(api.agentRuns.updateAgentStatus, { ... });
-      const mutationRef = "agentRuns:updateAgentStatus" as unknown;
-      await this.convex.mutation(
-        mutationRef as never,
-        {
-          runId: this.agentRunId,
-          status,
-        } as never,
-      );
+      await dbUpdateAgentStatus({
+        runId: this.agentRunId,
+        status,
+      });
     } catch (error: unknown) {
       // Status updates are best-effort -- log but don't throw
       const message = error instanceof Error ? error.message : String(error);
       console.warn(
-        `[agent-monitor] Failed to update Convex status for run ${this.agentRunId}: ${message}`
+        `[agent-monitor] Failed to update status for run ${this.agentRunId}: ${message}`
       );
     }
   }
 
   /**
-   * Mark the agent run as completed or failed in Convex with a summary.
+   * Mark the agent run as completed or failed in DynamoDB with a summary.
    *
    * @param status - The final status ("completed" or "failed").
    * @param stopReason - The ECS stop reason to include in the summary.
    */
-  private async completeConvexRun(
+  private async completeRun(
     status: "completed" | "failed",
     stopReason: string | null,
   ): Promise<void> {
     try {
-      // TODO: Replace with generated Convex API types.
-      // e.g., await this.convex.mutation(api.agentRuns.completeAgentRun, { ... });
-      const mutationRef = "agentRuns:completeAgentRun" as unknown;
-      await this.convex.mutation(
-        mutationRef as never,
-        {
-          runId: this.agentRunId,
-          status,
-          outputSummary: stopReason ?? `Task ${status}`,
-          errorMessage: status === "failed" ? (stopReason ?? "Unknown error") : undefined,
-        } as never,
-      );
+      await dbCompleteAgentRun({
+        runId: this.agentRunId,
+        status,
+        outputSummary: stopReason ?? `Task ${status}`,
+        errorMessage: status === "failed" ? (stopReason ?? "Unknown error") : undefined,
+      });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(
-        `[agent-monitor] Failed to complete Convex run ${this.agentRunId}: ${message}`
+        `[agent-monitor] Failed to complete run ${this.agentRunId}: ${message}`
       );
     }
   }

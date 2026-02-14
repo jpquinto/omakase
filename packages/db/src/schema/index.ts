@@ -1,16 +1,6 @@
-export { users } from "./users.js";
-export type { UserRole } from "./users.js";
-
-export { projects } from "./projects.js";
-export type { ProjectStatus } from "./projects.js";
-
-export { features } from "./features.js";
-export type { FeatureStatus } from "./features.js";
-
-export { agents } from "./agents.js";
-export type { AgentRole, AgentStatus } from "./agents.js";
-
-export { agentRuns } from "./agent-runs.js";
-export type { AgentRunRole, AgentRunStatus } from "./agent-runs.js";
-
-export { tickets } from "./tickets.js";
+export type { User, UserRole, NewUser } from "./users.js";
+export type { Project, ProjectStatus, NewProject } from "./projects.js";
+export type { Feature, FeatureStatus, NewFeature } from "./features.js";
+export type { Agent, AgentRole, AgentStatus, NewAgent } from "./agents.js";
+export type { AgentRun, AgentRunRole, AgentRunStatus, NewAgentRun } from "./agent-runs.js";
+export type { Ticket, NewTicket } from "./tickets.js";

@@ -1,0 +1,21 @@
+{
+  "version": "48.0.0",
+  "files": {
+    "c80dd14725c84eeaa04afc2d8d305b3a3560b17b30e2fe7e08175c236b39685f": {
+      "displayName": "AutoforgeStack Template",
+      "source": {
+        "path": "AutoforgeStack.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "211125619133-us-west-2-bbb881e5": {
+          "bucketName": "cdk-hnb659fds-assets-211125619133-us-west-2",
+          "objectKey": "c80dd14725c84eeaa04afc2d8d305b3a3560b17b30e2fe7e08175c236b39685f.json",
+          "region": "us-west-2",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::211125619133:role/cdk-hnb659fds-file-publishing-role-211125619133-us-west-2"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

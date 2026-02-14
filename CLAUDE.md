@@ -22,8 +22,8 @@ For full tech stack details, see [TECH_STACK.md](TECH_STACK.md).
 │   ├── web/              # Next.js 15 frontend (Vercel)
 │   └── orchestrator/     # Elysia backend (ECS Fargate)
 ├── packages/
-│   ├── convex/           # Convex schema + server functions
-│   ├── db/               # Drizzle ORM type schemas
+│   ├── dynamodb/          # DynamoDB data access layer
+│   ├── db/               # TypeScript type definitions
 │   └── shared/           # Shared utilities + types
 ├── infra/                # AWS CDK infrastructure
 ├── openspec/             # OpenSpec change management
@@ -49,16 +49,8 @@ bun --filter @autoforge/web run lint       # ESLint
 bun --filter @autoforge/orchestrator run dev   # Dev server with watch mode
 bun --filter @autoforge/orchestrator run start # Production start
 
-# Convex
-bun --filter @autoforge/convex run dev      # Local Convex dev server
-bun --filter @autoforge/convex run deploy   # Deploy to Convex cloud
-
 # Type checking (all packages)
 bun --filter '*' run typecheck
-
-# Drizzle ORM
-bun --filter @autoforge/db run generate    # Generate migrations
-bun --filter @autoforge/db run migrate     # Run migrations
 ```
 
 ### Infrastructure (CDK)
@@ -73,9 +65,6 @@ npx cdk deploy    # Deploy to AWS
 ## Testing
 
 ```bash
-# Convex unit tests
-bun --filter @autoforge/convex run test
-
 # Frontend E2E tests
 bun --filter @autoforge/web run test:e2e
 bun --filter @autoforge/web run test:e2e:ui    # With Playwright UI
@@ -86,7 +75,6 @@ bun --filter @autoforge/web run test:e2e:ui    # With Playwright UI
 GitHub Actions (`.github/workflows/ci.yml`) runs on push/PR to main:
 - Typecheck all packages
 - Lint web app
-- Run Convex tests
 - Run Playwright E2E tests
 
 ## Architecture
@@ -103,7 +91,7 @@ Next.js 15 App Router with React 19, Tailwind CSS v4 (neobrutalism design), and 
 - `src/middleware.ts` -- Auth0 middleware, protects `(app)/` routes
 - `src/lib/auth0.ts` -- Auth0Client singleton
 - `src/providers/auth-provider.tsx` -- Auth0 React context
-- `src/providers/convex-provider.tsx` -- Convex React client for real-time subscriptions
+- `src/providers/query-provider.tsx` -- TanStack Query provider for data fetching
 - `src/hooks/use-keyboard-shortcuts.ts` -- Global keyboard shortcuts
 - `src/components/kanban-board.tsx` -- Feature kanban with status columns
 - `src/components/dependency-graph.tsx` -- dagre-based dependency visualization
@@ -114,25 +102,25 @@ Next.js 15 App Router with React 19, Tailwind CSS v4 (neobrutalism design), and 
 
 **API routes:**
 - `api/auth/[auth0]/route.ts` -- Auth0 SDK handler
-- `api/auth/sync/route.ts` -- User sync to Convex
+- `api/auth/sync/route.ts` -- User sync to DynamoDB
 - `api/auth/linear/route.ts` -- Linear OAuth initiation
 - `api/auth/linear/callback/route.ts` -- Linear OAuth callback
 - `api/webhooks/linear/route.ts` -- Linear webhook receiver
 
 **Linear integration (`src/lib/linear/`):**
 - `client.ts` -- Linear GraphQL client
-- `ticket-sync.ts` -- Bidirectional Linear issue <-> Convex feature sync
+- `ticket-sync.ts` -- Bidirectional Linear issue <-> DynamoDB feature sync
 - `status-sync.ts` -- Status mapping between Linear and AutoForge
 - `comments.ts` -- Linear comment sync
 - `dependency-sync.ts` -- Dependency mapping
 
 ### Backend (`apps/orchestrator/`)
 
-Bun + Elysia server that polls Convex for ready features and orchestrates agent pipelines on ECS Fargate.
+Bun + Elysia server that polls DynamoDB for ready features and orchestrates agent pipelines on ECS Fargate.
 
 **Key files:**
 - `src/index.ts` -- Elysia server entry point with `/health` endpoint and request logging
-- `src/feature-watcher.ts` -- Polls Convex every 30s for pending features across all projects
+- `src/feature-watcher.ts` -- Polls DynamoDB every 30s for pending features across all projects
 - `src/pipeline.ts` -- 4-step agent pipeline: architect -> coder -> reviewer -> tester
 - `src/ecs-agent.ts` -- Launches/stops ECS Fargate tasks via AWS SDK v3
 - `src/agent-monitor.ts` -- Monitors ECS task completion and exit codes
@@ -147,7 +135,7 @@ Bun + Elysia server that polls Convex for ready features and orchestrates agent 
 
 **Environment variables:**
 - `PORT` -- HTTP port (default: 8080)
-- `CONVEX_URL` -- Convex deployment URL
+- `DYNAMODB_TABLE_PREFIX` -- DynamoDB table name prefix
 - `ECS_CLUSTER` -- ECS cluster name/ARN
 - `ECS_TASK_DEFINITION` -- Task definition family/ARN
 - `ECS_SUBNETS` -- Comma-separated subnet IDs
@@ -155,25 +143,20 @@ Bun + Elysia server that polls Convex for ready features and orchestrates agent 
 - `GITHUB_TOKEN` -- For PR creation (optional)
 - `POLL_INTERVAL_MS` -- Poll interval (default: 30000)
 
-### Database (`packages/convex/`)
+### Database (`packages/dynamodb/`)
 
-Convex real-time serverless database with 6 tables: `users`, `projects`, `features`, `agents`, `agent_runs`, `tickets`.
+DynamoDB data access layer with 6 tables: `users`, `projects`, `features`, `agents`, `agent_runs`, `tickets`.
 
-**Server functions:**
-- `convex/projects.ts` -- Project CRUD + `listActiveProjects`
-- `convex/features.ts` -- Feature status transitions, `getReadyFeatures` (dependency-aware)
-- `convex/dependencies.ts` -- BFS cycle detection for feature dependencies
-- `convex/agentRuns.ts` -- Agent execution record tracking
-- `convex/tickets.ts` -- Linear ticket sync and lookup
-
-**Test utilities:**
-- `convex/lib/graph-utils.ts` -- Graph traversal helpers
-- `convex/lib/feature-utils.ts` -- Feature logic helpers
-- `convex/__tests__/` -- Unit tests (cycle detection, feature logic)
+**Key modules:**
+- `src/repositories/projects.ts` -- Project CRUD + `listActiveProjects`
+- `src/repositories/features.ts` -- Feature status transitions, `getReadyFeatures` (dependency-aware)
+- `src/repositories/agent-runs.ts` -- Agent execution record tracking
+- `src/repositories/tickets.ts` -- Linear ticket sync and lookup
+- `src/lib/graph-utils.ts` -- BFS cycle detection for feature dependencies
 
 ### Type Layer (`packages/db/`)
 
-Drizzle ORM schemas that export TypeScript types (`Feature`, `Project`, `Agent`, `User`, `Ticket`, `AgentRun`) used across the monorepo. Not connected to a live database -- serves as the shared type system.
+TypeScript type definitions (`Feature`, `Project`, `Agent`, `User`, `Ticket`, `AgentRun`) used across the monorepo. Serves as the shared type system.
 
 ### Infrastructure (`infra/`)
 
@@ -185,24 +168,24 @@ See `infra/lib/autoforge-stack.ts` for the full resource definition.
 
 ### Agent Pipeline Flow
 
-1. `FeatureWatcher` polls Convex for active projects and pending features
+1. `FeatureWatcher` polls DynamoDB for active projects and pending features
 2. For each ready feature (dependencies met, within concurrency limits), launches an `AgentPipeline`
 3. Pipeline runs 4 sequential ECS Fargate tasks: architect -> coder -> reviewer -> tester
 4. If reviewer requests changes (exit code 2), coder re-runs once
-5. On success: feature marked `passing` in Convex, PR created on GitHub
+5. On success: feature marked `passing` in DynamoDB, PR created on GitHub
 6. On failure: feature marked `failing` with error details
 
-### Real-time Updates
+### Data Updates
 
-The frontend subscribes to Convex queries via `convex-nextjs`. All data changes (feature status, agent runs, project updates) propagate instantly to connected clients.
+The frontend fetches data from the orchestrator REST API via TanStack Query. Polling is used to keep the dashboard updated with current feature statuses, agent runs, and project state.
 
 ### Authentication
 
-Auth0 v4 SDK with `Auth0Client` singleton pattern. Middleware protects `(app)/` routes. Public routes under `(public)/` are open. RBAC roles (`admin`, `developer`, `viewer`) stored in Convex.
+Auth0 v4 SDK with `Auth0Client` singleton pattern. Middleware protects `(app)/` routes. Public routes under `(public)/` are open. RBAC roles (`admin`, `developer`, `viewer`) stored in DynamoDB.
 
 ### Linear Integration
 
-Bidirectional sync: Linear issues <-> Convex features. OAuth for connecting projects to Linear teams. Webhook receiver for real-time ticket updates. Status mapping between Linear states and feature statuses.
+Bidirectional sync: Linear issues <-> DynamoDB features. OAuth for connecting projects to Linear teams. Webhook receiver for real-time ticket updates. Status mapping between Linear states and feature statuses.
 
 ## Claude Code Integration
 
@@ -226,7 +209,8 @@ Bidirectional sync: Linear issues <-> Convex features. OAuth for connecting proj
 
 See `.env.example` for the full list. Key groups:
 - **Auth0**: `AUTH0_SECRET`, `AUTH0_BASE_URL`, `AUTH0_ISSUER_BASE_URL`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`
-- **Convex**: `NEXT_PUBLIC_CONVEX_URL`, `CONVEX_DEPLOY_KEY`
+- **DynamoDB**: `DYNAMODB_TABLE_PREFIX`
+- **Orchestrator**: `NEXT_PUBLIC_ORCHESTRATOR_URL`
 - **AWS**: `AWS_REGION`, `AWS_ACCOUNT_ID`, `ECS_CLUSTER_NAME`, `ECR_REPO_URI`
 - **Linear**: `LINEAR_CLIENT_ID`, `LINEAR_CLIENT_SECRET`, `LINEAR_WEBHOOK_SECRET`
 - **Claude**: `ANTHROPIC_API_KEY`

@@ -1,20 +1,23 @@
 /**
- * feature-watcher.ts -- Polls Convex for ready features and starts pipelines.
+ * feature-watcher.ts -- Polls DynamoDB for ready features and starts pipelines.
  *
  * The FeatureWatcher runs a continuous polling loop that:
- *   1. Queries Convex for all active projects
+ *   1. Queries DynamoDB for all active projects
  *   2. For each project, queries for features that are ready to work on
  *      (status "pending" with all dependencies met)
  *   3. Checks per-project concurrency limits
  *   4. Launches agent pipelines for ready features that fit within limits
  *
  * The watcher is the main driver of the orchestrator. It bridges the gap
- * between the Convex data layer (features, projects) and the ECS compute
+ * between the DynamoDB data layer (features, projects) and the ECS compute
  * layer (agent pipelines).
  */
 
 import { ECSClient } from "@aws-sdk/client-ecs";
-import { ConvexHttpClient } from "convex/browser";
+import {
+  listActiveProjects,
+  getReadyFeatures,
+} from "@autoforge/dynamodb";
 
 import { ConcurrencyManager } from "./concurrency.js";
 import {
@@ -23,25 +26,22 @@ import {
   type EcsConfig,
 } from "./pipeline.js";
 
-// TODO: Replace with generated Convex API types once `npx convex codegen` is run.
-// import { api } from "@autoforge/convex/_generated/api";
-
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-/** Minimal project shape returned from the Convex query. */
+/** Minimal project shape returned from the DynamoDB query. */
 interface Project {
-  _id: string;
+  id: string;
   name: string;
   status: "active" | "archived";
   repoUrl?: string;
   maxConcurrency: number;
 }
 
-/** Minimal feature shape returned from the Convex query. */
+/** Minimal feature shape returned from the DynamoDB query. */
 interface Feature {
-  _id: string;
+  id: string;
   projectId: string;
   name: string;
   description?: string;
@@ -71,14 +71,13 @@ const DEFAULT_POLL_INTERVAL_MS = 30 * 1000; // 30 seconds
 // ---------------------------------------------------------------------------
 
 /**
- * Continuously polls Convex for ready features and launches agent pipelines.
+ * Continuously polls DynamoDB for ready features and launches agent pipelines.
  *
  * The watcher is designed to be started once at orchestrator boot and
  * stopped on shutdown. It manages its own polling timer and delegates
  * pipeline execution to `AgentPipeline` instances.
  */
 export class FeatureWatcher {
-  private readonly convex: ConvexHttpClient;
   private readonly ecsClient: ECSClient;
   private readonly concurrency: ConcurrencyManager;
   private readonly pollIntervalMs: number;
@@ -95,11 +94,9 @@ export class FeatureWatcher {
   private polling = false;
 
   constructor(
-    convex: ConvexHttpClient,
     ecsClient: ECSClient,
     config: FeatureWatcherConfig,
   ) {
-    this.convex = convex;
     this.ecsClient = ecsClient;
     this.ecsConfig = config.ecsConfig;
     this.githubToken = config.githubToken;
@@ -168,7 +165,7 @@ export class FeatureWatcher {
 
   /**
    * Execute a single poll cycle:
-   *   1. Fetch active projects from Convex
+   *   1. Fetch active projects from DynamoDB
    *   2. For each project, fetch ready features
    *   3. Launch pipelines for features that fit within concurrency limits
    */
@@ -182,7 +179,7 @@ export class FeatureWatcher {
     this.polling = true;
 
     try {
-      const projects = await this.getActiveProjects();
+      const projects = await this.fetchActiveProjects();
 
       if (projects.length === 0) {
         console.log("[feature-watcher] No active projects found.");
@@ -220,12 +217,12 @@ export class FeatureWatcher {
    */
   private async pollProject(project: Project): Promise<number> {
     // Check if the project has capacity for more pipelines
-    if (!this.concurrency.canStart(project._id, project.maxConcurrency)) {
+    if (!this.concurrency.canStart(project.id, project.maxConcurrency)) {
       return 0;
     }
 
     // Fetch features that are ready to work on
-    const readyFeatures = await this.getReadyFeatures(project._id);
+    const readyFeatures = await this.fetchReadyFeatures(project.id);
 
     if (readyFeatures.length === 0) {
       return 0;
@@ -234,7 +231,7 @@ export class FeatureWatcher {
     console.log(
       `[feature-watcher] Project "${project.name}": ` +
         `${readyFeatures.length} ready feature(s), ` +
-        `${this.concurrency.getActiveCount(project._id)}/${project.maxConcurrency} active`
+        `${this.concurrency.getActiveCount(project.id)}/${project.maxConcurrency} active`
     );
 
     let launched = 0;
@@ -244,12 +241,12 @@ export class FeatureWatcher {
 
     for (const feature of readyFeatures) {
       // Re-check concurrency after each launch (it may have filled up)
-      if (!this.concurrency.canStart(project._id, project.maxConcurrency)) {
+      if (!this.concurrency.canStart(project.id, project.maxConcurrency)) {
         break;
       }
 
       // Skip features that already have active pipelines
-      if (this.concurrency.isActive(project._id, feature._id)) {
+      if (this.concurrency.isActive(project.id, feature.id)) {
         continue;
       }
 
@@ -277,14 +274,14 @@ export class FeatureWatcher {
    */
   private launchPipeline(project: Project, feature: Feature): void {
     // Acquire concurrency slot before starting
-    this.concurrency.acquire(project._id, feature._id);
+    this.concurrency.acquire(project.id, feature.id);
 
     // Parse repo owner/name from the repo URL for PR creation
     const { owner: repoOwner, name: repoName } = parseRepoUrl(project.repoUrl ?? "");
 
     const pipelineConfig: PipelineConfig = {
-      featureId: feature._id,
-      projectId: project._id,
+      featureId: feature.id,
+      projectId: project.id,
       featureName: feature.name,
       featureDescription: feature.description ?? "",
       repoUrl: project.repoUrl ?? "",
@@ -297,7 +294,6 @@ export class FeatureWatcher {
       pipelineConfig,
       this.ecsConfig,
       this.ecsClient,
-      this.convex,
     );
 
     // Run the pipeline asynchronously. Release the concurrency slot when done.
@@ -306,12 +302,12 @@ export class FeatureWatcher {
       .then((result) => {
         if (result.success) {
           console.log(
-            `[feature-watcher] Pipeline succeeded for feature ${feature._id} ` +
+            `[feature-watcher] Pipeline succeeded for feature ${feature.id} ` +
               `("${feature.name}")${result.prUrl ? `. PR: ${result.prUrl}` : ""}`
           );
         } else {
           console.error(
-            `[feature-watcher] Pipeline failed for feature ${feature._id} ` +
+            `[feature-watcher] Pipeline failed for feature ${feature.id} ` +
               `("${feature.name}"): ${result.errorMessage}`
           );
         }
@@ -319,37 +315,27 @@ export class FeatureWatcher {
       .catch((error: unknown) => {
         const message = error instanceof Error ? error.message : String(error);
         console.error(
-          `[feature-watcher] Unhandled pipeline error for feature ${feature._id}: ${message}`
+          `[feature-watcher] Unhandled pipeline error for feature ${feature.id}: ${message}`
         );
       })
       .finally(() => {
-        this.concurrency.release(project._id, feature._id);
+        this.concurrency.release(project.id, feature.id);
       });
   }
 
   // -------------------------------------------------------------------------
-  // Convex queries
+  // DynamoDB queries
   // -------------------------------------------------------------------------
 
   /**
-   * Fetch all active projects from Convex.
+   * Fetch all active projects from DynamoDB.
    *
    * @returns Array of active project documents.
    */
-  private async getActiveProjects(): Promise<Project[]> {
+  private async fetchActiveProjects(): Promise<Project[]> {
     try {
-      // TODO: Replace with generated Convex API types.
-      // e.g., return await this.convex.query(api.projects.listActiveProjects, {});
-      //
-      // Since there is no `listActiveProjects` query yet, we use a workaround:
-      // query all projects and filter by status in the orchestrator.
-      // A dedicated Convex query should be added for efficiency.
-      const queryRef = "projects:listActiveProjects" as unknown;
-      const projects = await this.convex.query(
-        queryRef as never,
-        {} as never,
-      );
-      return (projects as Project[]).filter((p) => p.status === "active");
+      const projects = await listActiveProjects();
+      return projects as Project[];
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`[feature-watcher] Failed to fetch projects: ${message}`);
@@ -360,18 +346,12 @@ export class FeatureWatcher {
   /**
    * Fetch features that are ready to work on for a project.
    *
-   * @param projectId - The Convex project ID.
+   * @param projectId - The project ID.
    * @returns Array of ready feature documents.
    */
-  private async getReadyFeatures(projectId: string): Promise<Feature[]> {
+  private async fetchReadyFeatures(projectId: string): Promise<Feature[]> {
     try {
-      // TODO: Replace with generated Convex API types.
-      // e.g., return await this.convex.query(api.features.getReadyFeatures, { projectId });
-      const queryRef = "features:getReadyFeatures" as unknown;
-      const features = await this.convex.query(
-        queryRef as never,
-        { projectId } as never,
-      );
+      const features = await getReadyFeatures({ projectId });
       return features as Feature[];
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);

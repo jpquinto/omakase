@@ -17,10 +17,10 @@ import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 // dependency graph, agent mission control, logs, and settings. Uses the
 // neobrutalism design system with bold tab borders and status colors.
 //
-// Mock data will be replaced with Convex queries once wired:
-//   import { useQuery } from "convex/react";
-//   import { api } from "@autoforge/convex/convex/_generated/api";
-//   const project = useQuery(api.projects.get, { id });
+// Mock data will be replaced with orchestrator API hooks once wired:
+//   import { useProject, useProjectFeatures } from "@/hooks/use-api";
+//   const { data: project } = useProject(id);
+//   const { data: features } = useProjectFeatures(id);
 // ---------------------------------------------------------------------------
 
 type TabId = "kanban" | "graph" | "agents" | "logs" | "settings";

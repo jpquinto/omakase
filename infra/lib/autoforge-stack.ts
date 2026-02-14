@@ -5,6 +5,7 @@ import * as ecs from "aws-cdk-lib/aws-ecs";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as elbv2 from "aws-cdk-lib/aws-elasticloadbalancingv2";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { Construct } from "constructs";
 
@@ -223,6 +224,28 @@ export class AutoforgeStack extends cdk.Stack {
       }),
     );
 
+    // Task 1.3: Grant the orchestrator read/write access to all
+    // DynamoDB tables used by AutoForge.
+    orchestratorTaskRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: "DynamoDbReadWrite",
+        effect: iam.Effect.ALLOW,
+        actions: [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:Query",
+          "dynamodb:BatchWriteItem",
+          "dynamodb:Scan",
+        ],
+        resources: [
+          `arn:aws:dynamodb:${this.region}:${this.account}:table/autoforge-*`,
+          `arn:aws:dynamodb:${this.region}:${this.account}:table/autoforge-*/index/*`,
+        ],
+      }),
+    );
+
     // ---------------------------------------------------------------
     // Task 7.4: Orchestrator Fargate Service
     // ---------------------------------------------------------------
@@ -364,6 +387,129 @@ export class AutoforgeStack extends cdk.Stack {
       "AGENT_SECURITY_GROUP_ID",
       ecsSecurityGroup.securityGroupId,
     );
+
+    // Task 1.4: Pass the DynamoDB table prefix so the orchestrator can
+    // construct table names at runtime.
+    orchestratorContainer.addEnvironment(
+      "DYNAMODB_TABLE_PREFIX",
+      "autoforge-",
+    );
+
+    // ---------------------------------------------------------------
+    // Task 1.1 & 1.2: DynamoDB Tables and Global Secondary Indexes
+    // ---------------------------------------------------------------
+    // Six tables matching the Convex schema, using on-demand billing
+    // and ULID string partition keys. Each table includes GSIs for the
+    // query patterns used by the orchestrator and dashboard.
+
+    const usersTable = new dynamodb.Table(this, "UsersTable", {
+      tableName: "autoforge-users",
+      partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+    usersTable.addGlobalSecondaryIndex({
+      indexName: "by_auth0Id",
+      partitionKey: { name: "auth0Id", type: dynamodb.AttributeType.STRING },
+    });
+    usersTable.addGlobalSecondaryIndex({
+      indexName: "by_email",
+      partitionKey: { name: "email", type: dynamodb.AttributeType.STRING },
+    });
+
+    const projectsTable = new dynamodb.Table(this, "ProjectsTable", {
+      tableName: "autoforge-projects",
+      partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+    projectsTable.addGlobalSecondaryIndex({
+      indexName: "by_status",
+      partitionKey: { name: "status", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "createdAt", type: dynamodb.AttributeType.STRING },
+    });
+
+    const featuresTable = new dynamodb.Table(this, "FeaturesTable", {
+      tableName: "autoforge-features",
+      partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+    featuresTable.addGlobalSecondaryIndex({
+      indexName: "by_project",
+      partitionKey: { name: "projectId", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "createdAt", type: dynamodb.AttributeType.STRING },
+    });
+    featuresTable.addGlobalSecondaryIndex({
+      indexName: "by_project_status",
+      partitionKey: { name: "projectId", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "status", type: dynamodb.AttributeType.STRING },
+    });
+    featuresTable.addGlobalSecondaryIndex({
+      indexName: "by_linearIssueId",
+      partitionKey: {
+        name: "linearIssueId",
+        type: dynamodb.AttributeType.STRING,
+      },
+    });
+
+    const agentsTable = new dynamodb.Table(this, "AgentsTable", {
+      tableName: "autoforge-agents",
+      partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+    agentsTable.addGlobalSecondaryIndex({
+      indexName: "by_project",
+      partitionKey: { name: "projectId", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "createdAt", type: dynamodb.AttributeType.STRING },
+    });
+    agentsTable.addGlobalSecondaryIndex({
+      indexName: "by_project_status",
+      partitionKey: { name: "projectId", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "status", type: dynamodb.AttributeType.STRING },
+    });
+
+    const agentRunsTable = new dynamodb.Table(this, "AgentRunsTable", {
+      tableName: "autoforge-agent-runs",
+      partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+    agentRunsTable.addGlobalSecondaryIndex({
+      indexName: "by_project",
+      partitionKey: { name: "projectId", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "startedAt", type: dynamodb.AttributeType.STRING },
+    });
+    agentRunsTable.addGlobalSecondaryIndex({
+      indexName: "by_feature",
+      partitionKey: { name: "featureId", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "startedAt", type: dynamodb.AttributeType.STRING },
+    });
+    agentRunsTable.addGlobalSecondaryIndex({
+      indexName: "by_agent",
+      partitionKey: { name: "agentId", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "startedAt", type: dynamodb.AttributeType.STRING },
+    });
+
+    const ticketsTable = new dynamodb.Table(this, "TicketsTable", {
+      tableName: "autoforge-tickets",
+      partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+    ticketsTable.addGlobalSecondaryIndex({
+      indexName: "by_project",
+      partitionKey: { name: "projectId", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "syncedAt", type: dynamodb.AttributeType.STRING },
+    });
+    ticketsTable.addGlobalSecondaryIndex({
+      indexName: "by_linearIssueId",
+      partitionKey: {
+        name: "linearIssueId",
+        type: dynamodb.AttributeType.STRING,
+      },
+    });
 
     // ---------------------------------------------------------------
     // Stack Outputs

@@ -8,8 +8,8 @@
  *
  * When a "blocks" relation is created in Linear between two issues
  * that are both tracked as AutoForge features, a corresponding
- * dependency edge is added in the Convex feature graph. Removing
- * the relation removes the dependency.
+ * dependency edge is added in the DynamoDB feature graph via the
+ * orchestrator API. Removing the relation removes the dependency.
  */
 
 // -----------------------------------------------------------------------
@@ -79,20 +79,17 @@ export async function handleRelationCreated(
     return;
   }
 
-  // TODO: Replace with actual Convex mutation calls.
+  // TODO: Replace with actual orchestrator API calls.
   //
   // Example:
-  //   import { fetchMutation, fetchQuery } from "convex/nextjs";
-  //   import { api } from "@convex/_generated/api";
+  //   import { apiFetch } from "@/lib/api-client";
   //
   //   // Resolve both issues to AutoForge features.
-  //   const blockingFeature = await fetchQuery(
-  //     api.features.getByLinearIssueId,
-  //     { linearIssueId: event.issue.identifier },
+  //   const blockingFeature = await apiFetch(
+  //     `/api/features/by-linear-issue/${event.issue.identifier}`,
   //   );
-  //   const blockedFeature = await fetchQuery(
-  //     api.features.getByLinearIssueId,
-  //     { linearIssueId: event.relatedIssue.identifier },
+  //   const blockedFeature = await apiFetch(
+  //     `/api/features/by-linear-issue/${event.relatedIssue.identifier}`,
   //   );
   //
   //   if (!blockingFeature || !blockedFeature) {
@@ -100,9 +97,12 @@ export async function handleRelationCreated(
   //     return;
   //   }
   //
-  //   await fetchMutation(api.features.addDependency, {
-  //     featureId: blockedFeature._id,
-  //     dependsOnFeatureId: blockingFeature._id,
+  //   await apiFetch("/api/features/dependencies", {
+  //     method: "POST",
+  //     body: JSON.stringify({
+  //       featureId: blockedFeature.id,
+  //       dependsOnFeatureId: blockingFeature.id,
+  //     }),
   //   });
 
   console.log(
@@ -131,28 +131,28 @@ export async function handleRelationRemoved(
     return;
   }
 
-  // TODO: Replace with actual Convex mutation calls.
+  // TODO: Replace with actual orchestrator API calls.
   //
   // Example:
-  //   import { fetchMutation, fetchQuery } from "convex/nextjs";
-  //   import { api } from "@convex/_generated/api";
+  //   import { apiFetch } from "@/lib/api-client";
   //
-  //   const blockingFeature = await fetchQuery(
-  //     api.features.getByLinearIssueId,
-  //     { linearIssueId: event.issue.identifier },
+  //   const blockingFeature = await apiFetch(
+  //     `/api/features/by-linear-issue/${event.issue.identifier}`,
   //   );
-  //   const blockedFeature = await fetchQuery(
-  //     api.features.getByLinearIssueId,
-  //     { linearIssueId: event.relatedIssue.identifier },
+  //   const blockedFeature = await apiFetch(
+  //     `/api/features/by-linear-issue/${event.relatedIssue.identifier}`,
   //   );
   //
   //   if (!blockingFeature || !blockedFeature) {
   //     return;
   //   }
   //
-  //   await fetchMutation(api.features.removeDependency, {
-  //     featureId: blockedFeature._id,
-  //     dependsOnFeatureId: blockingFeature._id,
+  //   await apiFetch(`/api/features/dependencies`, {
+  //     method: "DELETE",
+  //     body: JSON.stringify({
+  //       featureId: blockedFeature.id,
+  //       dependsOnFeatureId: blockingFeature.id,
+  //     }),
   //   });
 
   console.log(

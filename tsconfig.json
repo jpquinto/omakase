@@ -16,7 +16,9 @@
       "@autoforge/db": ["./packages/db/src/index.ts"],
       "@autoforge/db/*": ["./packages/db/src/*"],
       "@autoforge/shared": ["./packages/shared/src/index.ts"],
-      "@autoforge/shared/*": ["./packages/shared/src/*"]
+      "@autoforge/shared/*": ["./packages/shared/src/*"],
+      "@autoforge/dynamodb": ["./packages/dynamodb/src/index.ts"],
+      "@autoforge/dynamodb/*": ["./packages/dynamodb/src/*"]
     }
   },
   "exclude": ["node_modules", "dist", ".next"]
