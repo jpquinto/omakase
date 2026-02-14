@@ -1,0 +1,1866 @@
+{
+ "Description": "Omakase ECS infrastructure - orchestrator and agent services",
+ "Resources": {
+  "OmakaseVpc82E10B1F": {
+   "Type": "AWS::EC2::VPC",
+   "Properties": {
+    "CidrBlock": "10.0.0.0/16",
+    "EnableDnsHostnames": true,
+    "EnableDnsSupport": true,
+    "InstanceTenancy": "default",
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "OmakaseStack/OmakaseVpc"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OmakaseVpc/Resource"
+   }
+  },
+  "OmakaseVpcPublicSubnet1Subnet31AED316": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": "us-west-2a",
+    "CidrBlock": "10.0.0.0/24",
+    "MapPublicIpOnLaunch": true,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Public"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Public"
+     },
+     {
+      "Key": "Name",
+      "Value": "OmakaseStack/OmakaseVpc/PublicSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "OmakaseVpc82E10B1F"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OmakaseVpc/PublicSubnet1/Subnet"
+   }
+  },
+  "OmakaseVpcPublicSubnet1RouteTableB26A22AF": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "OmakaseStack/OmakaseVpc/PublicSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "OmakaseVpc82E10B1F"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OmakaseVpc/PublicSubnet1/RouteTable"
+   }
+  },
+  "OmakaseVpcPublicSubnet1RouteTableAssociation10C4F1B4": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "OmakaseVpcPublicSubnet1RouteTableB26A22AF"
+    },
+    "SubnetId": {
+     "Ref": "OmakaseVpcPublicSubnet1Subnet31AED316"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OmakaseVpc/PublicSubnet1/RouteTableAssociation"
+   }
+  },
+  "OmakaseVpcPublicSubnet1DefaultRouteEFAA9636": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "GatewayId": {
+     "Ref": "OmakaseVpcIGWB2536E6A"
+    },
+    "RouteTableId": {
+     "Ref": "OmakaseVpcPublicSubnet1RouteTableB26A22AF"
+    }
+   },
+   "DependsOn": [
+    "OmakaseVpcVPCGW898E8D5E"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OmakaseVpc/PublicSubnet1/DefaultRoute"
+   }
+  },
+  "OmakaseVpcPublicSubnet1EIPA5994174": {
+   "Type": "AWS::EC2::EIP",
+   "Properties": {
+    "Domain": "vpc",
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "OmakaseStack/OmakaseVpc/PublicSubnet1"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OmakaseVpc/PublicSubnet1/EIP"
+   }
+  },
+  "OmakaseVpcPublicSubnet1NATGatewayFB8599BD": {
+   "Type": "AWS::EC2::NatGateway",
+   "Properties": {
+    "AllocationId": {
+     "Fn::GetAtt": [
+      "OmakaseVpcPublicSubnet1EIPA5994174",
+      "AllocationId"
+     ]
+    },
+    "SubnetId": {
+     "Ref": "OmakaseVpcPublicSubnet1Subnet31AED316"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "OmakaseStack/OmakaseVpc/PublicSubnet1"
+     }
+    ]
+   },
+   "DependsOn": [
+    "OmakaseVpcPublicSubnet1DefaultRouteEFAA9636",
+    "OmakaseVpcPublicSubnet1RouteTableAssociation10C4F1B4"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OmakaseVpc/PublicSubnet1/NATGateway"
+   }
+  },
+  "OmakaseVpcPublicSubnet2SubnetCE2050C9": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": "us-west-2b",
+    "CidrBlock": "10.0.1.0/24",
+    "MapPublicIpOnLaunch": true,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Public"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Public"
+     },
+     {
+      "Key": "Name",
+      "Value": "OmakaseStack/OmakaseVpc/PublicSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "OmakaseVpc82E10B1F"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OmakaseVpc/PublicSubnet2/Subnet"
+   }
+  },
+  "OmakaseVpcPublicSubnet2RouteTable01C32516": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "OmakaseStack/OmakaseVpc/PublicSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "OmakaseVpc82E10B1F"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OmakaseVpc/PublicSubnet2/RouteTable"
+   }
+  },
+  "OmakaseVpcPublicSubnet2RouteTableAssociationC952E2B4": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "OmakaseVpcPublicSubnet2RouteTable01C32516"
+    },
+    "SubnetId": {
+     "Ref": "OmakaseVpcPublicSubnet2SubnetCE2050C9"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OmakaseVpc/PublicSubnet2/RouteTableAssociation"
+   }
+  },
+  "OmakaseVpcPublicSubnet2DefaultRouteB3750B64": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "GatewayId": {
+     "Ref": "OmakaseVpcIGWB2536E6A"
+    },
+    "RouteTableId": {
+     "Ref": "OmakaseVpcPublicSubnet2RouteTable01C32516"
+    }
+   },
+   "DependsOn": [
+    "OmakaseVpcVPCGW898E8D5E"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OmakaseVpc/PublicSubnet2/DefaultRoute"
+   }
+  },
+  "OmakaseVpcPrivateSubnet1Subnet25DFCEB3": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": "us-west-2a",
+    "CidrBlock": "10.0.2.0/24",
+    "MapPublicIpOnLaunch": false,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Private"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Private"
+     },
+     {
+      "Key": "Name",
+      "Value": "OmakaseStack/OmakaseVpc/PrivateSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "OmakaseVpc82E10B1F"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OmakaseVpc/PrivateSubnet1/Subnet"
+   }
+  },
+  "OmakaseVpcPrivateSubnet1RouteTableFF9AE15F": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "OmakaseStack/OmakaseVpc/PrivateSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "OmakaseVpc82E10B1F"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OmakaseVpc/PrivateSubnet1/RouteTable"
+   }
+  },
+  "OmakaseVpcPrivateSubnet1RouteTableAssociation6371BF75": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "OmakaseVpcPrivateSubnet1RouteTableFF9AE15F"
+    },
+    "SubnetId": {
+     "Ref": "OmakaseVpcPrivateSubnet1Subnet25DFCEB3"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OmakaseVpc/PrivateSubnet1/RouteTableAssociation"
+   }
+  },
+  "OmakaseVpcPrivateSubnet1DefaultRouteABC8B634": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "NatGatewayId": {
+     "Ref": "OmakaseVpcPublicSubnet1NATGatewayFB8599BD"
+    },
+    "RouteTableId": {
+     "Ref": "OmakaseVpcPrivateSubnet1RouteTableFF9AE15F"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OmakaseVpc/PrivateSubnet1/DefaultRoute"
+   }
+  },
+  "OmakaseVpcPrivateSubnet2Subnet9DA0E8D9": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": "us-west-2b",
+    "CidrBlock": "10.0.3.0/24",
+    "MapPublicIpOnLaunch": false,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Private"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Private"
+     },
+     {
+      "Key": "Name",
+      "Value": "OmakaseStack/OmakaseVpc/PrivateSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "OmakaseVpc82E10B1F"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OmakaseVpc/PrivateSubnet2/Subnet"
+   }
+  },
+  "OmakaseVpcPrivateSubnet2RouteTableDFA827CF": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "OmakaseStack/OmakaseVpc/PrivateSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "OmakaseVpc82E10B1F"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OmakaseVpc/PrivateSubnet2/RouteTable"
+   }
+  },
+  "OmakaseVpcPrivateSubnet2RouteTableAssociationC595D2A5": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "OmakaseVpcPrivateSubnet2RouteTableDFA827CF"
+    },
+    "SubnetId": {
+     "Ref": "OmakaseVpcPrivateSubnet2Subnet9DA0E8D9"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OmakaseVpc/PrivateSubnet2/RouteTableAssociation"
+   }
+  },
+  "OmakaseVpcPrivateSubnet2DefaultRoute610F7A77": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "NatGatewayId": {
+     "Ref": "OmakaseVpcPublicSubnet1NATGatewayFB8599BD"
+    },
+    "RouteTableId": {
+     "Ref": "OmakaseVpcPrivateSubnet2RouteTableDFA827CF"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OmakaseVpc/PrivateSubnet2/DefaultRoute"
+   }
+  },
+  "OmakaseVpcIGWB2536E6A": {
+   "Type": "AWS::EC2::InternetGateway",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "OmakaseStack/OmakaseVpc"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OmakaseVpc/IGW"
+   }
+  },
+  "OmakaseVpcVPCGW898E8D5E": {
+   "Type": "AWS::EC2::VPCGatewayAttachment",
+   "Properties": {
+    "InternetGatewayId": {
+     "Ref": "OmakaseVpcIGWB2536E6A"
+    },
+    "VpcId": {
+     "Ref": "OmakaseVpc82E10B1F"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OmakaseVpc/VPCGW"
+   }
+  },
+  "OmakaseCluster6CE503A9": {
+   "Type": "AWS::ECS::Cluster",
+   "Properties": {
+    "ClusterName": "omakase",
+    "ClusterSettings": [
+     {
+      "Name": "containerInsights",
+      "Value": "enabled"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OmakaseCluster/Resource"
+   }
+  },
+  "OrchestratorLogGroupE3FD5A7F": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": "/omakase/orchestrator",
+    "RetentionInDays": 30
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OrchestratorLogGroup/Resource"
+   }
+  },
+  "AgentsLogGroup0DE3C993": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": "/omakase/agents",
+    "RetentionInDays": 30
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/AgentsLogGroup/Resource"
+   }
+  },
+  "AlbSecurityGroup86A59E99": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "Omakase ALB - allows HTTP/HTTPS inbound",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "SecurityGroupIngress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow HTTP from anywhere",
+      "FromPort": 80,
+      "IpProtocol": "tcp",
+      "ToPort": 80
+     },
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow HTTPS from anywhere",
+      "FromPort": 443,
+      "IpProtocol": "tcp",
+      "ToPort": 443
+     }
+    ],
+    "VpcId": {
+     "Ref": "OmakaseVpc82E10B1F"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/AlbSecurityGroup/Resource"
+   }
+  },
+  "EcsSecurityGroup44008BF1": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "Omakase ECS tasks - allows traffic from ALB only",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "OmakaseVpc82E10B1F"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/EcsSecurityGroup/Resource"
+   }
+  },
+  "EcsSecurityGroupfromOmakaseStackAlbSecurityGroup20096CE28080940F603F": {
+   "Type": "AWS::EC2::SecurityGroupIngress",
+   "Properties": {
+    "Description": "Allow traffic from ALB on container port",
+    "FromPort": 8080,
+    "GroupId": {
+     "Fn::GetAtt": [
+      "EcsSecurityGroup44008BF1",
+      "GroupId"
+     ]
+    },
+    "IpProtocol": "tcp",
+    "SourceSecurityGroupId": {
+     "Fn::GetAtt": [
+      "AlbSecurityGroup86A59E99",
+      "GroupId"
+     ]
+    },
+    "ToPort": 8080
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/EcsSecurityGroup/from OmakaseStackAlbSecurityGroup20096CE2:8080"
+   }
+  },
+  "OmakaseAlb004B1FCD": {
+   "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+   "Properties": {
+    "LoadBalancerAttributes": [
+     {
+      "Key": "deletion_protection.enabled",
+      "Value": "false"
+     }
+    ],
+    "Scheme": "internet-facing",
+    "SecurityGroups": [
+     {
+      "Fn::GetAtt": [
+       "AlbSecurityGroup86A59E99",
+       "GroupId"
+      ]
+     }
+    ],
+    "Subnets": [
+     {
+      "Ref": "OmakaseVpcPublicSubnet1Subnet31AED316"
+     },
+     {
+      "Ref": "OmakaseVpcPublicSubnet2SubnetCE2050C9"
+     }
+    ],
+    "Type": "application"
+   },
+   "DependsOn": [
+    "OmakaseVpcPublicSubnet1DefaultRouteEFAA9636",
+    "OmakaseVpcPublicSubnet1RouteTableAssociation10C4F1B4",
+    "OmakaseVpcPublicSubnet2DefaultRouteB3750B64",
+    "OmakaseVpcPublicSubnet2RouteTableAssociationC952E2B4"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OmakaseAlb/Resource"
+   }
+  },
+  "OmakaseAlbHttpListener955F0364": {
+   "Type": "AWS::ElasticLoadBalancingV2::Listener",
+   "Properties": {
+    "DefaultActions": [
+     {
+      "TargetGroupArn": {
+       "Ref": "OmakaseAlbHttpListenerOrchestratorTargetGroup273E21E2"
+      },
+      "Type": "forward"
+     }
+    ],
+    "LoadBalancerArn": {
+     "Ref": "OmakaseAlb004B1FCD"
+    },
+    "Port": 80,
+    "Protocol": "HTTP"
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OmakaseAlb/HttpListener/Resource"
+   }
+  },
+  "OmakaseAlbHttpListenerOrchestratorTargetGroup273E21E2": {
+   "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+   "Properties": {
+    "HealthCheckIntervalSeconds": 30,
+    "HealthCheckPath": "/health",
+    "HealthCheckTimeoutSeconds": 5,
+    "HealthyThresholdCount": 2,
+    "Matcher": {
+     "HttpCode": "200"
+    },
+    "Port": 8080,
+    "Protocol": "HTTP",
+    "TargetGroupAttributes": [
+     {
+      "Key": "stickiness.enabled",
+      "Value": "false"
+     }
+    ],
+    "TargetType": "ip",
+    "UnhealthyThresholdCount": 3,
+    "VpcId": {
+     "Ref": "OmakaseVpc82E10B1F"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OmakaseAlb/HttpListener/OrchestratorTargetGroup/Resource"
+   }
+  },
+  "AgentRepositoryCEF64969": {
+   "Type": "AWS::ECR::Repository",
+   "Properties": {
+    "ImageScanningConfiguration": {
+     "ScanOnPush": true
+    },
+    "LifecyclePolicy": {
+     "LifecyclePolicyText": "{\"rules\":[{\"rulePriority\":1,\"description\":\"Keep only the last 10 images\",\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":10},\"action\":{\"type\":\"expire\"}}]}"
+    },
+    "RepositoryName": "omakase-agent"
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/AgentRepository/Resource"
+   }
+  },
+  "ApiKeysSecret5A58C5CD": {
+   "Type": "AWS::SecretsManager::Secret",
+   "Properties": {
+    "Description": "API keys used by Omakase agents (e.g. ANTHROPIC_API_KEY)",
+    "GenerateSecretString": {},
+    "Name": "omakase/api-keys"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/ApiKeysSecret/Resource"
+   }
+  },
+  "TaskExecutionRole250D2532": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+       ]
+      ]
+     }
+    ],
+    "RoleName": "omakase-task-execution"
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/TaskExecutionRole/Resource"
+   }
+  },
+  "TaskExecutionRoleDefaultPolicyA84DD1B0": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:BatchGetImage"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "AgentRepositoryCEF64969",
+         "Arn"
+        ]
+       }
+      },
+      {
+       "Action": "ecr:GetAuthorizationToken",
+       "Effect": "Allow",
+       "Resource": "*"
+      },
+      {
+       "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "OrchestratorLogGroupE3FD5A7F",
+         "Arn"
+        ]
+       }
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Ref": "ApiKeysSecret5A58C5CD"
+       }
+      },
+      {
+       "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "AgentsLogGroup0DE3C993",
+         "Arn"
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "TaskExecutionRoleDefaultPolicyA84DD1B0",
+    "Roles": [
+     {
+      "Ref": "TaskExecutionRole250D2532"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/TaskExecutionRole/DefaultPolicy/Resource"
+   }
+  },
+  "OrchestratorTaskRole4A62488A": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "RoleName": "omakase-orchestrator-task"
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OrchestratorTaskRole/Resource"
+   }
+  },
+  "OrchestratorTaskRoleDefaultPolicy4E83994D": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "ecs:RunTask",
+        "ecs:StopTask",
+        "ecs:DescribeTasks"
+       ],
+       "Condition": {
+        "ArnEquals": {
+         "ecs:cluster": {
+          "Fn::GetAtt": [
+           "OmakaseCluster6CE503A9",
+           "Arn"
+          ]
+         }
+        }
+       },
+       "Effect": "Allow",
+       "Resource": "*",
+       "Sid": "EcsAgentManagement"
+      },
+      {
+       "Action": "iam:PassRole",
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "TaskExecutionRole250D2532",
+         "Arn"
+        ]
+       },
+       "Sid": "PassRoleForAgentTasks"
+      },
+      {
+       "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "OrchestratorLogGroupE3FD5A7F",
+         "Arn"
+        ]
+       }
+      },
+      {
+       "Action": "iam:PassRole",
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "AgentTaskRoleAB8558E5",
+         "Arn"
+        ]
+       },
+       "Sid": "PassAgentTaskRole"
+      },
+      {
+       "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:Query",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:Scan"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        "arn:aws:dynamodb:us-west-2:211125619133:table/omakase-*",
+        "arn:aws:dynamodb:us-west-2:211125619133:table/omakase-*/index/*"
+       ],
+       "Sid": "DynamoDbReadWrite"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "OrchestratorTaskRoleDefaultPolicy4E83994D",
+    "Roles": [
+     {
+      "Ref": "OrchestratorTaskRole4A62488A"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OrchestratorTaskRole/DefaultPolicy/Resource"
+   }
+  },
+  "AgentTaskRoleAB8558E5": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "RoleName": "omakase-agent-task"
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/AgentTaskRole/Resource"
+   }
+  },
+  "AgentTaskRoleDefaultPolicyD9D35507": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "AgentsLogGroup0DE3C993",
+         "Arn"
+        ]
+       }
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Ref": "ApiKeysSecret5A58C5CD"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "AgentTaskRoleDefaultPolicyD9D35507",
+    "Roles": [
+     {
+      "Ref": "AgentTaskRoleAB8558E5"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/AgentTaskRole/DefaultPolicy/Resource"
+   }
+  },
+  "OrchestratorTaskDef2BBFA66F": {
+   "Type": "AWS::ECS::TaskDefinition",
+   "Properties": {
+    "ContainerDefinitions": [
+     {
+      "Environment": [
+       {
+        "Name": "ENV",
+        "Value": "production"
+       },
+       {
+        "Name": "PORT",
+        "Value": "8080"
+       },
+       {
+        "Name": "ECS_CLUSTER_ARN",
+        "Value": {
+         "Fn::GetAtt": [
+          "OmakaseCluster6CE503A9",
+          "Arn"
+         ]
+        }
+       },
+       {
+        "Name": "AGENT_TASK_DEF_ARN",
+        "Value": {
+         "Ref": "AgentTaskDef41623489"
+        }
+       },
+       {
+        "Name": "AGENT_SUBNET_IDS",
+        "Value": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Ref": "OmakaseVpcPrivateSubnet1Subnet25DFCEB3"
+           },
+           ",",
+           {
+            "Ref": "OmakaseVpcPrivateSubnet2Subnet9DA0E8D9"
+           }
+          ]
+         ]
+        }
+       },
+       {
+        "Name": "AGENT_SECURITY_GROUP_ID",
+        "Value": {
+         "Fn::GetAtt": [
+          "EcsSecurityGroup44008BF1",
+          "GroupId"
+         ]
+        }
+       },
+       {
+        "Name": "DYNAMODB_TABLE_PREFIX",
+        "Value": "omakase-"
+       }
+      ],
+      "Essential": true,
+      "HealthCheck": {
+       "Command": [
+        "CMD-SHELL",
+        "curl -f http://localhost:8080/health || exit 1"
+       ],
+       "Interval": 30,
+       "Retries": 3,
+       "StartPeriod": 60,
+       "Timeout": 5
+      },
+      "Image": {
+       "Fn::Join": [
+        "",
+        [
+         {
+          "Fn::Select": [
+           4,
+           {
+            "Fn::Split": [
+             ":",
+             {
+              "Fn::GetAtt": [
+               "AgentRepositoryCEF64969",
+               "Arn"
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         ".dkr.ecr.",
+         {
+          "Fn::Select": [
+           3,
+           {
+            "Fn::Split": [
+             ":",
+             {
+              "Fn::GetAtt": [
+               "AgentRepositoryCEF64969",
+               "Arn"
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         ".",
+         {
+          "Ref": "AWS::URLSuffix"
+         },
+         "/",
+         {
+          "Ref": "AgentRepositoryCEF64969"
+         },
+         ":latest"
+        ]
+       ]
+      },
+      "LogConfiguration": {
+       "LogDriver": "awslogs",
+       "Options": {
+        "awslogs-group": {
+         "Ref": "OrchestratorLogGroupE3FD5A7F"
+        },
+        "awslogs-stream-prefix": "orchestrator",
+        "awslogs-region": "us-west-2"
+       }
+      },
+      "Name": "OrchestratorContainer",
+      "PortMappings": [
+       {
+        "ContainerPort": 8080,
+        "Protocol": "tcp"
+       }
+      ],
+      "Secrets": [
+       {
+        "Name": "ANTHROPIC_API_KEY",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Ref": "ApiKeysSecret5A58C5CD"
+           },
+           ":ANTHROPIC_API_KEY::"
+          ]
+         ]
+        }
+       }
+      ]
+     }
+    ],
+    "Cpu": "1024",
+    "ExecutionRoleArn": {
+     "Fn::GetAtt": [
+      "TaskExecutionRole250D2532",
+      "Arn"
+     ]
+    },
+    "Family": "OmakaseStackOrchestratorTaskDef13EAB9AE",
+    "Memory": "2048",
+    "NetworkMode": "awsvpc",
+    "RequiresCompatibilities": [
+     "FARGATE"
+    ],
+    "TaskRoleArn": {
+     "Fn::GetAtt": [
+      "OrchestratorTaskRole4A62488A",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OrchestratorTaskDef/Resource"
+   }
+  },
+  "OrchestratorService5871F41E": {
+   "Type": "AWS::ECS::Service",
+   "Properties": {
+    "Cluster": {
+     "Ref": "OmakaseCluster6CE503A9"
+    },
+    "DeploymentConfiguration": {
+     "Alarms": {
+      "AlarmNames": [],
+      "Enable": false,
+      "Rollback": false
+     },
+     "MaximumPercent": 200,
+     "MinimumHealthyPercent": 50
+    },
+    "DesiredCount": 1,
+    "EnableECSManagedTags": false,
+    "HealthCheckGracePeriodSeconds": 60,
+    "LaunchType": "FARGATE",
+    "LoadBalancers": [
+     {
+      "ContainerName": "OrchestratorContainer",
+      "ContainerPort": 8080,
+      "TargetGroupArn": {
+       "Ref": "OmakaseAlbHttpListenerOrchestratorTargetGroup273E21E2"
+      }
+     }
+    ],
+    "NetworkConfiguration": {
+     "AwsvpcConfiguration": {
+      "AssignPublicIp": "DISABLED",
+      "SecurityGroups": [
+       {
+        "Fn::GetAtt": [
+         "EcsSecurityGroup44008BF1",
+         "GroupId"
+        ]
+       }
+      ],
+      "Subnets": [
+       {
+        "Ref": "OmakaseVpcPrivateSubnet1Subnet25DFCEB3"
+       },
+       {
+        "Ref": "OmakaseVpcPrivateSubnet2Subnet9DA0E8D9"
+       }
+      ]
+     }
+    },
+    "TaskDefinition": {
+     "Ref": "OrchestratorTaskDef2BBFA66F"
+    }
+   },
+   "DependsOn": [
+    "OmakaseAlbHttpListenerOrchestratorTargetGroup273E21E2",
+    "OmakaseAlbHttpListener955F0364",
+    "OrchestratorTaskRoleDefaultPolicy4E83994D",
+    "OrchestratorTaskRole4A62488A"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/OrchestratorService/Service"
+   }
+  },
+  "AgentTaskDef41623489": {
+   "Type": "AWS::ECS::TaskDefinition",
+   "Properties": {
+    "ContainerDefinitions": [
+     {
+      "Environment": [
+       {
+        "Name": "ENV",
+        "Value": "production"
+       }
+      ],
+      "Essential": true,
+      "Image": {
+       "Fn::Join": [
+        "",
+        [
+         {
+          "Fn::Select": [
+           4,
+           {
+            "Fn::Split": [
+             ":",
+             {
+              "Fn::GetAtt": [
+               "AgentRepositoryCEF64969",
+               "Arn"
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         ".dkr.ecr.",
+         {
+          "Fn::Select": [
+           3,
+           {
+            "Fn::Split": [
+             ":",
+             {
+              "Fn::GetAtt": [
+               "AgentRepositoryCEF64969",
+               "Arn"
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         ".",
+         {
+          "Ref": "AWS::URLSuffix"
+         },
+         "/",
+         {
+          "Ref": "AgentRepositoryCEF64969"
+         },
+         ":latest"
+        ]
+       ]
+      },
+      "LogConfiguration": {
+       "LogDriver": "awslogs",
+       "Options": {
+        "awslogs-group": {
+         "Ref": "AgentsLogGroup0DE3C993"
+        },
+        "awslogs-stream-prefix": "agent",
+        "awslogs-region": "us-west-2"
+       }
+      },
+      "Name": "AgentContainer",
+      "Secrets": [
+       {
+        "Name": "ANTHROPIC_API_KEY",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Ref": "ApiKeysSecret5A58C5CD"
+           },
+           ":ANTHROPIC_API_KEY::"
+          ]
+         ]
+        }
+       }
+      ]
+     }
+    ],
+    "Cpu": "1024",
+    "ExecutionRoleArn": {
+     "Fn::GetAtt": [
+      "TaskExecutionRole250D2532",
+      "Arn"
+     ]
+    },
+    "Family": "omakase-agent",
+    "Memory": "2048",
+    "NetworkMode": "awsvpc",
+    "RequiresCompatibilities": [
+     "FARGATE"
+    ],
+    "TaskRoleArn": {
+     "Fn::GetAtt": [
+      "AgentTaskRoleAB8558E5",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/AgentTaskDef/Resource"
+   }
+  },
+  "UsersTable9725E9C8": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "id",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "auth0Id",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "email",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "GlobalSecondaryIndexes": [
+     {
+      "IndexName": "by_auth0Id",
+      "KeySchema": [
+       {
+        "AttributeName": "auth0Id",
+        "KeyType": "HASH"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "by_email",
+      "KeySchema": [
+       {
+        "AttributeName": "email",
+        "KeyType": "HASH"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     }
+    ],
+    "KeySchema": [
+     {
+      "AttributeName": "id",
+      "KeyType": "HASH"
+     }
+    ],
+    "TableName": "omakase-users"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/UsersTable/Resource"
+   }
+  },
+  "ProjectsTableAA0A2089": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "id",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "status",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "createdAt",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "GlobalSecondaryIndexes": [
+     {
+      "IndexName": "by_status",
+      "KeySchema": [
+       {
+        "AttributeName": "status",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "createdAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     }
+    ],
+    "KeySchema": [
+     {
+      "AttributeName": "id",
+      "KeyType": "HASH"
+     }
+    ],
+    "TableName": "omakase-projects"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/ProjectsTable/Resource"
+   }
+  },
+  "FeaturesTable52D06210": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "id",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "projectId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "createdAt",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "status",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "linearIssueId",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "GlobalSecondaryIndexes": [
+     {
+      "IndexName": "by_project",
+      "KeySchema": [
+       {
+        "AttributeName": "projectId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "createdAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "by_project_status",
+      "KeySchema": [
+       {
+        "AttributeName": "projectId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "status",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "by_linearIssueId",
+      "KeySchema": [
+       {
+        "AttributeName": "linearIssueId",
+        "KeyType": "HASH"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     }
+    ],
+    "KeySchema": [
+     {
+      "AttributeName": "id",
+      "KeyType": "HASH"
+     }
+    ],
+    "TableName": "omakase-features"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/FeaturesTable/Resource"
+   }
+  },
+  "AgentsTable78E0948F": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "id",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "projectId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "createdAt",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "status",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "GlobalSecondaryIndexes": [
+     {
+      "IndexName": "by_project",
+      "KeySchema": [
+       {
+        "AttributeName": "projectId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "createdAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "by_project_status",
+      "KeySchema": [
+       {
+        "AttributeName": "projectId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "status",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     }
+    ],
+    "KeySchema": [
+     {
+      "AttributeName": "id",
+      "KeyType": "HASH"
+     }
+    ],
+    "TableName": "omakase-agents"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/AgentsTable/Resource"
+   }
+  },
+  "AgentRunsTableB0DA56A7": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "id",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "projectId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "startedAt",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "featureId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "agentId",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "GlobalSecondaryIndexes": [
+     {
+      "IndexName": "by_project",
+      "KeySchema": [
+       {
+        "AttributeName": "projectId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "startedAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "by_feature",
+      "KeySchema": [
+       {
+        "AttributeName": "featureId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "startedAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "by_agent",
+      "KeySchema": [
+       {
+        "AttributeName": "agentId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "startedAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     }
+    ],
+    "KeySchema": [
+     {
+      "AttributeName": "id",
+      "KeyType": "HASH"
+     }
+    ],
+    "TableName": "omakase-agent-runs"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/AgentRunsTable/Resource"
+   }
+  },
+  "TicketsTableB76A19AF": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "id",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "projectId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "syncedAt",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "linearIssueId",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "GlobalSecondaryIndexes": [
+     {
+      "IndexName": "by_project",
+      "KeySchema": [
+       {
+        "AttributeName": "projectId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "syncedAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "by_linearIssueId",
+      "KeySchema": [
+       {
+        "AttributeName": "linearIssueId",
+        "KeyType": "HASH"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     }
+    ],
+    "KeySchema": [
+     {
+      "AttributeName": "id",
+      "KeyType": "HASH"
+     }
+    ],
+    "TableName": "omakase-tickets"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/TicketsTable/Resource"
+   }
+  },
+  "AgentMessagesTable71313A80": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "runId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "timestamp",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "featureId",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "GlobalSecondaryIndexes": [
+     {
+      "IndexName": "by_feature",
+      "KeySchema": [
+       {
+        "AttributeName": "featureId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "timestamp",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     }
+    ],
+    "KeySchema": [
+     {
+      "AttributeName": "runId",
+      "KeyType": "HASH"
+     },
+     {
+      "AttributeName": "timestamp",
+      "KeyType": "RANGE"
+     }
+    ],
+    "TableName": "omakase-agent-messages"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/AgentMessagesTable/Resource"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/31SQW7bMBB8S+40m6o59Oq6bWAgSAUpyLVYURt1Y4oUuEsbBsG/F5Jsye0hp50ZDheDwRa6+PJV39/BiTemPWwsNTrVAuag4MS/E5pCp9fBqN2bey13qoyNJVPHxqGM2ooqHwVfoLG46qu2ZfaGQMi7xTyCH/tyHM8gjyB4grMqAx1BcF28d4LB4WKYk1zYVgTMnx6dqBpNDCTnx+DjMGX4UNi7LiBzVmhYp52NLBhG1xX+hNDBGJ8P3/GNHF3D/694J0AOw412+VtjOJKZC5lhVtZ3rNOT75ZYV5wVWmAhYz20DVhwhlx3LHTaDoMlM7X35KH9Nr3Naf/htz5iQXfxXPHN+wuEDmXJcEPHRoJOFQ6eSXyYGl9ZVowmoHAPDjoMOtUTvxQcULIi6HWq/HwK0yy9JTNtmlFW7dlB79tGp+VoJpCzqpB9DHNvv6IMUbJyvkX9zp+OxYP+XOj7u3cm2oTohHrU1Tz/As3h+TnOAgAA"
+   },
+   "Metadata": {
+    "aws:cdk:path": "OmakaseStack/CDKMetadata/Default"
+   }
+  }
+ },
+ "Outputs": {
+  "AlbDnsName": {
+   "Description": "Application Load Balancer DNS name",
+   "Value": {
+    "Fn::GetAtt": [
+     "OmakaseAlb004B1FCD",
+     "DNSName"
+    ]
+   }
+  },
+  "EcrRepositoryUri": {
+   "Description": "ECR repository URI for docker push",
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      {
+       "Fn::Select": [
+        4,
+        {
+         "Fn::Split": [
+          ":",
+          {
+           "Fn::GetAtt": [
+            "AgentRepositoryCEF64969",
+            "Arn"
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      ".dkr.ecr.",
+      {
+       "Fn::Select": [
+        3,
+        {
+         "Fn::Split": [
+          ":",
+          {
+           "Fn::GetAtt": [
+            "AgentRepositoryCEF64969",
+            "Arn"
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      ".",
+      {
+       "Ref": "AWS::URLSuffix"
+      },
+      "/",
+      {
+       "Ref": "AgentRepositoryCEF64969"
+      }
+     ]
+    ]
+   }
+  },
+  "ClusterName": {
+   "Description": "ECS cluster name",
+   "Value": {
+    "Ref": "OmakaseCluster6CE503A9"
+   }
+  },
+  "AgentTaskDefArn": {
+   "Description": "Agent task definition ARN for RunTask calls",
+   "Value": {
+    "Ref": "AgentTaskDef41623489"
+   }
+  },
+  "ApiKeysSecretArn": {
+   "Description": "Secrets Manager ARN for API keys",
+   "Value": {
+    "Ref": "ApiKeysSecret5A58C5CD"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

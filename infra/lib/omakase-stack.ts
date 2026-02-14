@@ -214,6 +214,26 @@ export class OmakaseStack extends cdk.Stack {
     agentsLogGroup.grantWrite(agentTaskRole);
     apiKeysSecret.grantRead(agentTaskRole);
 
+    // Grant agents DynamoDB access for memory and personality tables
+    agentTaskRole.addToPolicy(
+      new iam.PolicyStatement({
+        sid: "DynamoDbAgentMemory",
+        effect: iam.Effect.ALLOW,
+        actions: [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:Query",
+          "dynamodb:BatchWriteItem",
+        ],
+        resources: [
+          `arn:aws:dynamodb:${this.region}:${this.account}:table/omakase-agent-memories`,
+          `arn:aws:dynamodb:${this.region}:${this.account}:table/omakase-agent-memories/index/*`,
+          `arn:aws:dynamodb:${this.region}:${this.account}:table/omakase-agent-personalities`,
+        ],
+      }),
+    );
+
     // Allow orchestrator to pass the agent task role when launching tasks
     orchestratorTaskRole.addToPolicy(
       new iam.PolicyStatement({
@@ -522,6 +542,44 @@ export class OmakaseStack extends cdk.Stack {
       indexName: "by_feature",
       partitionKey: { name: "featureId", type: dynamodb.AttributeType.STRING },
       sortKey: { name: "timestamp", type: dynamodb.AttributeType.STRING },
+    });
+    agentMessagesTable.addGlobalSecondaryIndex({
+      indexName: "by_thread",
+      partitionKey: { name: "threadId", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "timestamp", type: dynamodb.AttributeType.STRING },
+    });
+
+    const agentThreadsTable = new dynamodb.Table(this, "AgentThreadsTable", {
+      tableName: "omakase-agent-threads",
+      partitionKey: { name: "agentName", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "threadId", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+    agentThreadsTable.addGlobalSecondaryIndex({
+      indexName: "by_project",
+      partitionKey: { name: "projectId", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "lastMessageAt", type: dynamodb.AttributeType.STRING },
+    });
+
+    const agentMemoriesTable = new dynamodb.Table(this, "AgentMemoriesTable", {
+      tableName: "omakase-agent-memories",
+      partitionKey: { name: "agentProjectKey", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "createdAt", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+    agentMemoriesTable.addGlobalSecondaryIndex({
+      indexName: "by_agent_project",
+      partitionKey: { name: "agentName", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "projectId", type: dynamodb.AttributeType.STRING },
+    });
+
+    const agentPersonalitiesTable = new dynamodb.Table(this, "AgentPersonalitiesTable", {
+      tableName: "omakase-agent-personalities",
+      partitionKey: { name: "agentName", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
     // ---------------------------------------------------------------

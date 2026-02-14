@@ -1,0 +1,21 @@
+{
+  "version": "48.0.0",
+  "files": {
+    "07e0d6ec85953c1bbac649155b91afa4ad2722ce8cb4d866aadb322d96faf7f6": {
+      "displayName": "OmakaseStack Template",
+      "source": {
+        "path": "OmakaseStack.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "211125619133-us-west-2-c23b6f48": {
+          "bucketName": "cdk-hnb659fds-assets-211125619133-us-west-2",
+          "objectKey": "07e0d6ec85953c1bbac649155b91afa4ad2722ce8cb4d866aadb322d96faf7f6.json",
+          "region": "us-west-2",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::211125619133:role/cdk-hnb659fds-file-publishing-role-211125619133-us-west-2"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}
