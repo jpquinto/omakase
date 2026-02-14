@@ -42,7 +42,7 @@ export function SpotifyNowPlaying() {
     if (!connected) return null;
     return (
       <div className="flex items-center gap-2 rounded-oma px-3 py-1.5 text-xs text-oma-text-faint">
-        <SpotifyIcon className="size-3.5 opacity-30" />
+        <SpotifyIcon className="size-3.5 text-oma-primary opacity-30" />
         <span className="hidden sm:inline">Not playing</span>
       </div>
     );
@@ -106,9 +106,9 @@ export function SpotifyNowPlaying() {
           {/* Playing indicator bars */}
           {track.isPlaying && (
             <div className="flex items-end gap-[2px]">
-              <span className="inline-block w-[2px] animate-[equalizer_0.8s_ease-in-out_infinite] rounded-full bg-[#1DB954]" style={{ height: "8px" }} />
-              <span className="inline-block w-[2px] animate-[equalizer_0.8s_ease-in-out_infinite_0.2s] rounded-full bg-[#1DB954]" style={{ height: "12px" }} />
-              <span className="inline-block w-[2px] animate-[equalizer_0.8s_ease-in-out_infinite_0.4s] rounded-full bg-[#1DB954]" style={{ height: "6px" }} />
+              <span className="inline-block w-[2px] animate-[equalizer_0.8s_ease-in-out_infinite] rounded-full bg-oma-primary" style={{ height: "8px" }} />
+              <span className="inline-block w-[2px] animate-[equalizer_0.8s_ease-in-out_infinite_0.2s] rounded-full bg-oma-primary" style={{ height: "12px" }} />
+              <span className="inline-block w-[2px] animate-[equalizer_0.8s_ease-in-out_infinite_0.4s] rounded-full bg-oma-primary" style={{ height: "6px" }} />
             </div>
           )}
           <MarqueeText
@@ -130,7 +130,7 @@ export function SpotifyNowPlaying() {
         className={cn(
           "flex size-5 shrink-0 items-center justify-center rounded-full transition-all duration-300",
           "opacity-0 group-hover/player:opacity-100",
-          "hover:bg-[#1DB954]/15 hover:text-[#1DB954]",
+          "hover:bg-oma-primary/15 hover:text-oma-primary",
           "text-oma-text-subtle",
         )}
         title="Open in Spotify"
@@ -141,7 +141,7 @@ export function SpotifyNowPlaying() {
       {/* Progress bar — thin line at the bottom */}
       <div className="absolute inset-x-2 -bottom-px h-[2px] overflow-hidden rounded-full bg-oma-bg-surface/50">
         <div
-          className="h-full rounded-full bg-[#1DB954]/60 transition-[width] duration-1000 ease-linear"
+          className="h-full rounded-full bg-oma-primary/60 transition-[width] duration-1000 ease-linear"
           style={{ width: `${progressPct}%` }}
         />
       </div>
