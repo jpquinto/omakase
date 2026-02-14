@@ -7,8 +7,8 @@
  * Claude Code CLI invocation are reused -- the only difference is the
  * compute substrate (local process vs Fargate container).
  *
- * Each feature gets an isolated workspace directory under
- * LOCAL_WORKSPACE_ROOT to avoid conflicts between concurrent pipelines.
+ * Each feature gets a shared workspace directory under
+ * LOCAL_WORKSPACE_ROOT. Sequential agents reuse the same clone.
  */
 
 import { spawn, type Subprocess } from "bun";
@@ -85,7 +85,7 @@ const DEFAULT_STATUS_UPDATE_INTERVAL_MS = 10 * 1000; // 10 seconds
  *
  * Spawns `agent-entrypoint.sh` with the same environment variables that
  * ECS would provide. The workspace is a directory under the configured
- * workspace root, keyed by feature ID and role to allow concurrent runs.
+ * workspace root, keyed by feature ID. Sequential agents share the clone.
  *
  * @param options - Configuration for the agent to launch.
  * @returns The spawned process and workspace path.
@@ -104,8 +104,8 @@ export async function startLocalAgent(
     workspaceRoot = DEFAULT_WORKSPACE_ROOT,
   } = options;
 
-  // Create a workspace directory for this feature+role combination
-  const workspace = resolve(workspaceRoot, featureId, role);
+  // Create a shared workspace directory for this feature (all roles reuse it)
+  const workspace = resolve(workspaceRoot, featureId);
   await mkdir(workspace, { recursive: true });
 
   // Resolve the entrypoint script path relative to this file

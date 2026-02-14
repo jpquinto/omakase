@@ -9,6 +9,7 @@
 import { createAgentRun, completeAgentRun } from "@omakase/dynamodb";
 import { getDefaultPersonality } from "@omakase/dynamodb";
 import { emit } from "./stream-bus.js";
+import { resolve } from "path";
 import type { Subprocess } from "bun";
 import type { AgentRunRole } from "@omakase/db";
 
@@ -46,16 +47,35 @@ export class WorkSessionManager {
   }
 
   /**
-   * Start a new work session: create an AgentRun, spawn the claude CLI, and begin parsing output.
+   * Start a new work session: provision workspace (if project given), create an AgentRun,
+   * spawn the claude CLI, and begin parsing output.
+   *
+   * If projectId + repoUrl are provided, clones/fetches the repo and injects agent context.
+   * If no project, runs Claude Code in the workspace root with access to everything.
+   * If a session already exists for the same project (or thread), returns it.
    */
   async startSession(params: {
     agentName: string;
-    projectId: string;
+    projectId?: string;
     threadId: string;
     prompt: string;
+    repoUrl?: string;
   }): Promise<{ runId: string; status: string }> {
     const role = AGENT_ROLE_MAP[params.agentName];
     if (!role) throw new Error(`Unknown agent: ${params.agentName}`);
+
+    // Enforce one active session per project (or per thread if no project)
+    if (params.projectId) {
+      const existing = this.findSessionByProject(params.projectId);
+      if (existing) {
+        return { runId: existing.runId, status: "existing" };
+      }
+    } else {
+      const existing = this.findSessionByThread(params.threadId);
+      if (existing) {
+        return { runId: existing.runId, status: "existing" };
+      }
+    }
 
     // Verify claude CLI is available
     const whichResult = Bun.spawnSync(["which", "claude"]);
@@ -63,28 +83,49 @@ export class WorkSessionManager {
       throw new Error("Claude CLI not found in PATH. Install it to use work mode.");
     }
 
-    // Create AgentRun record (Task 3.1)
+    // Set working directory: project workspace if project given, otherwise workspace root
+    let cwd: string;
+
+    if (params.projectId && params.repoUrl) {
+      cwd = resolve(this.localWorkspaceRoot, "work", params.projectId);
+
+      // Provision workspace: clone/fetch repo, install deps, inject agent context
+      const setupScript = resolve(import.meta.dir, "work-setup.sh");
+      const setupResult = Bun.spawnSync(["bash", setupScript], {
+        env: {
+          ...process.env,
+          REPO_URL: params.repoUrl,
+          WORKSPACE: cwd,
+          AGENT_ROLE: role,
+          AGENT_NAME: params.agentName,
+          PROJECT_ID: params.projectId,
+          BASE_BRANCH: "main",
+        },
+        stdout: "inherit",
+        stderr: "inherit",
+      });
+
+      if (setupResult.exitCode !== 0) {
+        throw new Error(`Workspace setup failed (exit code ${setupResult.exitCode})`);
+      }
+    } else {
+      // No project — run in workspace root with full access
+      cwd = this.localWorkspaceRoot;
+    }
+
+    // Create AgentRun record
     const runId = await createAgentRun({
       agentId: params.agentName,
-      projectId: params.projectId,
+      projectId: params.projectId ?? "general",
       featureId: `work-session-${params.threadId}`,
       role,
     });
-
-    // Build system prompt from agent personality
-    const personality = getDefaultPersonality(params.agentName);
-    const systemPrompt = personality
-      ? `${personality.persona}\nCommunication style: ${personality.communicationStyle}`
-      : `You are an AI agent with the role of ${role}.`;
-
-    // Set working directory to project workspace
-    const cwd = `${this.localWorkspaceRoot}/${params.projectId}`;
 
     // Spawn the claude CLI subprocess
     const args = [
       "claude",
       "--output-format", "stream-json",
-      "--system-prompt", systemPrompt,
+      "--dangerously-skip-permissions",
       "-p", params.prompt,
     ];
 
@@ -105,7 +146,7 @@ export class WorkSessionManager {
     const session: WorkSession = {
       runId,
       agentName: params.agentName,
-      projectId: params.projectId,
+      projectId: params.projectId ?? "general",
       threadId: params.threadId,
       process: proc,
       startedAt: now,
@@ -207,6 +248,24 @@ export class WorkSessionManager {
   listSessions(agentName: string): WorkSession[] {
     return Array.from(this.sessions.values()).filter(
       (s) => s.agentName === agentName,
+    );
+  }
+
+  /**
+   * Find an active session by project ID.
+   */
+  findSessionByProject(projectId: string): WorkSession | undefined {
+    return Array.from(this.sessions.values()).find(
+      (s) => s.projectId === projectId,
+    );
+  }
+
+  /**
+   * Find an active session by thread ID.
+   */
+  findSessionByThread(threadId: string): WorkSession | undefined {
+    return Array.from(this.sessions.values()).find(
+      (s) => s.threadId === threadId,
     );
   }
 

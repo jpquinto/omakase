@@ -579,14 +579,10 @@ const app = new Elysia()
       set.status = 404;
       return { error: "Agent not found" };
     }
-    const { projectId, title, mode } = body as { projectId: string; title?: string; mode?: AgentThreadMode };
-    if (!projectId) {
-      set.status = 400;
-      return { error: "projectId is required" };
-    }
+    const { projectId, title, mode } = body as { projectId?: string; title?: string; mode?: AgentThreadMode };
     const thread = await createThread({
       agentName: params.agentName,
-      projectId,
+      projectId: projectId || "general",
       title,
       mode,
     });
@@ -706,10 +702,20 @@ const app = new Elysia()
       set.status = 404;
       return { error: "Agent not found" };
     }
-    const { projectId, threadId, prompt } = body as { projectId: string; threadId: string; prompt: string };
-    if (!projectId || !threadId || !prompt) {
+    const { projectId, threadId, prompt } = body as { projectId?: string; threadId: string; prompt: string };
+    if (!threadId || !prompt) {
       set.status = 400;
-      return { error: "projectId, threadId, and prompt are required" };
+      return { error: "threadId and prompt are required" };
+    }
+    // Look up project to get repoUrl (optional — if no project, run in workspace root)
+    let repoUrl: string | undefined;
+    if (projectId) {
+      const project = await getProject({ projectId });
+      if (!project) {
+        set.status = 404;
+        return { error: "Project not found" };
+      }
+      repoUrl = project.repoUrl;
     }
     try {
       const result = await workSessionManager.startSession({
@@ -717,8 +723,9 @@ const app = new Elysia()
         projectId,
         threadId,
         prompt,
+        repoUrl,
       });
-      set.status = 201;
+      set.status = result.status === "existing" ? 200 : 201;
       return result;
     } catch (err) {
       set.status = 500;
@@ -742,6 +749,17 @@ const app = new Elysia()
       threadId: s.threadId,
       startedAt: s.startedAt,
     }));
+  })
+  .get("/api/agents/:agentName/work-sessions/active", async ({ params, query }) => {
+    const threadId = (query as Record<string, string>).threadId;
+    if (!threadId) {
+      return { active: false };
+    }
+    const session = workSessionManager.findSessionByThread(threadId);
+    if (session && session.process.exitCode === null) {
+      return { active: true, runId: session.runId };
+    }
+    return { active: false };
   })
   // Agent profile endpoints
   .get("/api/agents/:agentName/profile", async ({ params }) => {
