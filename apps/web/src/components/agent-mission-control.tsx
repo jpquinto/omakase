@@ -1,11 +1,16 @@
 "use client";
 
+import { useState } from "react";
+import type { AgentRunRole } from "@omakase/db";
+
 // ---------------------------------------------------------------------------
 // Agent Mission Control Component
 //
 // Displays a grid of agent cards showing each agent's mascot, name, role,
 // current status, and the feature they are working on. Uses the Omakase
 // liquid glass design system with glass surfaces and soft color accents.
+//
+// Cards for running agents are clickable to open the chat sidebar.
 // ---------------------------------------------------------------------------
 
 interface Agent {
@@ -15,40 +20,59 @@ interface Agent {
   role: "architect" | "coder" | "reviewer" | "tester";
   status: "idle" | "running" | "stopped" | "failed";
   currentFeature: string | null;
+  currentRunId: string | null;
+}
+
+interface ChatTarget {
+  runId: string;
+  agentName: string;
+  agentMascot: string;
+  agentRole: AgentRunRole;
+  featureName: string;
+  isActive: boolean;
+}
+
+interface AgentMissionControlProps {
+  onOpenChat?: (target: ChatTarget) => void;
+  activeChatRunId?: string | null;
 }
 
 const MOCK_AGENTS: Agent[] = [
   {
     id: "a1",
-    name: "Spark",
-    mascot: "\u26A1", // lightning bolt
+    name: "Miso",
+    mascot: "\uD83C\uDF5C", // steaming bowl
     role: "architect",
     status: "running",
     currentFeature: "Database Schema",
+    currentRunId: "run-miso-001",
   },
   {
     id: "a2",
-    name: "Fizz",
-    mascot: "\uD83E\uDDEA", // test tube
+    name: "Nori",
+    mascot: "\uD83C\uDF59", // rice ball
     role: "coder",
     status: "running",
     currentFeature: "Shopping Cart",
+    currentRunId: "run-nori-001",
   },
   {
     id: "a3",
-    name: "Octo",
-    mascot: "\uD83D\uDC19", // octopus
+    name: "Koji",
+    mascot: "\uD83C\uDF76", // sake
     role: "reviewer",
     status: "idle",
     currentFeature: null,
+    currentRunId: null,
   },
   {
     id: "a4",
-    name: "Hoot",
-    mascot: "\uD83E\uDD89", // owl
+    name: "Toro",
+    mascot: "\uD83C\uDF63", // sushi
     role: "tester",
     status: "running",
     currentFeature: "User Authentication",
+    currentRunId: "run-toro-001",
   },
 ];
 
@@ -85,7 +109,28 @@ function roleBadgeColor(role: Agent["role"]): string {
   return colors[role];
 }
 
-export function AgentMissionControl() {
+export function AgentMissionControl({ onOpenChat, activeChatRunId }: AgentMissionControlProps) {
+  // Track which agents have unread messages (cleared when chat opens)
+  const [unreadAgents, setUnreadAgents] = useState<Set<string>>(new Set());
+
+  const handleCardClick = (agent: Agent) => {
+    if (agent.status !== "running" || !agent.currentRunId || !agent.currentFeature || !onOpenChat) return;
+    // Clear unread badge for this agent
+    setUnreadAgents((prev) => {
+      const next = new Set(prev);
+      next.delete(agent.id);
+      return next;
+    });
+    onOpenChat({
+      runId: agent.currentRunId,
+      agentName: agent.name,
+      agentMascot: agent.mascot,
+      agentRole: agent.role,
+      featureName: agent.currentFeature,
+      isActive: true,
+    });
+  };
+
   return (
     <div className="space-y-4">
       {/* Section header */}
@@ -100,64 +145,84 @@ export function AgentMissionControl() {
 
       {/* Agent cards grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {MOCK_AGENTS.map((agent) => (
-          <div
-            key={agent.id}
-            className="glass rounded-oma-lg glass-edge p-5 transition-all duration-200 hover:scale-[1.02]"
-          >
-            {/* Mascot and name */}
-            <div className="mb-3 flex items-center gap-3">
-              <span
-                className="glass-sm rounded-oma flex h-12 w-12 items-center justify-center text-2xl leading-none"
-                role="img"
-                aria-label={agent.name}
-              >
-                {agent.mascot}
-              </span>
-              <div>
-                <h3 className="text-sm font-semibold text-oma-text">
-                  {agent.name}
-                </h3>
-                {/* Role badge */}
+        {MOCK_AGENTS.map((agent) => {
+          const isClickable = agent.status === "running" && !!agent.currentRunId && !!onOpenChat;
+          const isChatOpen = activeChatRunId === agent.currentRunId;
+          const hasUnread = unreadAgents.has(agent.id);
+
+          return (
+            <div
+              key={agent.id}
+              onClick={() => handleCardClick(agent)}
+              className={`glass rounded-oma-lg glass-edge p-5 transition-all duration-200 hover:scale-[1.02] ${
+                isClickable ? "cursor-pointer" : ""
+              } ${isChatOpen ? "ring-1 ring-oma-primary/40" : ""}`}
+            >
+              {/* Mascot and name */}
+              <div className="mb-3 flex items-center gap-3">
                 <span
-                  className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${roleBadgeColor(agent.role)}`}
+                  className="glass-sm rounded-oma flex h-12 w-12 items-center justify-center text-2xl leading-none relative"
+                  role="img"
+                  aria-label={agent.name}
                 >
-                  {agent.role}
+                  {agent.mascot}
+                  {/* Unread badge */}
+                  {hasUnread && (
+                    <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-oma-primary shadow-oma-glow-primary" />
+                  )}
+                </span>
+                <div>
+                  <h3 className="text-sm font-semibold text-oma-text">
+                    {agent.name}
+                  </h3>
+                  {/* Role badge */}
+                  <span
+                    className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${roleBadgeColor(agent.role)}`}
+                  >
+                    {agent.role}
+                  </span>
+                </div>
+              </div>
+
+              {/* Status indicator */}
+              <div className="mb-3 flex items-center gap-2">
+                <span
+                  className={`inline-block h-2.5 w-2.5 rounded-full ${statusDotColor(agent.status)} ${
+                    agent.status === "running" ? "animate-pulse" : ""
+                  }`}
+                />
+                <span className="text-xs font-medium text-oma-text-muted">
+                  {statusLabel(agent.status)}
                 </span>
               </div>
-            </div>
 
-            {/* Status indicator */}
-            <div className="mb-3 flex items-center gap-2">
-              <span
-                className={`inline-block h-2.5 w-2.5 rounded-full ${statusDotColor(agent.status)} ${
-                  agent.status === "running" ? "animate-pulse" : ""
-                }`}
-              />
-              <span className="text-xs font-medium text-oma-text-muted">
-                {statusLabel(agent.status)}
-              </span>
-            </div>
+              {/* Current feature or awaiting state */}
+              {agent.currentFeature ? (
+                <div className="glass-sm rounded-oma px-3 py-2">
+                  <p className="text-[10px] font-medium uppercase tracking-wider text-oma-text-subtle">
+                    Working on
+                  </p>
+                  <p className="text-xs font-medium text-oma-text">
+                    {agent.currentFeature}
+                  </p>
+                </div>
+              ) : (
+                <div className="glass-sm rounded-oma border border-dashed border-oma-glass-border px-3 py-2">
+                  <p className="text-[10px] font-medium text-oma-text-muted">
+                    Awaiting assignment
+                  </p>
+                </div>
+              )}
 
-            {/* Current feature or awaiting state */}
-            {agent.currentFeature ? (
-              <div className="glass-sm rounded-oma px-3 py-2">
-                <p className="text-[10px] font-medium uppercase tracking-wider text-oma-text-subtle">
-                  Working on
+              {/* Chat hint for running agents */}
+              {isClickable && (
+                <p className="mt-2 text-center text-[10px] text-oma-text-faint">
+                  Click to chat
                 </p>
-                <p className="text-xs font-medium text-oma-text">
-                  {agent.currentFeature}
-                </p>
-              </div>
-            ) : (
-              <div className="glass-sm rounded-oma border border-dashed border-oma-glass-border px-3 py-2">
-                <p className="text-[10px] font-medium text-oma-text-muted">
-                  Awaiting assignment
-                </p>
-              </div>
-            )}
-          </div>
-        ))}
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

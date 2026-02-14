@@ -1,15 +1,17 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { KanbanBoard } from "@/components/kanban-board";
 import { DependencyGraph } from "@/components/dependency-graph";
 import { AgentMissionControl } from "@/components/agent-mission-control";
 import { LogViewer } from "@/components/log-viewer";
+import { AgentChatPanel } from "@/components/agent-chat-panel";
 import { CelebrationOverlay } from "@/components/celebration-overlay";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { cn } from "@/lib/utils";
+import type { AgentRunRole } from "@omakase/db";
 
 // ---------------------------------------------------------------------------
 // Project Detail Page
@@ -49,10 +51,35 @@ const MOCK_PROJECT = {
   status: "active" as const,
 };
 
+interface ChatTarget {
+  runId: string;
+  agentName: string;
+  agentMascot: string;
+  agentRole: AgentRunRole;
+  featureName: string;
+  isActive: boolean;
+}
+
 export default function ProjectDetailPage() {
   const params = useParams<{ id: string }>();
   const [activeTab, setActiveTab] = useState<TabId>("kanban");
   const [showCelebration, setShowCelebration] = useState(false);
+  const [chatTarget, setChatTarget] = useState<ChatTarget | null>(null);
+
+  // Close chat panel on Escape
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && chatTarget) {
+        setChatTarget(null);
+      }
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [chatTarget]);
+
+  const handleOpenChat = useCallback((target: ChatTarget) => {
+    setChatTarget(target);
+  }, []);
 
   // Keyboard shortcut: G toggles between Kanban and Graph
   const handleToggleGraph = useCallback(() => {
@@ -161,13 +188,28 @@ export default function ProjectDetailPage() {
         })}
       </div>
 
-      {/* Tab content */}
-      <div className="animate-oma-fade-up">
-        {activeTab === "kanban" && <KanbanBoard />}
-        {activeTab === "graph" && <DependencyGraph />}
-        {activeTab === "agents" && <AgentMissionControl />}
-        {activeTab === "logs" && <LogViewer />}
-        {activeTab === "settings" && <SettingsTab projectId={params.id} />}
+      {/* Tab content + chat sidebar */}
+      <div className="relative flex gap-0">
+        <div className={cn("animate-oma-fade-up flex-1 transition-all duration-300", chatTarget && "mr-[400px]")}>
+          {activeTab === "kanban" && <KanbanBoard />}
+          {activeTab === "graph" && <DependencyGraph />}
+          {activeTab === "agents" && <AgentMissionControl onOpenChat={handleOpenChat} activeChatRunId={chatTarget?.runId ?? null} />}
+          {activeTab === "logs" && <LogViewer onOpenChat={handleOpenChat} />}
+          {activeTab === "settings" && <SettingsTab projectId={params.id} />}
+        </div>
+
+        {/* Chat sidebar */}
+        {chatTarget && (
+          <div className="fixed right-0 top-0 z-40 h-screen">
+            <AgentChatPanel
+              runId={chatTarget.runId}
+              agent={{ name: chatTarget.agentName, mascot: chatTarget.agentMascot, role: chatTarget.agentRole }}
+              featureName={chatTarget.featureName}
+              isActive={chatTarget.isActive}
+              onClose={() => setChatTarget(null)}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

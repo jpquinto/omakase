@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import type { AgentRunRole } from "@omakase/db";
 
 // ---------------------------------------------------------------------------
 // Log Viewer Component
@@ -8,7 +9,22 @@ import { useState, useRef, useEffect } from "react";
 // Terminal-style log viewer with a dark background, monospace font, agent
 // filtering, and auto-scroll behavior. Uses the Omakase liquid glass design
 // system with frosted glass filter bar and deep terminal area.
+//
+// Agent name tags are clickable to open the chat sidebar.
 // ---------------------------------------------------------------------------
+
+interface ChatTarget {
+  runId: string;
+  agentName: string;
+  agentMascot: string;
+  agentRole: AgentRunRole;
+  featureName: string;
+  isActive: boolean;
+}
+
+interface LogViewerProps {
+  onOpenChat?: (target: ChatTarget) => void;
+}
 
 interface LogEntry {
   id: string;
@@ -19,31 +35,39 @@ interface LogEntry {
   level: "info" | "warn" | "error" | "success";
 }
 
+/** Mock agent metadata for resolving chat targets from log entries */
+const AGENT_META: Record<number, { mascot: string; role: AgentRunRole; runId: string; feature: string }> = {
+  1: { mascot: "\uD83C\uDF5C", role: "architect", runId: "run-miso-001", feature: "Database Schema" },
+  2: { mascot: "\uD83C\uDF59", role: "coder", runId: "run-nori-001", feature: "Shopping Cart" },
+  3: { mascot: "\uD83C\uDF76", role: "reviewer", runId: "run-koji-001", feature: "Database Schema" },
+  4: { mascot: "\uD83C\uDF63", role: "tester", runId: "run-toro-001", feature: "User Authentication" },
+};
+
 const MOCK_LOGS: LogEntry[] = [
-  { id: "l1", timestamp: "14:23:01", agentIndex: 1, agentName: "Spark", message: "Starting feature analysis for Database Schema", level: "info" },
-  { id: "l2", timestamp: "14:23:03", agentIndex: 1, agentName: "Spark", message: "Reading app specification...", level: "info" },
-  { id: "l3", timestamp: "14:23:08", agentIndex: 2, agentName: "Fizz", message: "Claimed feature: Shopping Cart", level: "success" },
-  { id: "l4", timestamp: "14:23:12", agentIndex: 1, agentName: "Spark", message: "Creating SQLAlchemy models for 5 tables", level: "info" },
-  { id: "l5", timestamp: "14:23:15", agentIndex: 4, agentName: "Hoot", message: "Running test suite for User Authentication", level: "info" },
-  { id: "l6", timestamp: "14:23:18", agentIndex: 2, agentName: "Fizz", message: "Installing dependencies: zustand, @tanstack/react-query", level: "info" },
-  { id: "l7", timestamp: "14:23:22", agentIndex: 4, agentName: "Hoot", message: "WARNING: 2 tests flaky, retrying...", level: "warn" },
-  { id: "l8", timestamp: "14:23:25", agentIndex: 1, agentName: "Spark", message: "Database Schema marked as passing", level: "success" },
-  { id: "l9", timestamp: "14:23:28", agentIndex: 2, agentName: "Fizz", message: "Error: Cannot find module './CartContext'", level: "error" },
-  { id: "l10", timestamp: "14:23:30", agentIndex: 2, agentName: "Fizz", message: "Creating CartContext provider...", level: "info" },
-  { id: "l11", timestamp: "14:23:35", agentIndex: 4, agentName: "Hoot", message: "All 12 tests passing for User Authentication", level: "success" },
-  { id: "l12", timestamp: "14:23:38", agentIndex: 3, agentName: "Octo", message: "Reviewing code changes for Database Schema", level: "info" },
-  { id: "l13", timestamp: "14:23:42", agentIndex: 2, agentName: "Fizz", message: "Shopping Cart component compiled successfully", level: "info" },
-  { id: "l14", timestamp: "14:23:45", agentIndex: 3, agentName: "Octo", message: "Code review complete: 0 issues found", level: "success" },
-  { id: "l15", timestamp: "14:23:48", agentIndex: 2, agentName: "Fizz", message: "Running lint check...", level: "info" },
+  { id: "l1", timestamp: "14:23:01", agentIndex: 1, agentName: "Miso", message: "Starting feature analysis for Database Schema", level: "info" },
+  { id: "l2", timestamp: "14:23:03", agentIndex: 1, agentName: "Miso", message: "Reading app specification...", level: "info" },
+  { id: "l3", timestamp: "14:23:08", agentIndex: 2, agentName: "Nori", message: "Claimed feature: Shopping Cart", level: "success" },
+  { id: "l4", timestamp: "14:23:12", agentIndex: 1, agentName: "Miso", message: "Creating SQLAlchemy models for 5 tables", level: "info" },
+  { id: "l5", timestamp: "14:23:15", agentIndex: 4, agentName: "Toro", message: "Running test suite for User Authentication", level: "info" },
+  { id: "l6", timestamp: "14:23:18", agentIndex: 2, agentName: "Nori", message: "Installing dependencies: zustand, @tanstack/react-query", level: "info" },
+  { id: "l7", timestamp: "14:23:22", agentIndex: 4, agentName: "Toro", message: "WARNING: 2 tests flaky, retrying...", level: "warn" },
+  { id: "l8", timestamp: "14:23:25", agentIndex: 1, agentName: "Miso", message: "Database Schema marked as passing", level: "success" },
+  { id: "l9", timestamp: "14:23:28", agentIndex: 2, agentName: "Nori", message: "Error: Cannot find module './CartContext'", level: "error" },
+  { id: "l10", timestamp: "14:23:30", agentIndex: 2, agentName: "Nori", message: "Creating CartContext provider...", level: "info" },
+  { id: "l11", timestamp: "14:23:35", agentIndex: 4, agentName: "Toro", message: "All 12 tests passing for User Authentication", level: "success" },
+  { id: "l12", timestamp: "14:23:38", agentIndex: 3, agentName: "Koji", message: "Reviewing code changes for Database Schema", level: "info" },
+  { id: "l13", timestamp: "14:23:42", agentIndex: 2, agentName: "Nori", message: "Shopping Cart component compiled successfully", level: "info" },
+  { id: "l14", timestamp: "14:23:45", agentIndex: 3, agentName: "Koji", message: "Code review complete: 0 issues found", level: "success" },
+  { id: "l15", timestamp: "14:23:48", agentIndex: 2, agentName: "Nori", message: "Running lint check...", level: "info" },
 ];
 
 /** Agent filter options derived from mock data */
 const AGENT_FILTERS = [
   { index: 0, label: "All" },
-  { index: 1, label: "Spark" },
-  { index: 2, label: "Fizz" },
-  { index: 3, label: "Octo" },
-  { index: 4, label: "Hoot" },
+  { index: 1, label: "Miso" },
+  { index: 2, label: "Nori" },
+  { index: 3, label: "Koji" },
+  { index: 4, label: "Toro" },
 ];
 
 /** Maps log level to an Omakase text color for terminal display */
@@ -68,7 +92,7 @@ function agentColor(index: number): string {
   return colors[index] ?? "text-oma-text-subtle";
 }
 
-export function LogViewer() {
+export function LogViewer({ onOpenChat }: LogViewerProps) {
   const [activeFilter, setActiveFilter] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -83,6 +107,20 @@ export function LogViewer() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [filteredLogs.length, activeFilter]);
+
+  const handleAgentClick = (log: LogEntry) => {
+    if (!onOpenChat) return;
+    const meta = AGENT_META[log.agentIndex];
+    if (!meta) return;
+    onOpenChat({
+      runId: meta.runId,
+      agentName: log.agentName,
+      agentMascot: meta.mascot,
+      agentRole: meta.role,
+      featureName: meta.feature,
+      isActive: true,
+    });
+  };
 
   return (
     <div className="glass flex flex-col overflow-hidden rounded-oma-lg">
@@ -116,10 +154,13 @@ export function LogViewer() {
             {/* Timestamp */}
             <span className="shrink-0 text-oma-text-faint">{log.timestamp}</span>
 
-            {/* Agent tag */}
-            <span className={`shrink-0 font-bold ${agentColor(log.agentIndex)}`}>
+            {/* Agent tag — clickable to open chat */}
+            <button
+              onClick={() => handleAgentClick(log)}
+              className={`shrink-0 font-bold transition-opacity hover:opacity-80 ${agentColor(log.agentIndex)} ${onOpenChat ? "cursor-pointer underline-offset-2 hover:underline" : ""}`}
+            >
               [{log.agentName}]
-            </span>
+            </button>
 
             {/* Message */}
             <span className={levelColor(log.level)}>{log.message}</span>
