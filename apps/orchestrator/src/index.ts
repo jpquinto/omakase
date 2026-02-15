@@ -14,6 +14,7 @@
  *   DYNAMODB_TABLE_PREFIX   - DynamoDB table name prefix (default: "omakase-")
  *   GITHUB_TOKEN            - GitHub PAT for PR creation (optional)
  *   POLL_INTERVAL_MS        - Feature watcher poll interval in ms (default: 30000)
+ *   AUTO_DISPATCH           - Enable automatic pipeline dispatch (default: "true")
  *
  * ECS-only (when EXECUTION_MODE=ecs):
  *   ECS_CLUSTER             - ECS cluster name or ARN
@@ -116,6 +117,7 @@ const AWS_REGION = process.env["AWS_REGION"] ?? "us-east-1";
 const GITHUB_TOKEN = process.env["GITHUB_TOKEN"];
 const POLL_INTERVAL_MS = parseInt(process.env["POLL_INTERVAL_MS"] ?? "30000", 10);
 const LOCAL_WORKSPACE_ROOT = process.env["LOCAL_WORKSPACE_ROOT"] ?? "/tmp/omakase-agents";
+const AUTO_DISPATCH = (process.env["AUTO_DISPATCH"] ?? "true").toLowerCase() === "true";
 
 // ECS configuration -- only required when running in ECS mode
 const ECS_CLUSTER = EXECUTION_MODE === "ecs" ? requireEnv("ECS_CLUSTER") : "";
@@ -561,6 +563,14 @@ const app = new Elysia()
       return { error: `agentName must be one of: ${KNOWN_AGENTS.join(", ")}` };
     }
 
+    // Busy guard — reject if agent already has an active work session
+    const activeSessions = workSessionManager.listAllSessions();
+    const busySession = activeSessions.find((s) => s.agentName === agentName);
+    if (busySession) {
+      set.status = 409;
+      return { error: `Agent ${agentName} is currently busy with an active work session` };
+    }
+
     const feature = await getFeature({ featureId: params.featureId });
     if (!feature) {
       set.status = 404;
@@ -981,6 +991,12 @@ const app = new Elysia()
           controller.enqueue(encoder.encode(payload));
         };
 
+        // Immediately flush response headers with an SSE comment.
+        // Bun buffers headers until the first enqueue, so without this
+        // the client's EventSource never connects when there are no
+        // initial messages to send.
+        controller.enqueue(encoder.encode(": connected\n\n"));
+
         // Send initial batch of existing messages (thread-scoped or run-scoped)
         const initial = threadId
           ? await listMessagesByThread({ threadId, since: lastTimestamp || undefined })
@@ -1362,6 +1378,93 @@ const app = new Elysia()
       return { error: "File not found" };
     }
   })
+  // ---------------------------------------------------------------------------
+  // Agent status endpoints — MUST come before /api/agents/:agentName routes
+  // so "status" isn't matched as an agentName param.
+  // ---------------------------------------------------------------------------
+  .get("/api/agents/status", async () => {
+    const AGENT_NAMES = ["miso", "nori", "koji", "toro"] as const;
+    const allSessions = workSessionManager.listAllSessions();
+    const agents: Record<string, unknown> = {};
+
+    for (const name of AGENT_NAMES) {
+      const session = allSessions.find((s) => s.agentName === name);
+      if (session) {
+        // Try to get thread title for a more useful currentTask label
+        let currentTask = "Work session";
+        try {
+          const thread = await getThread({ agentName: name, threadId: session.threadId });
+          if (thread?.title) currentTask = thread.title;
+        } catch { /* fallback to generic label */ }
+        agents[name] = {
+          status: "working",
+          runId: session.runId,
+          threadId: session.threadId,
+          projectId: session.projectId,
+          startedAt: session.startedAt,
+          currentTask,
+        };
+      } else {
+        // Check most recent run for error state
+        const recentRuns = await listRunsByAgentName({ agentName: name, limit: 1 });
+        const lastRun = recentRuns[0];
+        if (lastRun && lastRun.status === "failed") {
+          agents[name] = {
+            status: "errored",
+            lastError: lastRun.errorMessage ?? "Unknown error",
+            lastRunId: lastRun.id,
+            erroredAt: lastRun.completedAt ?? lastRun.startedAt,
+          };
+        } else {
+          agents[name] = { status: "idle" };
+        }
+      }
+    }
+
+    return { agents };
+  })
+  .get("/api/agents/:agentName/status", async ({ params, set }) => {
+    const VALID_AGENTS = ["miso", "nori", "koji", "toro"];
+    const { agentName } = params;
+
+    if (!VALID_AGENTS.includes(agentName)) {
+      set.status = 404;
+      return { error: `Unknown agent: ${agentName}` };
+    }
+
+    const sessions = workSessionManager.listSessions(agentName);
+    const session = sessions[0];
+
+    if (session) {
+      let currentTask = "Work session";
+      try {
+        const thread = await getThread({ agentName, threadId: session.threadId });
+        if (thread?.title) currentTask = thread.title;
+      } catch { /* fallback */ }
+      return {
+        status: "working",
+        runId: session.runId,
+        threadId: session.threadId,
+        projectId: session.projectId,
+        startedAt: session.startedAt,
+        currentTask,
+      };
+    }
+
+    // Check most recent run for error state
+    const recentRuns = await listRunsByAgentName({ agentName, limit: 1 });
+    const lastRun = recentRuns[0];
+    if (lastRun && lastRun.status === "failed") {
+      return {
+        status: "errored",
+        lastError: lastRun.errorMessage ?? "Unknown error",
+        lastRunId: lastRun.id,
+        erroredAt: lastRun.completedAt ?? lastRun.startedAt,
+      };
+    }
+
+    return { status: "idle" };
+  })
   // Agent profile endpoints
   .get("/api/agents/:agentName/profile", async ({ params }) => {
     const personality = await getPersonality({ agentName: params.agentName });
@@ -1401,8 +1504,12 @@ if (EXECUTION_MODE === "ecs") {
 }
 console.log(`[orchestrator] Poll interval: ${POLL_INTERVAL_MS}ms`);
 
-// Start the feature watcher after the HTTP server is ready
-watcher.start();
+// Start the feature watcher after the HTTP server is ready (unless auto-dispatch is disabled)
+if (AUTO_DISPATCH) {
+  watcher.start();
+} else {
+  console.log("[orchestrator] Auto-dispatch disabled (AUTO_DISPATCH=false). Pipelines only run via manual assignment.");
+}
 
 console.log("[orchestrator] Orchestrator started successfully.");
 
