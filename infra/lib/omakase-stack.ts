@@ -13,7 +13,7 @@ import { Construct } from "constructs";
  *
  * Resources created:
  * - VPC with one public subnet (no NAT gateway)
- * - EC2 t3.micro instance with Elastic IP
+ * - EC2 t3.small instance with Elastic IP
  * - IAM instance profile (DynamoDB + Secrets Manager access)
  * - CloudWatch log groups
  * - DynamoDB tables (on-demand billing)
@@ -253,7 +253,7 @@ export class OmakaseStack extends cdk.Stack {
       vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
       instanceType: ec2.InstanceType.of(
         ec2.InstanceClass.T3,
-        ec2.InstanceSize.MICRO,
+        ec2.InstanceSize.SMALL,
       ),
       machineImage: ec2.MachineImage.latestAmazonLinux2023(),
       securityGroup: sg,
