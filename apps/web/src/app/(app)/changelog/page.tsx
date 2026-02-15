@@ -4,6 +4,23 @@ import { cn } from "@/lib/utils";
 
 const RELEASES = [
   {
+    version: "v0.0.8",
+    title: "Settings & Orchestrator Health",
+    changes: {
+      added: [
+        "Settings page with live orchestrator health status indicator",
+        "Orchestrator health polling hook (useOrchestratorHealth) with 15s interval",
+        "AUTO_DISPATCH environment variable to disable automatic pipeline dispatch",
+      ],
+      changed: [
+        "Upgraded EC2 instance from t3.small to t3.medium (4GB RAM) to support Claude Code CLI pipelines",
+      ],
+      fixed: [
+        "Orchestrator OOM crash caused by auto-dispatched Claude Code CLI processes exhausting 2GB RAM",
+      ],
+    },
+  },
+  {
     version: "v0.0.7",
     title: "Linear Workspace Integration",
     changes: {
