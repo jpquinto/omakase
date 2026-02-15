@@ -13,6 +13,8 @@ export {
   listProjects,
   listActiveProjects,
   updateProject,
+  clearGitHubConnection,
+  clearGitHubInstallation,
   deleteProject,
 } from "./projects.js";
 
@@ -25,6 +27,8 @@ export {
   getByLinearIssueId,
   getReadyFeatures,
   claimFeature,
+  markFeatureReviewReady,
+  transitionReviewReadyToPassing,
   markFeaturePassing,
   markFeatureFailing,
   markFeatureInProgress,

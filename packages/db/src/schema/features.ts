@@ -1,4 +1,4 @@
-export type FeatureStatus = "pending" | "in_progress" | "passing" | "failing";
+export type FeatureStatus = "pending" | "in_progress" | "review_ready" | "passing" | "failing";
 
 export interface Feature {
   id: string;

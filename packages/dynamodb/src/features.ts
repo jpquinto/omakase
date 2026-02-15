@@ -119,6 +119,36 @@ export async function claimFeature(params: {
   return null;
 }
 
+export async function markFeatureReviewReady(params: { featureId: string }): Promise<void> {
+  const now = new Date().toISOString();
+  await docClient.send(new UpdateCommand({
+    TableName: TABLE(),
+    Key: { id: params.featureId },
+    UpdateExpression: "SET #status = :status, updatedAt = :now REMOVE assignedAgentId",
+    ExpressionAttributeNames: { "#status": "status" },
+    ExpressionAttributeValues: {
+      ":status": "review_ready",
+      ":now": now,
+    },
+  }));
+}
+
+export async function transitionReviewReadyToPassing(params: { featureId: string }): Promise<void> {
+  const now = new Date().toISOString();
+  await docClient.send(new UpdateCommand({
+    TableName: TABLE(),
+    Key: { id: params.featureId },
+    UpdateExpression: "SET #status = :passing, completedAt = :now, updatedAt = :now",
+    ConditionExpression: "#status = :reviewReady",
+    ExpressionAttributeNames: { "#status": "status" },
+    ExpressionAttributeValues: {
+      ":passing": "passing",
+      ":reviewReady": "review_ready",
+      ":now": now,
+    },
+  }));
+}
+
 export async function markFeaturePassing(params: { featureId: string }): Promise<void> {
   const now = new Date().toISOString();
   await docClient.send(new UpdateCommand({
@@ -236,6 +266,7 @@ export async function getFeatureStats(params: { projectId: string }): Promise<{
   total: number;
   pending: number;
   inProgress: number;
+  reviewReady: number;
   passing: number;
   failing: number;
 }> {
@@ -244,6 +275,7 @@ export async function getFeatureStats(params: { projectId: string }): Promise<{
     total: features.length,
     pending: features.filter((f) => f.status === "pending").length,
     inProgress: features.filter((f) => f.status === "in_progress").length,
+    reviewReady: features.filter((f) => f.status === "review_ready").length,
     passing: features.filter((f) => f.status === "passing").length,
     failing: features.filter((f) => f.status === "failing").length,
   };

@@ -153,6 +153,7 @@ describe("Features", () => {
         total: 5,
         pending: 2,
         inProgress: 1,
+        reviewReady: 0,
         passing: 1,
         failing: 1,
       });
@@ -166,6 +167,7 @@ describe("Features", () => {
         total: 0,
         pending: 0,
         inProgress: 0,
+        reviewReady: 0,
         passing: 0,
         failing: 0,
       });

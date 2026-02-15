@@ -10,6 +10,10 @@ export interface Project {
   status: ProjectStatus;
   linearTeamId?: string;
   linearAccessToken?: string;
+  githubInstallationId?: number;
+  githubRepoOwner?: string;
+  githubRepoName?: string;
+  githubDefaultBranch?: string;
   maxConcurrency: number;
   createdAt: string;
   updatedAt: string;

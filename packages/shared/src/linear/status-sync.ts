@@ -85,7 +85,7 @@ export const ISSUE_DETAIL_QUERY = `
 // Types
 // -----------------------------------------------------------------------
 
-type FeatureStatus = "pending" | "in_progress" | "passing" | "failing";
+type FeatureStatus = "pending" | "in_progress" | "review_ready" | "passing" | "failing";
 
 interface SyncOptions {
   /** The Linear issue ID (UUID, not the human-readable identifier). */
@@ -140,6 +140,7 @@ const STATUS_TO_LINEAR_STATE: Record<
 > = {
   pending: { name: "Todo", fallbackType: "unstarted" },
   in_progress: { name: "In Progress", fallbackType: "started" },
+  review_ready: { name: "In Review", fallbackType: "started" },
   passing: { name: "Done", fallbackType: "completed" },
   failing: { name: "In Review", fallbackType: "started" },
 };

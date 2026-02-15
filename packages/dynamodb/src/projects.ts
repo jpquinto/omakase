@@ -62,6 +62,10 @@ export async function updateProject(params: {
   repoUrl?: string;
   linearTeamId?: string;
   linearAccessToken?: string;
+  githubInstallationId?: number;
+  githubRepoOwner?: string;
+  githubRepoName?: string;
+  githubDefaultBranch?: string;
   maxConcurrency?: number;
   members?: string[];
 }): Promise<void> {
@@ -101,6 +105,36 @@ export async function getByLinearTeamId(params: { linearTeamId: string }): Promi
     Limit: 1,
   }));
   return (result.Items?.[0] as Project) ?? null;
+}
+
+export async function clearGitHubConnection(params: { projectId: string }): Promise<void> {
+  await docClient.send(new UpdateCommand({
+    TableName: TABLE(),
+    Key: { id: params.projectId },
+    UpdateExpression: "SET updatedAt = :now REMOVE githubRepoOwner, githubRepoName, githubDefaultBranch, repoUrl",
+    ExpressionAttributeValues: { ":now": new Date().toISOString() },
+  }));
+}
+
+export async function clearGitHubInstallation(params: { installationId: number }): Promise<void> {
+  // Scan for all projects with this installation ID
+  const result = await docClient.send(new ScanCommand({
+    TableName: TABLE(),
+    FilterExpression: "githubInstallationId = :installationId",
+    ExpressionAttributeValues: { ":installationId": params.installationId },
+  }));
+
+  const projects = (result.Items ?? []) as Project[];
+  const now = new Date().toISOString();
+
+  for (const project of projects) {
+    await docClient.send(new UpdateCommand({
+      TableName: TABLE(),
+      Key: { id: project.id },
+      UpdateExpression: "SET updatedAt = :now REMOVE githubInstallationId, githubRepoOwner, githubRepoName, githubDefaultBranch, repoUrl",
+      ExpressionAttributeValues: { ":now": now },
+    }));
+  }
 }
 
 export async function deleteProject(params: { projectId: string }): Promise<void> {

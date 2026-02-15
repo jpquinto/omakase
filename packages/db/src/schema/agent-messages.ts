@@ -1,7 +1,7 @@
 import type { AgentRunRole } from "./agent-runs.js";
 
-export type AgentMessageSender = "user" | "agent";
-export type AgentMessageType = "message" | "status" | "error" | "quiz";
+export type AgentMessageSender = "user" | "agent" | "system";
+export type AgentMessageType = "message" | "status" | "error" | "quiz" | "pr_ready" | "pr_created";
 
 export type QuizPhase = "topic_prompt" | "question" | "answer_result" | "complete";
 
