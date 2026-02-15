@@ -11,7 +11,6 @@ import { cookies } from "next/headers";
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const installationId = searchParams.get("installation_id");
-  const setupAction = searchParams.get("setup_action");
   const state = searchParams.get("state");
 
   const cookieStore = await cookies();

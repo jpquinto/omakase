@@ -35,7 +35,7 @@ interface AgentChatPanelProps {
   initialThreadId?: string;
 }
 
-export function AgentChatPanel({ runId, agent, featureName, projectId, isActive, onClose, initialThreadId }: AgentChatPanelProps) {
+export function AgentChatPanel({ runId, agent, featureName: _featureName, projectId, isActive, onClose, initialThreadId }: AgentChatPanelProps) {
   const router = useRouter();
   const agentName = ROLE_TO_AGENT[agent.role] ?? agent.role;
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(initialThreadId ?? null);
@@ -45,7 +45,7 @@ export function AgentChatPanel({ runId, agent, featureName, projectId, isActive,
   const [pendingMode, setPendingMode] = useState<AgentThreadMode>("chat");
   const titleInputRef = useRef<HTMLInputElement>(null);
 
-  const { threads, createThread, updateThread, refetch: refetchThreads, hasMore, loadMore } = useAgentThreads(agentName, projectId);
+  const { threads, updateThread, refetch: refetchThreads, hasMore, loadMore } = useAgentThreads(agentName, projectId);
 
   // Resolve selected thread object early for mode detection
   const selectedThread = threads.find((t) => t.threadId === selectedThreadId);
@@ -98,8 +98,7 @@ export function AgentChatPanel({ runId, agent, featureName, projectId, isActive,
   useEffect(() => {
     prevStreamContentRef.current = "";
     voice.stopSpeaking();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedThreadId]);
+  }, [selectedThreadId]); // voice is stable ref
 
   const [input, setInput] = useState("");
   const [isScrolledUp, setIsScrolledUp] = useState(false);
@@ -446,7 +445,7 @@ function ConversationWelcome({
   palette,
   onSendMessage,
   isExiting,
-  canSend,
+  canSend: _canSend,
   mode,
   onModeChange,
 }: {

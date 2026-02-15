@@ -312,6 +312,35 @@ export function useDisconnectLinear() {
   }, []);
 }
 
+/** Trigger a bulk sync of Linear issues to project features. */
+export function useSyncLinear() {
+  return useCallback(
+    async (projectId: string) => {
+      return apiFetch<{ synced: number; created: number; updated: number }>(
+        `/api/projects/${projectId}/linear/sync`,
+        { method: "POST" },
+      );
+    },
+    [],
+  );
+}
+
+/** Assign a pending feature to a specific agent, triggering the pipeline. */
+export function useAssignFeature() {
+  return useCallback(
+    async (featureId: string, agentName: string) => {
+      return apiFetch<{ success: boolean; featureId: string; assignedTo: string }>(
+        `/api/features/${featureId}/assign`,
+        {
+          method: "POST",
+          body: JSON.stringify({ agentName }),
+        },
+      );
+    },
+    [],
+  );
+}
+
 /** Disconnect a project from its GitHub integration. */
 export function useDisconnectGitHub() {
   return useCallback(async (projectId: string) => {

@@ -33,6 +33,7 @@ export {
   markFeatureFailing,
   markFeatureInProgress,
   updateFromLinear,
+  bulkSyncFromLinear,
   updateFeature,
   deleteFeature,
   getFeatureStats,

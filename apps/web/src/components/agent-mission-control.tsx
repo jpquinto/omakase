@@ -144,7 +144,7 @@ export function AgentMissionControl({ onOpenChat, activeChatRunId }: AgentMissio
       </div>
 
       {/* Agent cards grid */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         {MOCK_AGENTS.map((agent) => {
           const isClickable = agent.status === "running" && !!agent.currentRunId && !!onOpenChat;
           const isChatOpen = activeChatRunId === agent.currentRunId;

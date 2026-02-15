@@ -186,7 +186,9 @@ export function CreateProjectWizard({
       <DialogContent
         showCloseButton={false}
         className={cn(
-          "glass-lg flex w-full max-w-lg flex-col overflow-hidden rounded-oma-lg border border-oma-glass-border bg-oma-bg-elevated p-0 shadow-oma-lg",
+          "glass-lg flex w-full flex-col overflow-hidden border border-oma-glass-border bg-oma-bg-elevated p-0 shadow-oma-lg",
+          // Mobile: full-screen, Desktop: centered modal
+          "h-[100dvh] max-w-none rounded-none md:h-auto md:max-w-lg md:rounded-oma-lg",
         )}
       >
         <DialogTitle className="sr-only">Create Project</DialogTitle>

@@ -1,56 +1,59 @@
 ## ADDED Requirements
 
-### Requirement: Convex project initialization
-The system SHALL have a Convex project configured with a schema defining tables for projects, features, agents, agent_runs, tickets, and users.
+### Requirement: Create feature from Linear issue
+The system SHALL provide a DynamoDB data-access function `createFromLinear` in `packages/dynamodb/src/features.ts` that creates a feature from Linear webhook data.
 
-#### Scenario: Schema defines all required tables
-- **WHEN** the Convex dev server starts
-- **THEN** the schema validates successfully with tables: projects, features, agents, agent_runs, tickets, users
+#### Scenario: Create feature with all Linear fields
+- **WHEN** `createFromLinear` is called with projectId, name, description, priority, linearIssueId, linearIssueUrl, and optional category
+- **THEN** a new feature item SHALL be inserted into the features table with status "pending", empty dependencies array, a generated ULID as `id`, ISO timestamps for `createdAt` and `updatedAt`, and all provided fields
 
-### Requirement: Project CRUD via Convex mutations
-The system SHALL support creating, reading, updating, and deleting projects through Convex mutations.
+#### Scenario: Duplicate linearIssueId is rejected
+- **WHEN** `createFromLinear` is called with a `linearIssueId` that already exists in the features table
+- **THEN** the function SHALL return the existing feature without creating a duplicate
 
-#### Scenario: Create a new project
-- **WHEN** a mutation `createProject` is called with name, description, and owner
-- **THEN** a new project document is inserted with status "active" and a generated ID
+### Requirement: Query feature by Linear issue ID
+The system SHALL provide a DynamoDB data-access function `getByLinearIssueId` in `packages/dynamodb/src/features.ts` that looks up a feature by its `linearIssueId` field.
 
-#### Scenario: List projects for authenticated user
-- **WHEN** a query `listProjects` is called with a user ID
-- **THEN** it returns all projects where the user is an owner or member
+#### Scenario: Feature exists with matching linearIssueId
+- **WHEN** `getByLinearIssueId` is called with a linearIssueId that matches a feature
+- **THEN** the full feature object SHALL be returned
 
-### Requirement: Feature management via Convex
-The system SHALL manage features (name, description, priority, category, status, dependencies, steps) through Convex queries and mutations, replacing the SQLite features.db.
+#### Scenario: No feature matches linearIssueId
+- **WHEN** `getByLinearIssueId` is called with a linearIssueId that does not match any feature
+- **THEN** `null` SHALL be returned
 
-#### Scenario: Create features in bulk
-- **WHEN** a mutation `createFeaturesBulk` is called with an array of feature definitions
-- **THEN** all features are inserted atomically with status "pending"
+### Requirement: Update feature from Linear issue
+The system SHALL provide a DynamoDB data-access function `updateFromLinear` in `packages/dynamodb/src/features.ts` that updates a feature's fields from Linear webhook data.
 
-#### Scenario: Claim next available feature
-- **WHEN** a mutation `claimFeature` is called by an agent
-- **THEN** the first feature with status "pending" and all dependencies met is atomically updated to "in_progress" with the agent's ID, and the feature data is returned
+#### Scenario: Update name, description, and priority
+- **WHEN** `updateFromLinear` is called with featureId, name, description, and priority
+- **THEN** the feature item SHALL be updated with the new values via an UpdateCommand and `updatedAt` SHALL be refreshed to the current ISO timestamp
 
-#### Scenario: Mark feature as passing
-- **WHEN** a mutation `markFeaturePassing` is called with a feature ID
-- **THEN** the feature status is updated to "passing" and a timestamp is recorded
+#### Scenario: Feature not found
+- **WHEN** `updateFromLinear` is called with a featureId that does not exist
+- **THEN** the UpdateCommand SHALL execute without error (DynamoDB UpdateCommand does not throw on missing keys by default)
 
-### Requirement: Real-time data subscriptions
-The system SHALL provide reactive queries that automatically push updates to all connected clients when data changes.
+### Requirement: Query project by Linear team ID
+The system SHALL provide a DynamoDB data-access function `getByLinearTeamId` in `packages/dynamodb/src/projects.ts` that looks up a project by its `linearTeamId` field.
 
-#### Scenario: Feature status change propagates to dashboard
-- **WHEN** an agent marks a feature as "passing" via mutation
-- **THEN** all clients subscribed to that project's features query receive the updated feature within 1 second
+#### Scenario: Project exists with matching linearTeamId
+- **WHEN** `getByLinearTeamId` is called with a linearTeamId that matches a project
+- **THEN** the full project object SHALL be returned
 
-#### Scenario: Agent status updates propagate in real-time
-- **WHEN** an agent's run status changes (started, thinking, coding, testing, completed, failed)
-- **THEN** all subscribed dashboard clients reflect the new status without polling
+#### Scenario: No project matches linearTeamId
+- **WHEN** `getByLinearTeamId` is called with a linearTeamId that does not match any project
+- **THEN** `null` SHALL be returned
 
-### Requirement: Dependency graph storage
-The system SHALL store feature dependencies as references between feature documents with cycle detection on write.
+### Requirement: Store Linear access token on project
+The system SHALL use the existing `updateProject` function in `packages/dynamodb/src/projects.ts` to store a Linear OAuth access token and team ID on a project record.
 
-#### Scenario: Add valid dependency
-- **WHEN** a mutation `addDependency` is called linking feature A → feature B
-- **THEN** the dependency is stored and feature A's `blockedBy` list includes feature B
+#### Scenario: Store token and team ID
+- **WHEN** `updateProject` is called with projectId, linearAccessToken, and linearTeamId
+- **THEN** the project item SHALL be updated with the token, team ID, and `updatedAt` refreshed
 
-#### Scenario: Reject circular dependency
-- **WHEN** a mutation `addDependency` would create a cycle (A→B→C→A)
-- **THEN** the mutation throws an error and no dependency is created
+### Requirement: Export new functions from DynamoDB package
+The system SHALL export `createFromLinear`, `getByLinearIssueId`, `updateFromLinear`, and `getByLinearTeamId` from `packages/dynamodb/src/index.ts`.
+
+#### Scenario: Functions are importable
+- **WHEN** a consumer imports from `@omakase/dynamodb`
+- **THEN** `createFromLinear`, `getByLinearIssueId`, `updateFromLinear`, and `getByLinearTeamId` SHALL be available as named exports

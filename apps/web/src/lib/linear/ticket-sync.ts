@@ -62,6 +62,7 @@ export interface LinearIssueEvent {
   team?: LinearTeam;
   assignee?: LinearUser;
   labels: LinearLabel[];
+  projectId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -191,6 +192,11 @@ export async function handleIssueCreated(
     return;
   }
 
+  // If the project is scoped to a specific Linear project, skip issues from other projects
+  if (project.linearProjectId && event.projectId && event.projectId !== project.linearProjectId) {
+    return;
+  }
+
   const labelNames = event.labels.map((l) => l.name);
   const category = labelNames
     .filter((l) => l.toLowerCase() !== TRIGGER_LABEL.toLowerCase())
@@ -206,6 +212,9 @@ export async function handleIssueCreated(
       category,
       linearIssueId: event.identifier,
       linearIssueUrl: event.url,
+      linearStateName: event.state?.name,
+      linearLabels: event.labels.map((l) => l.name),
+      linearAssigneeName: event.assignee?.name,
     }),
   });
 
@@ -249,6 +258,9 @@ export async function handleIssueUpdated(
       name: event.title,
       description: event.description ?? "",
       priority: mapLinearPriority(event.priority),
+      linearStateName: event.state?.name,
+      linearLabels: event.labels.map((l) => l.name),
+      linearAssigneeName: event.assignee?.name,
     }),
   });
 

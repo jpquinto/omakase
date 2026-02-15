@@ -9,15 +9,18 @@
  * Environment variables:
  *   PORT                    - HTTP server port (default: 8080)
  *   EXECUTION_MODE          - "ecs" for Fargate tasks, "local" for subprocesses (default: "ecs")
- *   ECS_CLUSTER             - ECS cluster name or ARN (required when EXECUTION_MODE=ecs)
- *   ECS_TASK_DEFINITION     - ECS task definition family or ARN (required when EXECUTION_MODE=ecs)
- *   ECS_SUBNETS             - Comma-separated VPC subnet IDs (required when EXECUTION_MODE=ecs)
- *   ECS_SECURITY_GROUP      - Security group ID for Fargate tasks (required when EXECUTION_MODE=ecs)
- *   ECS_CONTAINER_NAME      - Container name in the task definition (default: "agent")
- *   AWS_REGION              - AWS region for ECS client (default: "us-east-1")
+ *   AWS_REGION              - AWS region (default: "us-east-1")
  *   LOCAL_WORKSPACE_ROOT    - Root dir for local agent workspaces (default: "/tmp/omakase-agents")
+ *   DYNAMODB_TABLE_PREFIX   - DynamoDB table name prefix (default: "omakase-")
  *   GITHUB_TOKEN            - GitHub PAT for PR creation (optional)
  *   POLL_INTERVAL_MS        - Feature watcher poll interval in ms (default: 30000)
+ *
+ * ECS-only (when EXECUTION_MODE=ecs):
+ *   ECS_CLUSTER             - ECS cluster name or ARN
+ *   ECS_TASK_DEFINITION     - ECS task definition family or ARN
+ *   ECS_SUBNETS             - Comma-separated VPC subnet IDs
+ *   ECS_SECURITY_GROUP      - Security group ID for Fargate tasks
+ *   ECS_CONTAINER_NAME      - Container name in the task definition (default: "agent")
  */
 
 import { Elysia } from "elysia";
@@ -41,10 +44,12 @@ import {
   createFeaturesBulk,
   getByLinearIssueId,
   updateFromLinear,
+  bulkSyncFromLinear,
   updateFeature,
   deleteFeature,
   getByLinearTeamId,
   updateProject,
+  markFeatureInProgress,
   clearGitHubConnection,
   clearGitHubInstallation,
   transitionReviewReadyToPassing,
@@ -72,7 +77,8 @@ import {
 import type { AgentMessageSender, AgentMessageType, AgentRunRole, AgentThreadMode, AgentThreadStatus, QuizMetadata } from "@omakase/db";
 
 import { FeatureWatcher, type FeatureWatcherConfig } from "./feature-watcher.js";
-import type { EcsConfig, ExecutionMode } from "./pipeline.js";
+import { AgentPipeline, type EcsConfig, type ExecutionMode } from "./pipeline.js";
+import { fetchAllTeamIssues } from "@omakase/shared";
 import { generateAgentResponse } from "./agent-responder.js";
 import { handleQuizMessage } from "./quiz-handler.js";
 import { subscribe } from "./stream-bus.js";
@@ -210,7 +216,7 @@ const app = new Elysia()
   })
   // Linear integration endpoints
   .post("/api/features/from-linear", async ({ body }) => {
-    const { projectId, name, description, priority, category, linearIssueId, linearIssueUrl } = body as {
+    const { projectId, name, description, priority, category, linearIssueId, linearIssueUrl, linearStateName, linearLabels, linearAssigneeName } = body as {
       projectId: string;
       name: string;
       description?: string;
@@ -218,8 +224,11 @@ const app = new Elysia()
       category?: string;
       linearIssueId: string;
       linearIssueUrl: string;
+      linearStateName?: string;
+      linearLabels?: string[];
+      linearAssigneeName?: string;
     };
-    return await createFromLinear({ projectId, name, description, priority, category, linearIssueId, linearIssueUrl });
+    return await createFromLinear({ projectId, name, description, priority, category, linearIssueId, linearIssueUrl, linearStateName, linearLabels, linearAssigneeName });
   })
   .get("/api/features/by-linear-issue/:linearIssueId", async ({ params }) => {
     const feature = await getByLinearIssueId({ linearIssueId: params.linearIssueId });
@@ -229,12 +238,15 @@ const app = new Elysia()
     return feature;
   })
   .patch("/api/features/:featureId/from-linear", async ({ params, body }) => {
-    const { name, description, priority } = body as {
+    const { name, description, priority, linearStateName, linearLabels, linearAssigneeName } = body as {
       name: string;
       description?: string;
       priority: number;
+      linearStateName?: string;
+      linearLabels?: string[];
+      linearAssigneeName?: string;
     };
-    await updateFromLinear({ featureId: params.featureId, name, description, priority });
+    await updateFromLinear({ featureId: params.featureId, name, description, priority, linearStateName, linearLabels, linearAssigneeName });
     return { success: true };
   })
   .post("/api/projects/:projectId/linear-token", async ({ params, body }) => {
@@ -243,6 +255,14 @@ const app = new Elysia()
       linearTeamId: string;
     };
     await updateProject({ projectId: params.projectId, linearAccessToken, linearTeamId });
+    return { success: true };
+  })
+  .patch("/api/projects/:projectId/linear/project", async ({ params, body }) => {
+    const { linearProjectId, linearProjectName } = body as {
+      linearProjectId: string;
+      linearProjectName: string;
+    };
+    await updateProject({ projectId: params.projectId, linearProjectId, linearProjectName });
     return { success: true };
   })
   .get("/api/projects/by-linear-team/:teamId", async ({ params }) => {
@@ -380,9 +400,155 @@ const app = new Elysia()
     await removeDependency({ featureId: params.featureId, dependsOnId: params.dependsOnId });
     return { success: true };
   })
+  // Linear sync endpoint — bulk fetch and upsert from Linear
+  .post("/api/projects/:projectId/linear/sync", async ({ params, set }) => {
+    const project = await getProject({ projectId: params.projectId });
+    if (!project) {
+      set.status = 404;
+      return { error: "Project not found" };
+    }
+    if (!project.linearAccessToken || !project.linearTeamId) {
+      set.status = 400;
+      return { error: "Project is not connected to Linear" };
+    }
+
+    try {
+      const issues = await fetchAllTeamIssues({
+        accessToken: project.linearAccessToken,
+        teamId: project.linearTeamId,
+        label: "omakase",
+        projectId: project.linearProjectId,
+      });
+
+      const mapped = issues.map((issue) => ({
+        linearIssueId: issue.id,
+        linearIssueUrl: issue.url,
+        name: issue.title,
+        description: issue.description ?? undefined,
+        priority: issue.priority,
+        category: issue.labels.nodes
+          .filter((l) => l.name.toLowerCase() !== "omakase")
+          .map((l) => l.name)
+          .join(", ") || undefined,
+        linearStateName: issue.state.name,
+        linearLabels: issue.labels.nodes.map((l) => l.name),
+        linearAssigneeName: issue.assignee?.name ?? undefined,
+      }));
+
+      const result = await bulkSyncFromLinear({
+        projectId: params.projectId,
+        issues: mapped,
+      });
+
+      return { synced: mapped.length, created: result.created, updated: result.updated };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes("401") || message.includes("Unauthorized")) {
+        set.status = 401;
+        return { error: "Linear access token is expired or revoked. Please reconnect Linear." };
+      }
+      set.status = 500;
+      return { error: `Sync failed: ${message}` };
+    }
+  })
+  // Feature assignment endpoint — manually assign a feature to an agent
+  .post("/api/features/:featureId/assign", async ({ params, body, set }) => {
+    const { agentName } = body as { agentName: string };
+    const KNOWN_AGENTS = ["miso", "nori", "koji", "toro"];
+    if (!agentName || !KNOWN_AGENTS.includes(agentName)) {
+      set.status = 400;
+      return { error: `agentName must be one of: ${KNOWN_AGENTS.join(", ")}` };
+    }
+
+    const feature = await getFeature({ featureId: params.featureId });
+    if (!feature) {
+      set.status = 404;
+      return { error: "Feature not found" };
+    }
+    if (feature.status !== "pending") {
+      set.status = 409;
+      return { error: `Feature must be in "pending" status to assign (current: "${feature.status}")` };
+    }
+
+    const project = await getProject({ projectId: feature.projectId });
+    if (!project) {
+      set.status = 404;
+      return { error: "Project not found" };
+    }
+    if (!project.repoUrl) {
+      set.status = 400;
+      return { error: "Project has no repository configured" };
+    }
+
+    // Check concurrency
+    const activeAgents = await listActiveAgents({ projectId: project.id });
+    if (activeAgents.length >= project.maxConcurrency) {
+      set.status = 429;
+      return { error: `Concurrency limit reached (${activeAgents.length}/${project.maxConcurrency} active pipelines)` };
+    }
+
+    // Claim the feature
+    try {
+      await markFeatureInProgress({ featureId: feature.id, agentId: agentName });
+    } catch (err) {
+      const errObj = err as { name?: string };
+      if (errObj.name === "ConditionalCheckFailedException") {
+        set.status = 409;
+        return { error: "Feature was already claimed by another process" };
+      }
+      throw err;
+    }
+
+    // Build pipeline config and launch
+    const repoOwner = project.githubRepoOwner ?? "";
+    const repoName = project.githubRepoName ?? "";
+
+    let githubToken = GITHUB_TOKEN ?? "";
+    if (project.githubInstallationId && isGitHubAppConfigured()) {
+      try {
+        githubToken = await getInstallationToken(project.githubInstallationId);
+      } catch {
+        // Fall through to GITHUB_TOKEN
+      }
+    }
+
+    const pipelineConfig: import("./pipeline.js").PipelineConfig = {
+      featureId: feature.id,
+      projectId: project.id,
+      featureName: feature.name,
+      featureDescription: feature.description ?? "",
+      repoUrl: project.repoUrl,
+      repoOwner,
+      repoName,
+      githubToken,
+      baseBranch: project.githubDefaultBranch,
+      linearIssueId: feature.linearIssueId,
+      linearIssueUrl: feature.linearIssueUrl,
+      linearAccessToken: project.linearAccessToken,
+      githubInstallationId: project.githubInstallationId,
+      executionMode: EXECUTION_MODE,
+      localWorkspaceRoot: EXECUTION_MODE === "local" ? LOCAL_WORKSPACE_ROOT : undefined,
+    };
+
+    const pipeline = new AgentPipeline(pipelineConfig, ecsConfig, ecsClient);
+
+    // Fire and forget
+    pipeline.execute().then((result) => {
+      if (result.success) {
+        console.log(`[orchestrator] Manual pipeline succeeded for feature ${feature.id}`);
+      } else {
+        console.error(`[orchestrator] Manual pipeline failed for feature ${feature.id}: ${result.errorMessage}`);
+      }
+    }).catch((err) => {
+      console.error(`[orchestrator] Manual pipeline error for feature ${feature.id}:`, err);
+    });
+
+    set.status = 202;
+    return { success: true, featureId: feature.id, assignedTo: agentName };
+  })
   // Linear disconnect endpoint
   .delete("/api/projects/:projectId/linear-token", async ({ params }) => {
-    await updateProject({ projectId: params.projectId, linearAccessToken: "", linearTeamId: "" });
+    await updateProject({ projectId: params.projectId, linearAccessToken: "", linearTeamId: "", linearProjectId: "", linearProjectName: "" });
     return { success: true };
   })
   // GitHub App integration endpoints

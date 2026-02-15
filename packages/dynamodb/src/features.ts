@@ -203,6 +203,9 @@ export async function createFromLinear(params: {
   category?: string;
   linearIssueId: string;
   linearIssueUrl: string;
+  linearStateName?: string;
+  linearLabels?: string[];
+  linearAssigneeName?: string;
 }): Promise<Feature> {
   // Check for duplicate linearIssueId
   const existing = await getByLinearIssueId({ linearIssueId: params.linearIssueId });
@@ -222,6 +225,9 @@ export async function createFromLinear(params: {
     dependencies: [],
     linearIssueId: params.linearIssueId,
     linearIssueUrl: params.linearIssueUrl,
+    linearStateName: params.linearStateName,
+    linearLabels: params.linearLabels,
+    linearAssigneeName: params.linearAssigneeName,
     createdAt: now,
     updatedAt: now,
   };
@@ -246,20 +252,94 @@ export async function updateFromLinear(params: {
   name: string;
   description?: string;
   priority: number;
+  linearStateName?: string;
+  linearLabels?: string[];
+  linearAssigneeName?: string;
 }): Promise<void> {
   const now = new Date().toISOString();
+  const updates = [
+    "#name = :name",
+    "description = :description",
+    "priority = :priority",
+    "updatedAt = :now",
+  ];
+  const values: Record<string, unknown> = {
+    ":name": params.name,
+    ":description": params.description,
+    ":priority": params.priority,
+    ":now": now,
+  };
+
+  if (params.linearStateName !== undefined) {
+    updates.push("linearStateName = :linearStateName");
+    values[":linearStateName"] = params.linearStateName;
+  }
+  if (params.linearLabels !== undefined) {
+    updates.push("linearLabels = :linearLabels");
+    values[":linearLabels"] = params.linearLabels;
+  }
+  if (params.linearAssigneeName !== undefined) {
+    updates.push("linearAssigneeName = :linearAssigneeName");
+    values[":linearAssigneeName"] = params.linearAssigneeName;
+  }
+
   await docClient.send(new UpdateCommand({
     TableName: TABLE(),
     Key: { id: params.featureId },
-    UpdateExpression: "SET #name = :name, description = :description, priority = :priority, updatedAt = :now",
+    UpdateExpression: `SET ${updates.join(", ")}`,
     ExpressionAttributeNames: { "#name": "name" },
-    ExpressionAttributeValues: {
-      ":name": params.name,
-      ":description": params.description,
-      ":priority": params.priority,
-      ":now": now,
-    },
+    ExpressionAttributeValues: values,
   }));
+}
+
+export async function bulkSyncFromLinear(params: {
+  projectId: string;
+  issues: Array<{
+    linearIssueId: string;
+    linearIssueUrl: string;
+    name: string;
+    description?: string;
+    priority: number;
+    category?: string;
+    linearStateName?: string;
+    linearLabels?: string[];
+    linearAssigneeName?: string;
+  }>;
+}): Promise<{ created: number; updated: number }> {
+  let created = 0;
+  let updated = 0;
+
+  for (const issue of params.issues) {
+    const existing = await getByLinearIssueId({ linearIssueId: issue.linearIssueId });
+    if (existing) {
+      await updateFromLinear({
+        featureId: existing.id,
+        name: issue.name,
+        description: issue.description,
+        priority: issue.priority,
+        linearStateName: issue.linearStateName,
+        linearLabels: issue.linearLabels,
+        linearAssigneeName: issue.linearAssigneeName,
+      });
+      updated++;
+    } else {
+      await createFromLinear({
+        projectId: params.projectId,
+        name: issue.name,
+        description: issue.description,
+        priority: issue.priority,
+        category: issue.category,
+        linearIssueId: issue.linearIssueId,
+        linearIssueUrl: issue.linearIssueUrl,
+        linearStateName: issue.linearStateName,
+        linearLabels: issue.linearLabels,
+        linearAssigneeName: issue.linearAssigneeName,
+      });
+      created++;
+    }
+  }
+
+  return { created, updated };
 }
 
 export async function getFeatureStats(params: { projectId: string }): Promise<{

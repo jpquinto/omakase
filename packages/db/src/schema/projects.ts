@@ -10,6 +10,8 @@ export interface Project {
   status: ProjectStatus;
   linearTeamId?: string;
   linearAccessToken?: string;
+  linearProjectId?: string;
+  linearProjectName?: string;
   githubInstallationId?: number;
   githubRepoOwner?: string;
   githubRepoName?: string;

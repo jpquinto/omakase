@@ -18,7 +18,7 @@
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::211125619133:role/cdk-hnb659fds-deploy-role-211125619133-us-west-2",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::211125619133:role/cdk-hnb659fds-cfn-exec-role-211125619133-us-west-2",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-211125619133-us-west-2/07e0d6ec85953c1bbac649155b91afa4ad2722ce8cb4d866aadb322d96faf7f6.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-211125619133-us-west-2/45c1dfc38674f0c70fac3a899399673364b06942944cdcd8ea7bb3ba8a58204c.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
         "additionalDependencies": [
@@ -64,90 +64,6 @@
             "data": "OmakaseVpcPublicSubnet1DefaultRouteEFAA9636"
           }
         ],
-        "/OmakaseStack/OmakaseVpc/PublicSubnet1/EIP": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "OmakaseVpcPublicSubnet1EIPA5994174"
-          }
-        ],
-        "/OmakaseStack/OmakaseVpc/PublicSubnet1/NATGateway": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "OmakaseVpcPublicSubnet1NATGatewayFB8599BD"
-          }
-        ],
-        "/OmakaseStack/OmakaseVpc/PublicSubnet2/Subnet": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "OmakaseVpcPublicSubnet2SubnetCE2050C9"
-          }
-        ],
-        "/OmakaseStack/OmakaseVpc/PublicSubnet2/RouteTable": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "OmakaseVpcPublicSubnet2RouteTable01C32516"
-          }
-        ],
-        "/OmakaseStack/OmakaseVpc/PublicSubnet2/RouteTableAssociation": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "OmakaseVpcPublicSubnet2RouteTableAssociationC952E2B4"
-          }
-        ],
-        "/OmakaseStack/OmakaseVpc/PublicSubnet2/DefaultRoute": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "OmakaseVpcPublicSubnet2DefaultRouteB3750B64"
-          }
-        ],
-        "/OmakaseStack/OmakaseVpc/PrivateSubnet1/Subnet": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "OmakaseVpcPrivateSubnet1Subnet25DFCEB3"
-          }
-        ],
-        "/OmakaseStack/OmakaseVpc/PrivateSubnet1/RouteTable": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "OmakaseVpcPrivateSubnet1RouteTableFF9AE15F"
-          }
-        ],
-        "/OmakaseStack/OmakaseVpc/PrivateSubnet1/RouteTableAssociation": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "OmakaseVpcPrivateSubnet1RouteTableAssociation6371BF75"
-          }
-        ],
-        "/OmakaseStack/OmakaseVpc/PrivateSubnet1/DefaultRoute": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "OmakaseVpcPrivateSubnet1DefaultRouteABC8B634"
-          }
-        ],
-        "/OmakaseStack/OmakaseVpc/PrivateSubnet2/Subnet": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "OmakaseVpcPrivateSubnet2Subnet9DA0E8D9"
-          }
-        ],
-        "/OmakaseStack/OmakaseVpc/PrivateSubnet2/RouteTable": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "OmakaseVpcPrivateSubnet2RouteTableDFA827CF"
-          }
-        ],
-        "/OmakaseStack/OmakaseVpc/PrivateSubnet2/RouteTableAssociation": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "OmakaseVpcPrivateSubnet2RouteTableAssociationC595D2A5"
-          }
-        ],
-        "/OmakaseStack/OmakaseVpc/PrivateSubnet2/DefaultRoute": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "OmakaseVpcPrivateSubnet2DefaultRoute610F7A77"
-          }
-        ],
         "/OmakaseStack/OmakaseVpc/IGW": [
           {
             "type": "aws:cdk:logicalId",
@@ -160,10 +76,10 @@
             "data": "OmakaseVpcVPCGW898E8D5E"
           }
         ],
-        "/OmakaseStack/OmakaseCluster/Resource": [
+        "/OmakaseStack/OrchestratorSG/Resource": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "OmakaseCluster6CE503A9"
+            "data": "OrchestratorSG6CDCE819"
           }
         ],
         "/OmakaseStack/OrchestratorLogGroup/Resource": [
@@ -172,270 +88,76 @@
             "data": "OrchestratorLogGroupE3FD5A7F"
           }
         ],
-        "/OmakaseStack/AgentsLogGroup/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "AgentsLogGroup0DE3C993"
-          }
-        ],
-        "/OmakaseStack/AlbSecurityGroup/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "AlbSecurityGroup86A59E99"
-          }
-        ],
-        "/OmakaseStack/EcsSecurityGroup/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "EcsSecurityGroup44008BF1"
-          }
-        ],
-        "/OmakaseStack/EcsSecurityGroup/from OmakaseStackAlbSecurityGroup20096CE2:8080": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "EcsSecurityGroupfromOmakaseStackAlbSecurityGroup20096CE28080940F603F"
-          }
-        ],
-        "/OmakaseStack/OmakaseAlb/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "OmakaseAlb004B1FCD"
-          }
-        ],
-        "/OmakaseStack/OmakaseAlb/HttpListener/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "OmakaseAlbHttpListener955F0364"
-          }
-        ],
-        "/OmakaseStack/OmakaseAlb/HttpListener/OrchestratorTargetGroup/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "OmakaseAlbHttpListenerOrchestratorTargetGroup273E21E2"
-          }
-        ],
-        "/OmakaseStack/AgentRepository/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "AgentRepositoryCEF64969"
-          }
-        ],
         "/OmakaseStack/ApiKeysSecret/Resource": [
           {
             "type": "aws:cdk:logicalId",
             "data": "ApiKeysSecret5A58C5CD"
           }
         ],
-        "/OmakaseStack/TaskExecutionRole/Resource": [
+        "/OmakaseStack/OrchestratorRole/Resource": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "TaskExecutionRole250D2532"
+            "data": "OrchestratorRole4C17C129"
           }
         ],
-        "/OmakaseStack/TaskExecutionRole/DefaultPolicy/Resource": [
+        "/OmakaseStack/OrchestratorRole/DefaultPolicy/Resource": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "TaskExecutionRoleDefaultPolicyA84DD1B0"
+            "data": "OrchestratorRoleDefaultPolicy95E3A3CA"
           }
         ],
-        "/OmakaseStack/OrchestratorTaskRole/Resource": [
+        "/OmakaseStack/Orchestrator/InstanceProfile": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "OrchestratorTaskRole4A62488A"
+            "data": "OrchestratorInstanceProfile81CC666C"
           }
         ],
-        "/OmakaseStack/OrchestratorTaskRole/DefaultPolicy/Resource": [
+        "/OmakaseStack/Orchestrator/Resource": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "OrchestratorTaskRoleDefaultPolicy4E83994D"
+            "data": "Orchestrator6EF1216F"
           }
         ],
-        "/OmakaseStack/AgentTaskRole/Resource": [
+        "/OmakaseStack/SsmParameterValue:--aws--service--ami-amazon-linux-latest--al2023-ami-kernel-6.1-x86_64:C96584B6-F00A-464E-AD19-53AFF4B05118.Parameter": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "AgentTaskRoleAB8558E5"
+            "data": "SsmParameterValueawsserviceamiamazonlinuxlatestal2023amikernel61x8664C96584B6F00A464EAD1953AFF4B05118Parameter"
           }
         ],
-        "/OmakaseStack/AgentTaskRole/DefaultPolicy/Resource": [
+        "/OmakaseStack/OrchestratorEIP": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "AgentTaskRoleDefaultPolicyD9D35507"
+            "data": "OrchestratorEIP"
           }
         ],
-        "/OmakaseStack/OrchestratorTaskDef/Resource": [
+        "/OmakaseStack/EIPAssociation": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "OrchestratorTaskDef2BBFA66F"
+            "data": "EIPAssociation"
           }
         ],
-        "/OmakaseStack/OrchestratorService": [
-          {
-            "type": "aws:cdk:warning",
-            "data": "minHealthyPercent has not been configured so the default value of 50% is used. The number of running tasks will decrease below the desired count during deployments etc. See https://github.com/aws/aws-cdk/issues/31705 [ack: @aws-cdk/aws-ecs:minHealthyPercent]",
-            "trace": [
-              "Annotations.addMessage (/Users/turinglabs/Desktop/omakase/omakase/infra/node_modules/aws-cdk-lib/core/lib/annotations.js:1:2066)",
-              "Annotations.addWarningV2 (/Users/turinglabs/Desktop/omakase/omakase/infra/node_modules/aws-cdk-lib/core/lib/annotations.js:1:984)",
-              "new BaseService2 (/Users/turinglabs/Desktop/omakase/omakase/infra/node_modules/aws-cdk-lib/aws-ecs/lib/base/base-service.js:1:12364)",
-              "new FargateService2 (/Users/turinglabs/Desktop/omakase/omakase/infra/node_modules/aws-cdk-lib/aws-ecs/lib/fargate/fargate-service.js:1:6371)",
-              "new FargateService2 (/Users/turinglabs/Desktop/omakase/omakase/infra/node_modules/aws-cdk-lib/core/lib/prop-injectable.js:1:681)",
-              "new OmakaseStack (/Users/turinglabs/Desktop/omakase/omakase/infra/lib/omakase-stack.ts:305:33)",
-              "Object.<anonymous> (/Users/turinglabs/Desktop/omakase/omakase/infra/lib/app.ts:7:1)",
-              "Module._compile (node:internal/modules/cjs/loader:1761:14)",
-              "Module.m._compile (/Users/turinglabs/.npm/_npx/1bf7c3c15bf47d04/node_modules/ts-node/src/index.ts:1618:23)",
-              "node:internal/modules/cjs/loader:1893:10",
-              "Object.require.extensions.<computed> [as .ts] (/Users/turinglabs/.npm/_npx/1bf7c3c15bf47d04/node_modules/ts-node/src/index.ts:1621:12)",
-              "Module.load (node:internal/modules/cjs/loader:1481:32)",
-              "Module._load (node:internal/modules/cjs/loader:1300:12)",
-              "TracingChannel.traceSync (node:diagnostics_channel:328:14)",
-              "wrapModuleLoad (node:internal/modules/cjs/loader:245:24)",
-              "Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)",
-              "phase4 (/Users/turinglabs/.npm/_npx/1bf7c3c15bf47d04/node_modules/ts-node/src/bin.ts:649:14)",
-              "bootstrap (/Users/turinglabs/.npm/_npx/1bf7c3c15bf47d04/node_modules/ts-node/src/bin.ts:95:10)",
-              "main (/Users/turinglabs/.npm/_npx/1bf7c3c15bf47d04/node_modules/ts-node/src/bin.ts:55:10)",
-              "Object.<anonymous> (/Users/turinglabs/.npm/_npx/1bf7c3c15bf47d04/node_modules/ts-node/src/bin.ts:800:3)",
-              "Module._compile (node:internal/modules/cjs/loader:1761:14)",
-              "Object.<anonymous> (node:internal/modules/cjs/loader:1893:10)",
-              "Module.load (node:internal/modules/cjs/loader:1481:32)",
-              "Module._load (node:internal/modules/cjs/loader:1300:12)",
-              "TracingChannel.traceSync (node:diagnostics_channel:328:14)",
-              "wrapModuleLoad (node:internal/modules/cjs/loader:245:24)",
-              "Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)",
-              "node:internal/main/run_main_module:33:47"
-            ]
-          }
-        ],
-        "/OmakaseStack/OrchestratorService/Service": [
+        "/OmakaseStack/InstanceId": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "OrchestratorService5871F41E"
+            "data": "InstanceId"
           }
         ],
-        "/OmakaseStack/AgentTaskDef/Resource": [
+        "/OmakaseStack/ElasticIp": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "AgentTaskDef41623489"
+            "data": "ElasticIp"
           }
         ],
-        "/OmakaseStack/UsersTable": [
-          {
-            "type": "aws:cdk:hasPhysicalName",
-            "data": {
-              "Ref": "UsersTable9725E9C8"
-            }
-          }
-        ],
-        "/OmakaseStack/UsersTable/Resource": [
+        "/OmakaseStack/OrchestratorUrl": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "UsersTable9725E9C8"
+            "data": "OrchestratorUrl"
           }
         ],
-        "/OmakaseStack/ProjectsTable": [
-          {
-            "type": "aws:cdk:hasPhysicalName",
-            "data": {
-              "Ref": "ProjectsTableAA0A2089"
-            }
-          }
-        ],
-        "/OmakaseStack/ProjectsTable/Resource": [
+        "/OmakaseStack/SshCommand": [
           {
             "type": "aws:cdk:logicalId",
-            "data": "ProjectsTableAA0A2089"
-          }
-        ],
-        "/OmakaseStack/FeaturesTable": [
-          {
-            "type": "aws:cdk:hasPhysicalName",
-            "data": {
-              "Ref": "FeaturesTable52D06210"
-            }
-          }
-        ],
-        "/OmakaseStack/FeaturesTable/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "FeaturesTable52D06210"
-          }
-        ],
-        "/OmakaseStack/AgentsTable": [
-          {
-            "type": "aws:cdk:hasPhysicalName",
-            "data": {
-              "Ref": "AgentsTable78E0948F"
-            }
-          }
-        ],
-        "/OmakaseStack/AgentsTable/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "AgentsTable78E0948F"
-          }
-        ],
-        "/OmakaseStack/AgentRunsTable": [
-          {
-            "type": "aws:cdk:hasPhysicalName",
-            "data": {
-              "Ref": "AgentRunsTableB0DA56A7"
-            }
-          }
-        ],
-        "/OmakaseStack/AgentRunsTable/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "AgentRunsTableB0DA56A7"
-          }
-        ],
-        "/OmakaseStack/TicketsTable": [
-          {
-            "type": "aws:cdk:hasPhysicalName",
-            "data": {
-              "Ref": "TicketsTableB76A19AF"
-            }
-          }
-        ],
-        "/OmakaseStack/TicketsTable/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "TicketsTableB76A19AF"
-          }
-        ],
-        "/OmakaseStack/AgentMessagesTable": [
-          {
-            "type": "aws:cdk:hasPhysicalName",
-            "data": {
-              "Ref": "AgentMessagesTable71313A80"
-            }
-          }
-        ],
-        "/OmakaseStack/AgentMessagesTable/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "AgentMessagesTable71313A80"
-          }
-        ],
-        "/OmakaseStack/AlbDnsName": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "AlbDnsName"
-          }
-        ],
-        "/OmakaseStack/EcrRepositoryUri": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "EcrRepositoryUri"
-          }
-        ],
-        "/OmakaseStack/ClusterName": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "ClusterName"
-          }
-        ],
-        "/OmakaseStack/AgentTaskDefArn": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "AgentTaskDefArn"
+            "data": "SshCommand"
           }
         ],
         "/OmakaseStack/ApiKeysSecretArn": [

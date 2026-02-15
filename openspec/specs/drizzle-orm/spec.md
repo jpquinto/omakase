@@ -1,33 +1,32 @@
-## ADDED Requirements
+## MODIFIED Requirements
 
 ### Requirement: Drizzle schema definitions
-The system SHALL define TypeScript schema files using Drizzle ORM that serve as canonical type definitions shared between backend services and frontend.
+The system SHALL define TypeScript type definitions in `packages/db/` that serve as canonical types shared between backend services and frontend. Drizzle ORM dependency is removed; types are plain TypeScript interfaces.
 
-#### Scenario: Schema files compile and export types
+#### Scenario: Type files compile and export types
 - **WHEN** the TypeScript project builds
-- **THEN** Drizzle schema files in `packages/db/schema/` compile without errors and export inferred types for all tables
+- **THEN** type files in `packages/db/src/schema/` compile without errors and export types for all 6 entities (User, Project, Feature, Agent, AgentRun, Ticket)
 
 ### Requirement: Drizzle-Convex schema alignment
-The system SHALL maintain Drizzle schema definitions that align with the Convex schema, ensuring type consistency across the stack.
+The system SHALL maintain TypeScript type definitions that align with the DynamoDB table schemas, ensuring type consistency across the stack.
 
-#### Scenario: Types match between Drizzle and Convex
-- **WHEN** a feature type is defined in both Drizzle and Convex schemas
-- **THEN** the field names, types, and nullability constraints are identical
-
-### Requirement: Migration support for schema evolution
-The system SHALL use Drizzle Kit for generating and applying schema migrations when the data model changes.
-
-#### Scenario: Generate migration after schema change
-- **WHEN** a developer modifies a Drizzle schema file and runs `drizzle-kit generate`
-- **THEN** a SQL migration file is created in `packages/db/migrations/` reflecting the diff
-
-#### Scenario: Apply pending migrations
-- **WHEN** `drizzle-kit migrate` is executed
-- **THEN** all pending migrations are applied in order and the migration state is updated
+#### Scenario: Types match DynamoDB attributes
+- **WHEN** a Feature type is defined in `packages/db/`
+- **THEN** the field names and types match the DynamoDB item attributes for the features table
 
 ### Requirement: Shared type exports
-The system SHALL export Drizzle-inferred types (e.g., `Feature`, `Project`, `Agent`, `Ticket`) from a shared package consumed by both frontend and backend.
+The system SHALL export TypeScript types (e.g., `Feature`, `Project`, `Agent`, `Ticket`) from `@autoforge/db` consumed by both frontend and backend.
 
 #### Scenario: Frontend imports shared types
-- **WHEN** a Next.js component imports `Feature` from `@omakase/db`
-- **THEN** the type includes all fields defined in the Drizzle schema with correct TypeScript types
+- **WHEN** a Next.js component imports `Feature` from `@autoforge/db`
+- **THEN** the type includes all fields defined in the schema with correct TypeScript types
+
+#### Scenario: Backend imports shared types
+- **WHEN** the orchestrator imports `Project` from `@autoforge/db`
+- **THEN** the type matches the DynamoDB item structure
+
+## REMOVED Requirements
+
+### Requirement: Migration support for schema evolution
+**Reason**: Drizzle Kit migrations are for SQL databases. DynamoDB schema changes are managed via CDK (table/GSI modifications) and application-level attribute handling.
+**Migration**: Schema changes are expressed as CDK updates for table/GSI changes and TypeScript type updates for new attributes. DynamoDB is schemaless at the item level.

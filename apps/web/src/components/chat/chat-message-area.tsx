@@ -83,7 +83,7 @@ export function ChatMessageArea({
           ref={scrollRef}
           onScroll={onScroll}
           className={cn(
-            "h-full space-y-2 overflow-y-auto px-6 py-4 transition-all duration-500",
+            "h-full space-y-2 overflow-y-auto px-3 py-3 transition-all duration-500 md:px-6 md:py-4",
             showWelcome && "opacity-0 pointer-events-none",
           )}
         >

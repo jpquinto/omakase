@@ -42,7 +42,6 @@ import {
   Play,
   PanelTop,
   Trash2,
-  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -89,12 +88,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { VoiceBlob } from "@/components/chat/voice-blob";
+import { AudioArtifact } from "@/components/chat/audio-artifact";
 import {
   ResizablePanelGroup,
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
-import { Mic, GripVertical, PanelLeftClose } from "lucide-react";
+import { Mic, PanelLeftClose } from "lucide-react";
 
 // ============================================================================
 // Custom Hooks
@@ -3306,6 +3306,26 @@ function VoiceSection() {
             <Mic className="h-4 w-4" />
             {blobActive ? "Stop" : "Preview Voice Blob"}
           </button>
+        </div>
+      </GlassCard>
+
+      {/* Audio Artifact cards */}
+      <GlassCard className="mb-8">
+        <SubHeading>Audio Artifact</SubHeading>
+        <p className="mb-6 text-sm text-oma-text-muted">
+          Compact voice-message cards embedded in chat when an agent responds in talk mode.
+          Shows waveform visualization, playback controls, and duration with agent-colored accents.
+        </p>
+        <div className="flex flex-col gap-4">
+          {agents.map((agent) => (
+            <AudioArtifact
+              key={agent.id}
+              audioUrl={`#demo-${agent.id}`}
+              duration={Math.floor(12 + Math.random() * 30)}
+              role={agent.id === "miso" ? "architect" : agent.id === "nori" ? "coder" : agent.id === "koji" ? "reviewer" : "tester"}
+              agentName={agent.name}
+            />
+          ))}
         </div>
       </GlassCard>
 

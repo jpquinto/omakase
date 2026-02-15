@@ -200,7 +200,7 @@ function HeroSkeleton() {
 
 function StatsSkeleton() {
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
       {[1, 2, 3, 4].map((i) => (
         <div
           key={i}
@@ -384,77 +384,125 @@ export default function AgentProfilePage() {
             }
 
             return (
-              <div className="glass overflow-hidden rounded-oma">
-                {/* Table header */}
-                <div className="grid grid-cols-[1fr_120px_80px_80px_90px_90px] gap-3 px-5 py-3 text-[11px] font-medium uppercase tracking-wider text-oma-text-subtle">
-                  <span>Ticket</span>
-                  <span>Project</span>
-                  <span>Priority</span>
-                  <span>Status</span>
-                  <span className="text-right">Changes</span>
-                  <span className="text-right">Resolved</span>
-                </div>
-
-                {/* Table rows */}
-                <div className="divide-y divide-white/[0.04]">
+              <>
+                {/* Mobile: card view */}
+                <div className="space-y-2 md:hidden">
                   {tickets.map((ticket, i) => {
                     const statusInfo = TICKET_STATUS_STYLES[ticket.status];
                     return (
                       <div
                         key={ticket.id}
                         className={cn(
-                          "group/ticket grid grid-cols-[1fr_120px_80px_80px_90px_90px] items-center gap-3 px-5 py-3.5",
-                          "transition-all duration-200 hover:bg-white/[0.02]",
-                          "animate-oma-fade-up opacity-0",
+                          "glass rounded-oma p-4 animate-oma-fade-up opacity-0",
                         )}
                         style={{ animationDelay: `${i * 60}ms`, animationFillMode: "forwards" }}
                       >
-                        {/* Ticket ID + Title */}
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <span className={cn("shrink-0 font-mono text-xs font-medium", meta.accentColor)}>
-                            {ticket.id}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <span className={cn("font-mono text-xs font-medium", meta.accentColor)}>
+                              {ticket.id}
+                            </span>
+                            <p className="mt-0.5 truncate text-sm font-medium text-oma-text">
+                              {ticket.title}
+                            </p>
+                          </div>
+                          <span className={cn("flex shrink-0 items-center gap-1 text-xs font-medium", statusInfo.className)}>
+                            {ticket.status === "merged" && <GitPullRequest className="size-3" />}
+                            {ticket.status === "passing" && <CheckCircle2 className="size-3" />}
+                            {ticket.status === "in_review" && <Clock className="size-3" />}
+                            {statusInfo.label}
                           </span>
-                          <span className="truncate text-sm text-oma-text">
-                            {ticket.title}
-                          </span>
-                          <ExternalLink className="size-3 shrink-0 text-oma-text-faint opacity-0 transition-opacity group-hover/ticket:opacity-100" />
                         </div>
-
-                        {/* Project */}
-                        <span className="truncate text-xs text-oma-text-muted">
-                          {ticket.project}
-                        </span>
-
-                        {/* Priority */}
-                        <span className={cn(
-                          "inline-flex w-fit items-center rounded-oma-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                          PRIORITY_STYLES[ticket.priority],
-                        )}>
-                          {ticket.priority}
-                        </span>
-
-                        {/* Status */}
-                        <span className={cn("flex items-center gap-1.5 text-xs font-medium", statusInfo.className)}>
-                          {ticket.status === "merged" && <GitPullRequest className="size-3" />}
-                          {ticket.status === "passing" && <CheckCircle2 className="size-3" />}
-                          {ticket.status === "in_review" && <Clock className="size-3" />}
-                          {statusInfo.label}
-                        </span>
-
-                        {/* Lines changed */}
-                        <span className="text-right font-mono text-xs text-oma-text-muted">
-                          {ticket.linesChanged > 0 ? `+${ticket.linesChanged}` : "\u2014"}
-                        </span>
-
-                        {/* Resolved time */}
-                        <span className="text-right text-xs text-oma-text-faint">
-                          {formatRelativeTime(ticket.resolvedAt)}
-                        </span>
+                        <div className="mt-2 flex items-center gap-3 text-xs text-oma-text-muted">
+                          <span className="truncate">{ticket.project}</span>
+                          <span className={cn(
+                            "inline-flex items-center rounded-oma-full px-2 py-0.5 text-[10px] font-semibold uppercase",
+                            PRIORITY_STYLES[ticket.priority],
+                          )}>
+                            {ticket.priority}
+                          </span>
+                          <span className="ml-auto text-oma-text-faint">
+                            {formatRelativeTime(ticket.resolvedAt)}
+                          </span>
+                        </div>
                       </div>
                     );
                   })}
                 </div>
-              </div>
+
+                {/* Desktop: table view */}
+                <div className="hidden md:block glass overflow-hidden rounded-oma">
+                  {/* Table header */}
+                  <div className="grid grid-cols-[1fr_120px_80px_80px_90px_90px] gap-3 px-5 py-3 text-[11px] font-medium uppercase tracking-wider text-oma-text-subtle">
+                    <span>Ticket</span>
+                    <span>Project</span>
+                    <span>Priority</span>
+                    <span>Status</span>
+                    <span className="text-right">Changes</span>
+                    <span className="text-right">Resolved</span>
+                  </div>
+
+                  {/* Table rows */}
+                  <div className="divide-y divide-white/[0.04]">
+                    {tickets.map((ticket, i) => {
+                      const statusInfo = TICKET_STATUS_STYLES[ticket.status];
+                      return (
+                        <div
+                          key={ticket.id}
+                          className={cn(
+                            "group/ticket grid grid-cols-[1fr_120px_80px_80px_90px_90px] items-center gap-3 px-5 py-3.5",
+                            "transition-all duration-200 hover:bg-white/[0.02]",
+                            "animate-oma-fade-up opacity-0",
+                          )}
+                          style={{ animationDelay: `${i * 60}ms`, animationFillMode: "forwards" }}
+                        >
+                          {/* Ticket ID + Title */}
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className={cn("shrink-0 font-mono text-xs font-medium", meta.accentColor)}>
+                              {ticket.id}
+                            </span>
+                            <span className="truncate text-sm text-oma-text">
+                              {ticket.title}
+                            </span>
+                            <ExternalLink className="size-3 shrink-0 text-oma-text-faint opacity-0 transition-opacity group-hover/ticket:opacity-100" />
+                          </div>
+
+                          {/* Project */}
+                          <span className="truncate text-xs text-oma-text-muted">
+                            {ticket.project}
+                          </span>
+
+                          {/* Priority */}
+                          <span className={cn(
+                            "inline-flex w-fit items-center rounded-oma-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                            PRIORITY_STYLES[ticket.priority],
+                          )}>
+                            {ticket.priority}
+                          </span>
+
+                          {/* Status */}
+                          <span className={cn("flex items-center gap-1.5 text-xs font-medium", statusInfo.className)}>
+                            {ticket.status === "merged" && <GitPullRequest className="size-3" />}
+                            {ticket.status === "passing" && <CheckCircle2 className="size-3" />}
+                            {ticket.status === "in_review" && <Clock className="size-3" />}
+                            {statusInfo.label}
+                          </span>
+
+                          {/* Lines changed */}
+                          <span className="text-right font-mono text-xs text-oma-text-muted">
+                            {ticket.linesChanged > 0 ? `+${ticket.linesChanged}` : "\u2014"}
+                          </span>
+
+                          {/* Resolved time */}
+                          <span className="text-right text-xs text-oma-text-faint">
+                            {formatRelativeTime(ticket.resolvedAt)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
             );
           })()}
         </section>

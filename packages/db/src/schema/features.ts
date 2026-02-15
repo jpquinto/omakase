@@ -13,6 +13,9 @@ export interface Feature {
   assignedAgentId?: string;
   linearIssueId?: string;
   linearIssueUrl?: string;
+  linearStateName?: string;
+  linearLabels?: string[];
+  linearAssigneeName?: string;
   completedAt?: string;
   createdAt: string;
   updatedAt: string;

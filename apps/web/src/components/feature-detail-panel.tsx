@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   ChevronDown,
   Plus,
@@ -332,7 +332,13 @@ export function FeatureDetailPanel({
     <Dialog open={!!feature} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent
         showCloseButton
-        className="glass-lg flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-oma-lg border border-oma-glass-border bg-oma-bg-elevated p-0 shadow-oma-lg"
+        className={cn(
+          "glass-lg flex w-full flex-col overflow-hidden border border-oma-glass-border bg-oma-bg-elevated p-0 shadow-oma-lg",
+          // Mobile: full-screen overlay
+          "h-[100dvh] max-w-none rounded-none",
+          // Desktop: centered dialog
+          "md:max-h-[85vh] md:h-auto md:max-w-lg md:rounded-oma-lg",
+        )}
       >
         <DialogTitle className="sr-only">
           Feature Details{feature ? `: ${feature.name}` : ""}

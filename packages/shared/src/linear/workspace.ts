@@ -329,3 +329,51 @@ export async function getLinearTeam(params: {
 
   return data.team;
 }
+
+/**
+ * Fetch all issues for a team, optionally filtered by label. Paginates
+ * through all pages automatically.
+ *
+ * @param params.accessToken - A valid Linear OAuth access token.
+ * @param params.teamId      - The team to fetch issues from.
+ * @param params.label       - Optional label name to filter by (e.g. "omakase").
+ * @returns All matching issues across all pages.
+ */
+export async function fetchAllTeamIssues(params: {
+  accessToken: string;
+  teamId: string;
+  label?: string;
+  projectId?: string;
+}): Promise<LinearIssue[]> {
+  const { accessToken, teamId, label, projectId } = params;
+  const allIssues: LinearIssue[] = [];
+  let after: string | undefined;
+
+  do {
+    const filter: Record<string, unknown> = {
+      team: { id: { eq: teamId } },
+    };
+    if (label) {
+      filter.labels = { name: { eq: label } };
+    }
+    if (projectId) {
+      filter.project = { id: { eq: projectId } };
+    }
+
+    const data = await linearGraphQL<IssuesResponse>(
+      ISSUES_QUERY,
+      { filter, first: 50, after: after ?? null },
+      accessToken,
+    );
+
+    allIssues.push(...data.issues.nodes);
+
+    if (data.issues.pageInfo.hasNextPage && data.issues.pageInfo.endCursor) {
+      after = data.issues.pageInfo.endCursor;
+    } else {
+      break;
+    }
+  } while (true);
+
+  return allIssues;
+}

@@ -185,7 +185,7 @@ export function CalendarHeatmap({
                 : "hover:ring-oma-primary/40";
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 overflow-x-auto">
       {/* Header with total */}
       <div className="flex items-baseline justify-between">
         <p className="text-xs text-oma-text-muted">

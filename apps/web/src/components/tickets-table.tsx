@@ -17,13 +17,15 @@ import {
   ArrowUpDown,
   ExternalLink,
   Plus,
+  RefreshCw,
   Search,
   Trash2,
+  UserPlus,
   X,
 } from "lucide-react";
 import type { Feature, FeatureStatus } from "@omakase/db";
 import { cn } from "@/lib/utils";
-import { useCreateFeature, useDeleteFeature, useUpdateFeature } from "@/hooks/use-api";
+import { useAssignFeature, useCreateFeature, useDeleteFeature, useSyncLinear, useUpdateFeature } from "@/hooks/use-api";
 import { LinearTicketBadge } from "@/components/linear-ticket-badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -360,11 +362,15 @@ export function TicketsTable({
   // --- State ---
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<FeatureStatus | "all">("all");
+  const [linearStateFilter, setLinearStateFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [showAddForm, setShowAddForm] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Feature | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncCooldown, setSyncCooldown] = useState(0);
+  const [assigningFeatureId, setAssigningFeatureId] = useState<string | null>(null);
 
   // --- New feature form state ---
   const [newName, setNewName] = useState("");
@@ -376,6 +382,61 @@ export function TicketsTable({
   const createFeature = useCreateFeature();
   const updateFeature = useUpdateFeature();
   const deleteFeature = useDeleteFeature();
+  const syncLinear = useSyncLinear();
+  const assignFeature = useAssignFeature();
+
+  // --- Unique Linear state names for filter dropdown ---
+  const linearStateOptions = useMemo(() => {
+    const states = new Set<string>();
+    for (const f of features) {
+      if (f.linearStateName) states.add(f.linearStateName);
+    }
+    return Array.from(states).sort();
+  }, [features]);
+
+  // --- Sync cooldown timer ---
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startCooldown = useCallback(() => {
+    setSyncCooldown(30);
+    if (cooldownRef.current) clearInterval(cooldownRef.current);
+    cooldownRef.current = setInterval(() => {
+      setSyncCooldown((prev) => {
+        if (prev <= 1) {
+          if (cooldownRef.current) clearInterval(cooldownRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, []);
+
+  // --- Sync handler ---
+  const handleSync = useCallback(async () => {
+    setIsSyncing(true);
+    try {
+      await syncLinear(projectId);
+      onRefetch();
+      startCooldown();
+    } catch {
+      // Error surfaced through the API client
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [syncLinear, projectId, onRefetch, startCooldown]);
+
+  // --- Agent assignment handler ---
+  const handleAssign = useCallback(
+    async (featureId: string, agentName: string) => {
+      try {
+        await assignFeature(featureId, agentName);
+        setAssigningFeatureId(null);
+        onRefetch();
+      } catch {
+        // Error surfaced through the API client
+      }
+    },
+    [assignFeature, onRefetch],
+  );
 
   // --- Sorting handler ---
   const handleSort = useCallback(
@@ -404,6 +465,11 @@ export function TicketsTable({
     // Apply status filter
     if (statusFilter !== "all") {
       result = result.filter((f) => f.status === statusFilter);
+    }
+
+    // Apply Linear state filter
+    if (linearStateFilter !== "all") {
+      result = result.filter((f) => f.linearStateName === linearStateFilter);
     }
 
     // Apply sorting
@@ -439,7 +505,7 @@ export function TicketsTable({
     }
 
     return result;
-  }, [features, searchQuery, statusFilter, sortField, sortDirection]);
+  }, [features, searchQuery, statusFilter, linearStateFilter, sortField, sortDirection]);
 
   // --- Inline update handler ---
   const handleInlineUpdate = useCallback(
@@ -527,6 +593,24 @@ export function TicketsTable({
           </select>
         </div>
 
+        {/* Linear state filter (only shown if any features have Linear metadata) */}
+        {linearStateOptions.length > 0 && (
+          <div className="glass-sm rounded-oma">
+            <select
+              value={linearStateFilter}
+              onChange={(e) => setLinearStateFilter(e.target.value)}
+              className="rounded-oma bg-transparent px-3 py-2 text-sm text-oma-text outline-none"
+            >
+              <option value="all" className="bg-oma-bg-elevated">All Linear States</option>
+              {linearStateOptions.map((state) => (
+                <option key={state} value={state} className="bg-oma-bg-elevated">
+                  {state}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Add Feature button */}
         <Button
           size="sm"
@@ -536,6 +620,24 @@ export function TicketsTable({
           {showAddForm ? <X className="size-3.5" /> : <Plus className="size-3.5" />}
           {showAddForm ? "Cancel" : "Add Feature"}
         </Button>
+
+        {/* Sync from Linear button (conditional) */}
+        {hasLinearConnection && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void handleSync()}
+            disabled={isSyncing || syncCooldown > 0}
+            className="gap-1.5 rounded-oma"
+          >
+            <RefreshCw className={cn("size-3.5", isSyncing && "animate-spin")} />
+            {isSyncing
+              ? "Syncing..."
+              : syncCooldown > 0
+                ? `Sync (${syncCooldown}s)`
+                : "Sync Linear"}
+          </Button>
+        )}
 
         {/* Browse Linear button (conditional) */}
         {hasLinearConnection && (
@@ -552,9 +654,73 @@ export function TicketsTable({
       </div>
 
       {/* ----------------------------------------------------------------- */}
-      {/* Table wrapper                                                     */}
+      {/* Mobile: Card view                                                 */}
       {/* ----------------------------------------------------------------- */}
-      <div className="glass rounded-oma-lg overflow-hidden">
+      <div className="flex flex-col gap-3 md:hidden">
+        {displayedFeatures.map((feature) => (
+          <div
+            key={feature.id}
+            onClick={() => onSelectFeature(feature)}
+            className="glass rounded-oma cursor-pointer p-4 transition-colors hover:bg-white/[0.04] active:bg-white/[0.06]"
+          >
+            <div className="mb-2 flex items-start justify-between gap-2">
+              <span className="text-sm font-medium text-oma-text">{feature.name}</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeleteTarget(feature);
+                }}
+                className="flex size-8 shrink-0 items-center justify-center rounded-oma-sm text-oma-text-subtle hover:bg-oma-fail/10 hover:text-oma-fail"
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <InlinePrioritySelect
+                value={feature.priority}
+                onSave={(priority) => void handleInlineUpdate(feature.id, { priority })}
+              />
+              <InlineStatusSelect
+                value={feature.status}
+                onSave={(status) => void handleInlineUpdate(feature.id, { status })}
+              />
+              {feature.category && (
+                <span className="inline-block rounded-oma-full bg-oma-primary/15 px-2 py-0.5 text-xs font-medium text-oma-primary">
+                  {feature.category}
+                </span>
+              )}
+            </div>
+            {feature.linearIssueId && feature.linearIssueUrl && (
+              <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                <LinearTicketBadge
+                  linearIssueId={feature.linearIssueId}
+                  linearIssueUrl={feature.linearIssueUrl}
+                />
+              </div>
+            )}
+          </div>
+        ))}
+        {displayedFeatures.length === 0 && (
+          <div className="glass rounded-oma px-4 py-12 text-center">
+            <p className="text-sm text-oma-text-muted">
+              {features.length === 0
+                ? "No features yet. Tap \"Add Feature\" to get started."
+                : "No features match your search or filter."}
+            </p>
+          </div>
+        )}
+        <div className="px-1 py-1">
+          <span className="text-xs text-oma-text-subtle">
+            {displayedFeatures.length} of {features.length} feature{features.length !== 1 ? "s" : ""}
+          </span>
+        </div>
+      </div>
+
+      {/* ----------------------------------------------------------------- */}
+      {/* Desktop: Table wrapper                                            */}
+      {/* ----------------------------------------------------------------- */}
+      <div className="glass rounded-oma-lg hidden overflow-hidden md:block">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             {/* Table header */}
@@ -595,6 +761,11 @@ export function TicketsTable({
                 <th className="px-4 py-3 text-left">
                   <span className="text-xs font-semibold uppercase tracking-wider text-oma-text-muted">
                     Linear
+                  </span>
+                </th>
+                <th className="px-4 py-3 text-left">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-oma-text-muted">
+                    Linear State
                   </span>
                 </th>
                 <th className="px-4 py-3 text-left">
@@ -663,6 +834,9 @@ export function TicketsTable({
                       }}
                       className="w-full rounded-oma-sm border border-oma-glass-border-bright bg-oma-bg-surface px-2 py-1 text-xs text-oma-text placeholder:text-oma-text-subtle outline-none focus:border-oma-primary"
                     />
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-xs text-oma-text-subtle">--</span>
                   </td>
                   <td className="px-4 py-3">
                     <span className="text-xs text-oma-text-subtle">--</span>
@@ -741,6 +915,17 @@ export function TicketsTable({
                     )}
                   </td>
 
+                  {/* Linear State */}
+                  <td className="px-4 py-3">
+                    {feature.linearStateName ? (
+                      <span className="inline-block rounded-oma-full bg-oma-info/15 px-2 py-0.5 text-xs font-medium text-oma-info">
+                        {feature.linearStateName}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-oma-text-subtle">--</span>
+                    )}
+                  </td>
+
                   {/* Created date */}
                   <td className="px-4 py-3">
                     <span className="text-xs text-oma-text-muted">
@@ -750,17 +935,65 @@ export function TicketsTable({
 
                   {/* Actions */}
                   <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeleteTarget(feature);
-                      }}
-                      className="inline-flex items-center justify-center rounded-oma-sm p-1.5 text-oma-text-subtle transition-colors hover:bg-oma-fail/10 hover:text-oma-fail"
-                      title="Delete feature"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
+                    <div className="flex items-center justify-end gap-1">
+                      {/* Assign to agent (pending features only) */}
+                      {feature.status === "pending" && (
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setAssigningFeatureId(
+                                assigningFeatureId === feature.id ? null : feature.id,
+                              );
+                            }}
+                            className="inline-flex items-center justify-center rounded-oma-sm p-1.5 text-oma-text-subtle transition-colors hover:bg-oma-primary/10 hover:text-oma-primary"
+                            title="Assign to agent"
+                          >
+                            <UserPlus className="size-3.5" />
+                          </button>
+                          {/* Agent selection popover */}
+                          {assigningFeatureId === feature.id && (
+                            <div
+                              className="glass-lg absolute right-0 top-full z-50 mt-1 w-48 rounded-oma border border-oma-glass-border-bright p-1"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {[
+                                { name: "miso", label: "Miso", role: "Architect", color: "text-oma-gold" },
+                                { name: "nori", label: "Nori", role: "Coder", color: "text-oma-indigo" },
+                                { name: "koji", label: "Koji", role: "Reviewer", color: "text-oma-secondary" },
+                                { name: "toro", label: "Toro", role: "Tester", color: "text-oma-jade" },
+                              ].map((agent) => (
+                                <button
+                                  key={agent.name}
+                                  type="button"
+                                  onClick={() => void handleAssign(feature.id, agent.name)}
+                                  className="flex w-full items-center gap-2 rounded-oma-sm px-3 py-2 text-left text-sm transition-colors hover:bg-white/[0.06]"
+                                >
+                                  <span className={cn("font-medium", agent.color)}>
+                                    {agent.label}
+                                  </span>
+                                  <span className="text-xs text-oma-text-muted">
+                                    {agent.role}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteTarget(feature);
+                        }}
+                        className="inline-flex items-center justify-center rounded-oma-sm p-1.5 text-oma-text-subtle transition-colors hover:bg-oma-fail/10 hover:text-oma-fail"
+                        title="Delete feature"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -770,7 +1003,7 @@ export function TicketsTable({
               {/* --------------------------------------------------------- */}
               {displayedFeatures.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center">
+                  <td colSpan={8} className="px-4 py-12 text-center">
                     <p className="text-sm text-oma-text-muted">
                       {features.length === 0
                         ? "No features yet. Click \"Add Feature\" to get started."

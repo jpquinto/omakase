@@ -51,13 +51,13 @@ export function ChatInput({
   voiceSupported = false,
   isTalkMode = false,
   isListening = false,
-  isSpeaking = false,
+  isSpeaking: _isSpeaking = false,
   transcript = "",
   voiceError,
   onToggleTalkMode,
   onStartListening,
   onStopListening,
-  onStopSpeaking,
+  onStopSpeaking: _onStopSpeaking,
   onVoiceSend,
 }: ChatInputProps) {
   const palette = ROLE_PALETTE[agent.role];
@@ -66,7 +66,7 @@ export function ChatInput({
   // Hold-to-talk timer — short press = toggle, long press = push-to-talk
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isHoldingRef = useRef(false);
-  const [isHolding, setIsHolding] = useState(false);
+  const [, setIsHolding] = useState(false);
 
   const handleMicDown = useCallback(() => {
     if (!canSend || !onStartListening) return;
@@ -137,7 +137,7 @@ export function ChatInput({
 
       {/* Input area — hidden during welcome state */}
       <div className={cn(
-        "border-t px-6 py-4 transition-all duration-500",
+        "border-t px-3 py-3 transition-all duration-500 md:px-6 md:py-4",
         palette.border,
         showWelcome && "opacity-0 pointer-events-none",
       )}>

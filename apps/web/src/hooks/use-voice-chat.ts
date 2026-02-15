@@ -102,7 +102,7 @@ export interface UseVoiceChatResult {
   error: string | null;
 }
 
-export function useVoiceChat({ role, onTranscript }: UseVoiceChatOptions): UseVoiceChatResult {
+export function useVoiceChat({ role, onTranscript: _onTranscript }: UseVoiceChatOptions): UseVoiceChatResult {
   // SSR-safe: detect support only after mount
   const [supported, setSupported] = useState(false);
   const [isTalkMode, setIsTalkMode] = useState(false);

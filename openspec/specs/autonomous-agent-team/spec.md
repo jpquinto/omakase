@@ -1,26 +1,7 @@
-## ADDED Requirements
-
-### Requirement: Agent role definitions
-The system SHALL define four agent roles, each with specialized CLAUDE.md instructions and tool access: architect, coder, reviewer, and tester.
-
-#### Scenario: Architect agent receives planning prompt
-- **WHEN** an architect agent is started for a feature
-- **THEN** it receives a CLAUDE.md instructing it to read the feature requirements, analyze affected files, and produce an implementation plan
-
-#### Scenario: Coder agent receives implementation prompt
-- **WHEN** a coder agent is started with an implementation plan
-- **THEN** it receives a CLAUDE.md instructing it to implement the plan, write code, and run lint/type-check
-
-#### Scenario: Reviewer agent receives review prompt
-- **WHEN** a reviewer agent is started for completed code changes
-- **THEN** it receives a CLAUDE.md instructing it to review the diff for quality, security, and correctness issues
-
-#### Scenario: Tester agent receives testing prompt
-- **WHEN** a tester agent is started for a feature
-- **THEN** it receives a CLAUDE.md instructing it to write tests covering the feature's acceptance criteria and run them
+## MODIFIED Requirements
 
 ### Requirement: Orchestrator service
-The system SHALL run an orchestrator that watches for ready features, assigns them to agents in the correct role sequence, and manages the pipeline.
+The system SHALL run an orchestrator that watches for ready features, assigns them to agents in the correct role sequence, and manages the pipeline. Upon successful pipeline completion, the orchestrator SHALL transition the feature to `review_ready` status and post a `pr_ready` message in the agent chat, instead of directly creating a pull request.
 
 #### Scenario: Orchestrator picks up ready feature
 - **WHEN** a feature has status "pending" and all dependencies are met
@@ -38,61 +19,21 @@ The system SHALL run an orchestrator that watches for ready features, assigns th
 - **WHEN** an agent in the pipeline fails (non-zero exit or explicit failure)
 - **THEN** the orchestrator retries the step once, and if it fails again, marks the feature as "failing" and alerts
 
-### Requirement: Agent status reporting
-The system SHALL report agent status to Convex in real-time, including current phase (thinking, coding, testing), output logs, and completion status.
-
-#### Scenario: Agent status updates during execution
-- **WHEN** an agent is running and produces output
-- **THEN** status updates are written to the agent_runs table in Convex every 5 seconds
-
-#### Scenario: Agent completion recorded
-- **WHEN** an agent finishes (success or failure)
-- **THEN** the final status, duration, and output summary are recorded in Convex
-
-### Requirement: Concurrent agent execution with limits
-The system SHALL support running multiple agent pipelines concurrently, respecting per-project concurrency limits.
-
-#### Scenario: Multiple features processed in parallel
-- **WHEN** 3 features are ready and the concurrency limit is 3
-- **THEN** 3 architect agents are launched simultaneously
-
-#### Scenario: Concurrency limit enforced
-- **WHEN** the concurrency limit is 2 and 2 pipelines are active
-- **THEN** additional ready features wait in queue until a pipeline completes
+#### Scenario: Pipeline completion defers PR creation
+- **WHEN** all four pipeline steps complete successfully (tester exits with code 0)
+- **THEN** the orchestrator marks the feature as `review_ready`, posts a `pr_ready` message with branch name, diff summary, and test results, and does NOT automatically create a pull request
 
 ### Requirement: Agent workspace isolation
-The system SHALL give each agent an isolated workspace with its own git branch and working directory.
+The system SHALL give each agent an isolated workspace with its own git branch and working directory. The workspace SHALL be provisioned using the project's GitHub App installation token for authenticated repo access.
 
-#### Scenario: Agent works on isolated branch
-- **WHEN** a coder agent starts working on a feature
-- **THEN** it creates a branch named `agent/<feature-id>` from the main branch and commits changes there
+#### Scenario: Agent works on isolated branch with installation token
+- **WHEN** a coder agent starts working on a feature for a project with `githubInstallationId`
+- **THEN** the orchestrator generates an installation token, provisions the workspace with authenticated clone/fetch, and the agent creates a branch named `agent/<feature-id>` from the default branch
 
-#### Scenario: Completed work is submitted as PR
+#### Scenario: Agent works on isolated branch without installation token
+- **WHEN** a coder agent starts working on a feature for a project without `githubInstallationId` but with `repoUrl`
+- **THEN** the agent clones using the plain `repoUrl` and creates a branch named `agent/<feature-id>` from the default branch
+
+#### Scenario: Completed work awaits user review
 - **WHEN** the full agent pipeline completes successfully for a feature
-- **THEN** a pull request is created from the agent's branch to main with the implementation details
-
-### Requirement: Agent message checking during execution
-The agent execution wrapper SHALL poll the orchestrator for user messages at a configurable interval (default: 5 seconds) and at natural breakpoints between pipeline steps.
-
-#### Scenario: Agent checks for messages during execution
-- **WHEN** an agent is running and the poll interval elapses
-- **THEN** the agent queries `GET /api/agent-runs/:runId/messages?since=<lastCheck>&sender=user` for new user messages
-
-#### Scenario: Agent receives user message
-- **WHEN** the agent poll returns one or more user messages
-- **THEN** the agent processes the messages and posts a response via `POST /api/agent-runs/:runId/messages` with `sender: "agent"`
-
-#### Scenario: Agent checks between pipeline steps
-- **WHEN** the pipeline transitions between steps (e.g., architect completes, coder starts)
-- **THEN** the orchestrator checks for pending user messages and includes them as context for the next agent step
-
-### Requirement: Agent status messages posted to chat
-The orchestrator SHALL post status messages to the agent-messages table when an agent transitions between phases, so users can see lifecycle events in the chat.
-
-#### Scenario: Agent phase transition creates status message
-- **WHEN** an agent run's status changes (e.g., from "thinking" to "coding")
-- **THEN** the orchestrator creates a message with `type: "status"` and `content` describing the transition (e.g., "Started coding phase")
-
-#### Scenario: Agent failure creates error message
-- **WHEN** an agent run fails
-- **THEN** the orchestrator creates a message with `type: "error"` and `content` containing the error summary
+- **THEN** the feature branch is pushed to the remote and the feature enters `review_ready` status, awaiting user instruction to create a pull request

@@ -10,7 +10,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-Omakase is an autonomous development platform that uses a team of AI agents (architect, coder, reviewer, tester) to implement features from Linear tickets. The orchestrator polls for ready features, runs a 4-step agent pipeline on AWS ECS Fargate, and reports results back to a real-time dashboard.
+Omakase is an autonomous development platform that uses a team of AI agents (architect, coder, reviewer, tester) to implement features from Linear tickets. The orchestrator runs on a single EC2 instance, spawning Claude Code CLI processes for work sessions, and reports results back to a real-time dashboard.
 
 For full tech stack details, see [TECH_STACK.md](TECH_STACK.md).
 
@@ -20,7 +20,7 @@ For full tech stack details, see [TECH_STACK.md](TECH_STACK.md).
 /
 ├── apps/
 │   ├── web/              # Next.js 15 frontend (Vercel)
-│   └── orchestrator/     # Elysia backend (ECS Fargate)
+│   └── orchestrator/     # Elysia backend (EC2 instance)
 ├── packages/
 │   ├── dynamodb/          # DynamoDB data access layer
 │   ├── db/               # TypeScript type definitions
@@ -135,11 +135,10 @@ Bun + Elysia server that polls DynamoDB for ready features and orchestrates agen
 
 **Environment variables:**
 - `PORT` -- HTTP port (default: 8080)
+- `EXECUTION_MODE` -- "ecs" or "local" (default: "ecs"; use "local" on EC2)
+- `LOCAL_WORKSPACE_ROOT` -- Root dir for agent workspaces (default: "/tmp/omakase-agents")
 - `DYNAMODB_TABLE_PREFIX` -- DynamoDB table name prefix
-- `ECS_CLUSTER` -- ECS cluster name/ARN
-- `ECS_TASK_DEFINITION` -- Task definition family/ARN
-- `ECS_SUBNETS` -- Comma-separated subnet IDs
-- `ECS_SECURITY_GROUP` -- Security group ID
+- `AWS_REGION` -- AWS region (default: "us-east-1")
 - `GITHUB_TOKEN` -- For PR creation (optional)
 - `POLL_INTERVAL_MS` -- Poll interval (default: 30000)
 
@@ -160,7 +159,9 @@ TypeScript type definitions (`Feature`, `Project`, `Agent`, `User`, `Ticket`, `A
 
 ### Infrastructure (`infra/`)
 
-AWS CDK stack creating: VPC (2 AZs), ECS Cluster, ALB, ECR repository, Orchestrator Fargate service, Agent task definition, IAM roles, Secrets Manager, CloudWatch log groups.
+AWS CDK stack creating: VPC (1 AZ, public subnet only), EC2 t3.micro instance with Elastic IP, IAM instance profile (DynamoDB + Secrets Manager), CloudWatch log groups, DynamoDB tables, Secrets Manager.
+
+The EC2 instance runs the orchestrator directly via Bun (no Docker/ECS). Claude Code CLI is installed on the instance and authenticated via `claude login` for plan-based billing. Deploy with `./scripts/deploy.sh`.
 
 See `infra/lib/omakase-stack.ts` for the full resource definition.
 
@@ -233,6 +234,6 @@ See `.env.example` for the full list. Key groups:
 - **Auth0**: `AUTH0_SECRET`, `AUTH0_BASE_URL`, `AUTH0_ISSUER_BASE_URL`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`
 - **DynamoDB**: `DYNAMODB_TABLE_PREFIX`
 - **Orchestrator**: `NEXT_PUBLIC_ORCHESTRATOR_URL`
-- **AWS**: `AWS_REGION`, `AWS_ACCOUNT_ID`, `ECS_CLUSTER_NAME`, `ECR_REPO_URI`
+- **AWS**: `AWS_REGION`, `AWS_ACCOUNT_ID`
 - **Linear**: `LINEAR_CLIENT_ID`, `LINEAR_CLIENT_SECRET`, `LINEAR_WEBHOOK_SECRET`
 - **Claude**: `ANTHROPIC_API_KEY`

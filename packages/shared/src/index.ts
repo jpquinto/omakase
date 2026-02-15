@@ -6,6 +6,7 @@ export {
   listLinearIssues,
   listLinearProjects,
   getLinearTeam,
+  fetchAllTeamIssues,
 } from "./linear/workspace";
 export type {
   LinearTeam,

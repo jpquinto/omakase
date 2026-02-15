@@ -8,6 +8,8 @@
     "packages/*"
   ],
   "devDependencies": {
-    "@next/font": "^14.2.15"
+    "@eslint/js": "^10.0.1",
+    "@next/font": "^14.2.15",
+    "typescript-eslint": "^8.55.0"
   }
 }

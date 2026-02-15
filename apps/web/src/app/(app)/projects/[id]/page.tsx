@@ -143,7 +143,7 @@ export default function ProjectDetailPage() {
 
           <div className="flex items-start justify-between">
             <div>
-              <h1 className="font-serif text-2xl font-semibold text-oma-text">
+              <h1 className="font-serif text-xl font-semibold text-oma-text md:text-2xl">
                 {project.name}
               </h1>
               <p className="mt-1 text-sm text-oma-text-muted">
@@ -152,7 +152,7 @@ export default function ProjectDetailPage() {
             </div>
 
             {/* Stats badges */}
-            <div className="flex items-center gap-3">
+            <div className="hidden items-center gap-3 md:flex">
               {/* Progress badge */}
               <div className="glass-sm flex items-center gap-2.5 rounded-oma px-3 py-2">
                 <div className="h-1.5 w-20 overflow-hidden rounded-oma-full bg-oma-bg-surface">
@@ -230,6 +230,9 @@ export default function ProjectDetailPage() {
             projectDescription={project.description ?? ""}
             maxConcurrency={project.maxConcurrency}
             linearTeamId={project.linearTeamId}
+            linearAccessToken={project.linearAccessToken}
+            linearProjectId={project.linearProjectId}
+            linearProjectName={project.linearProjectName}
             hasLinearConnection={hasLinearConnection}
             githubInstallationId={project.githubInstallationId}
             githubRepoOwner={project.githubRepoOwner}
@@ -337,18 +340,52 @@ interface SettingsTabProps {
   projectDescription: string;
   maxConcurrency: number;
   linearTeamId?: string;
+  linearAccessToken?: string;
+  linearProjectId?: string;
+  linearProjectName?: string;
   hasLinearConnection: boolean;
   githubInstallationId?: number;
   githubRepoOwner?: string;
   githubRepoName?: string;
 }
 
-function SettingsTab({ projectId, projectName, projectDescription, maxConcurrency, linearTeamId, hasLinearConnection, githubInstallationId, githubRepoOwner, githubRepoName }: SettingsTabProps) {
+function SettingsTab({ projectId, projectName, projectDescription, maxConcurrency, linearTeamId, linearAccessToken: _linearAccessToken, linearProjectId, linearProjectName, hasLinearConnection, githubInstallationId, githubRepoOwner, githubRepoName }: SettingsTabProps) {
   const [yoloEnabled, setYoloEnabled] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
   const disconnectLinear = useDisconnectLinear();
   const disconnectGitHub = useDisconnectGitHub();
+
+  // Linear project selector state
+  const [linearProjects, setLinearProjects] = useState<Array<{ id: string; name: string }> | null>(null);
+  const [loadingLinearProjects, setLoadingLinearProjects] = useState(false);
+  const [savingLinearProject, setSavingLinearProject] = useState(false);
+
+  const loadLinearProjects = useCallback(async () => {
+    if (!linearTeamId) return;
+    setLoadingLinearProjects(true);
+    try {
+      const projects = await apiFetch<Array<{ id: string; name: string }>>(`/api/linear/projects?projectId=${projectId}`);
+      setLinearProjects(projects);
+    } catch {
+      setLinearProjects([]);
+    } finally {
+      setLoadingLinearProjects(false);
+    }
+  }, [linearTeamId, projectId]);
+
+  const handleSelectLinearProject = useCallback(async (lpId: string, lpName: string) => {
+    setSavingLinearProject(true);
+    try {
+      await apiFetch(`/api/projects/${projectId}/linear/project`, {
+        method: "PATCH",
+        body: JSON.stringify({ linearProjectId: lpId, linearProjectName: lpName }),
+      });
+      window.location.reload();
+    } catch {
+      setSavingLinearProject(false);
+    }
+  }, [projectId]);
 
   // Controlled state for editable project fields
   const [name, setName] = useState(projectName);
@@ -437,6 +474,45 @@ function SettingsTab({ projectId, projectName, projectDescription, maxConcurrenc
                 >
                   Disconnect
                 </button>
+              </div>
+
+              {/* Linear Project Selector */}
+              <div className="glass-sm rounded-oma p-4">
+                <p className="mb-1 text-xs font-medium text-oma-text-muted">Linear Project</p>
+                {linearProjectId ? (
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-oma-text">{linearProjectName || linearProjectId}</p>
+                    <button
+                      onClick={() => void handleSelectLinearProject("", "")}
+                      className="text-xs text-oma-text-subtle hover:text-oma-text"
+                    >
+                      Change
+                    </button>
+                  </div>
+                ) : linearProjects === null ? (
+                  <button
+                    onClick={() => void loadLinearProjects()}
+                    disabled={loadingLinearProjects}
+                    className="rounded-oma bg-oma-bg-surface px-3 py-1.5 text-xs font-medium text-oma-text transition-colors hover:bg-white/[0.06]"
+                  >
+                    {loadingLinearProjects ? "Loading..." : "Select a Linear project"}
+                  </button>
+                ) : linearProjects.length === 0 ? (
+                  <p className="text-xs text-oma-text-subtle">No projects found in this team</p>
+                ) : (
+                  <div className="space-y-1">
+                    {linearProjects.map((lp) => (
+                      <button
+                        key={lp.id}
+                        onClick={() => void handleSelectLinearProject(lp.id, lp.name)}
+                        disabled={savingLinearProject}
+                        className="flex w-full items-center rounded-oma-sm px-3 py-2 text-left text-sm text-oma-text transition-colors hover:bg-white/[0.06]"
+                      >
+                        {lp.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {showDisconnectConfirm && (

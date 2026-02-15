@@ -65,7 +65,7 @@ export default function AgentChatPage() {
     else localStorage.removeItem(`omakase:project:${name}`);
   }, [name]);
 
-  const { threads, createThread, updateThread, refetch: refetchThreads, hasMore, loadMore } = useAgentThreads(name, null);
+  const { threads, updateThread, refetch: refetchThreads } = useAgentThreads(name, null);
 
   // Resolve selected thread object
   const selectedThread = threads.find((t) => t.threadId === selectedThreadId);
@@ -119,8 +119,7 @@ export default function AgentChatPage() {
   useEffect(() => {
     prevStreamContentRef.current = "";
     voice.stopSpeaking();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedThreadId]);
+  }, [selectedThreadId]); // voice is stable ref
 
   const [input, setInput] = useState("");
   const [isScrolledUp, setIsScrolledUp] = useState(false);
@@ -289,29 +288,8 @@ export default function AgentChatPage() {
     setWelcomeDismissed(false);
   }, [updateThreadUrl]);
 
-  const handleCreateThread = useCallback(async () => {
-    try {
-      const thread = await createThread(undefined, pendingMode);
-      updateThreadUrl(thread.threadId);
-      setPendingNewConversation(false);
-      setWelcomeDismissed(false);
-    } catch {
-      setSelectedThreadId(null);
-      setPendingNewConversation(true);
-      setWelcomeDismissed(false);
-    }
-  }, [createThread, pendingMode, updateThreadUrl]);
-
   const handleRenameThread = async (threadId: string, newTitle: string) => {
     await updateThread(threadId, { title: newTitle });
-  };
-
-  const handleArchiveThread = async (threadId: string) => {
-    await updateThread(threadId, { status: "archived" });
-    if (selectedThreadId === threadId) {
-      const remaining = threads.filter((t) => t.threadId !== threadId);
-      updateThreadUrl(remaining.length > 0 ? remaining[0].threadId : null);
-    }
   };
 
   // Inline title editing
@@ -445,7 +423,7 @@ export default function AgentChatPage() {
   return (
     <div className="-m-8 flex h-[calc(100vh-3.5rem)]">
       {chatColumn}
-      <div className={cn("h-full w-[380px] shrink-0 border-l", palette.border)}>
+      <div className={cn("hidden h-full w-[380px] shrink-0 border-l md:block", palette.border)}>
         <WorkspaceExplorer
           runId={workSessionRunId!}
           role={agentMeta.agentRole}

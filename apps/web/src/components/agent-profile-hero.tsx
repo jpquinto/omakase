@@ -77,7 +77,7 @@ export function AgentProfileHero({
         </div>
 
         {/* Display Name */}
-        <h1 className="mb-2 font-serif text-4xl font-bold tracking-tight text-oma-text sm:text-5xl">
+        <h1 className="mb-2 font-serif text-2xl font-bold tracking-tight text-oma-text md:text-4xl lg:text-5xl">
           {displayName}
         </h1>
 

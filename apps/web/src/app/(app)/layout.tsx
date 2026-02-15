@@ -8,13 +8,15 @@ import {
   Palette,
   BarChart3,
   Settings,
+  ScrollText,
   ChevronLeft,
   ChevronRight,
-  MessageSquare,
   MessageSquareDashed,
   User,
+  Menu,
+  X,
 } from "lucide-react";
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useProject } from "@/hooks/use-api";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -37,6 +39,7 @@ const NAV_ITEMS = [
   { href: "/style-system", label: "Style System", icon: Palette },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/changelog", label: "Changelog", icon: ScrollText },
 ];
 
 const AGENTS = [
@@ -344,6 +347,7 @@ export default function AppLayout({
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [chatTarget, setChatTarget] = useState<ChatTarget | null>(null);
 
   const breadcrumbs = useBreadcrumbs(pathname);
@@ -356,9 +360,14 @@ export default function AppLayout({
 
   const isOnChatPage = !!chatRouteMatch;
 
+  // Auto-close mobile drawer on navigation
+  useEffect(() => {
+    setMobileDrawerOpen(false);
+  }, [pathname]);
+
   const handleOpenChat = useCallback((target: ChatTarget) => {
+    setMobileDrawerOpen(false);
     if (isOnChatPage) {
-      // Navigate to different agent's chat page
       const targetId = AGENTS.find((a) => a.name === target.agentName)?.id;
       if (targetId) {
         router.push(`/agents/${targetId}/chat`);
@@ -368,8 +377,11 @@ export default function AppLayout({
     }
   }, [isOnChatPage, router]);
 
+  // On mobile, sidebar is always expanded (never collapsed icon mode)
+  const sidebarCollapsed = collapsed; // Only applies on desktop (md+)
+
   return (
-    <div className="flex min-h-screen bg-oma-bg font-sans">
+    <div className="flex min-h-dvh bg-oma-bg font-sans md:min-h-screen">
       {/* ── Animated gradient blobs ── */}
       <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
         <svg className="absolute h-full w-full" xmlns="http://www.w3.org/2000/svg">
@@ -378,80 +390,62 @@ export default function AppLayout({
               <feGaussianBlur in="SourceGraphic" stdDeviation="80" />
             </filter>
           </defs>
-          {/* Sakura pink blob — top-left drift */}
-          <ellipse
-            cx="20%"
-            cy="25%"
-            rx="22%"
-            ry="18%"
-            fill="rgba(244, 114, 182, 0.08)"
-            filter="url(#blob-blur)"
-            style={{ animation: "oma-blob-drift-1 25s ease-in-out infinite" }}
-          />
-          {/* Indigo blob — top-right drift */}
-          <ellipse
-            cx="75%"
-            cy="20%"
-            rx="18%"
-            ry="22%"
-            fill="rgba(129, 140, 248, 0.07)"
-            filter="url(#blob-blur)"
-            style={{ animation: "oma-blob-drift-2 30s ease-in-out infinite" }}
-          />
-          {/* Gold blob — center drift */}
-          <ellipse
-            cx="55%"
-            cy="55%"
-            rx="20%"
-            ry="16%"
-            fill="rgba(251, 191, 36, 0.05)"
-            filter="url(#blob-blur)"
-            style={{ animation: "oma-blob-drift-3 28s ease-in-out infinite" }}
-          />
-          {/* Beni red blob — bottom-left drift */}
-          <ellipse
-            cx="30%"
-            cy="75%"
-            rx="16%"
-            ry="20%"
-            fill="rgba(248, 113, 113, 0.06)"
-            filter="url(#blob-blur)"
-            style={{ animation: "oma-blob-drift-4 32s ease-in-out infinite" }}
-          />
-          {/* Jade blob — bottom-right drift */}
-          <ellipse
-            cx="80%"
-            cy="70%"
-            rx="14%"
-            ry="18%"
-            fill="rgba(110, 231, 183, 0.05)"
-            filter="url(#blob-blur)"
-            style={{ animation: "oma-blob-drift-1 35s ease-in-out infinite reverse" }}
-          />
+          <ellipse cx="20%" cy="25%" rx="22%" ry="18%" fill="rgba(244, 114, 182, 0.08)" filter="url(#blob-blur)" style={{ animation: "oma-blob-drift-1 25s ease-in-out infinite" }} />
+          <ellipse cx="75%" cy="20%" rx="18%" ry="22%" fill="rgba(129, 140, 248, 0.07)" filter="url(#blob-blur)" style={{ animation: "oma-blob-drift-2 30s ease-in-out infinite" }} />
+          <ellipse cx="55%" cy="55%" rx="20%" ry="16%" fill="rgba(251, 191, 36, 0.05)" filter="url(#blob-blur)" style={{ animation: "oma-blob-drift-3 28s ease-in-out infinite" }} />
+          <ellipse cx="30%" cy="75%" rx="16%" ry="20%" fill="rgba(248, 113, 113, 0.06)" filter="url(#blob-blur)" style={{ animation: "oma-blob-drift-4 32s ease-in-out infinite" }} />
+          <ellipse cx="80%" cy="70%" rx="14%" ry="18%" fill="rgba(110, 231, 183, 0.05)" filter="url(#blob-blur)" style={{ animation: "oma-blob-drift-1 35s ease-in-out infinite reverse" }} />
         </svg>
       </div>
+
+      {/* ── Mobile backdrop overlay ── */}
+      {mobileDrawerOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+          onClick={() => setMobileDrawerOpen(false)}
+          aria-hidden="true"
+        />
+      )}
 
       {/* ── Sidebar ── */}
       <aside
         className={cn(
-          "glass-lg fixed inset-y-0 left-0 z-40 flex flex-col transition-all duration-300",
-          collapsed ? "w-16" : "w-60"
+          "glass-lg fixed inset-y-0 left-0 z-50 flex flex-col transition-all duration-300",
+          // Mobile: drawer behavior — off-screen by default, slide in when open
+          mobileDrawerOpen ? "translate-x-0" : "-translate-x-full",
+          "w-60 md:translate-x-0",
+          // Desktop: respect collapsed state
+          "md:z-40",
+          sidebarCollapsed && "md:w-16"
         )}
       >
-        {/* Logo */}
-        <div className="flex h-16 items-center px-4">
+        {/* Logo + mobile close */}
+        <div className="flex h-16 items-center justify-between px-4">
           <Link href="/" className="flex items-center gap-3 overflow-hidden">
-            {/* Sakura dot logo */}
             <div className="relative flex h-8 w-8 shrink-0 items-center justify-center">
               <div className="absolute inset-0 animate-oma-glow-pulse rounded-full bg-oma-primary/20" />
               <div className="relative h-5 w-5 rounded-full bg-gradient-to-br from-oma-primary to-oma-primary-dim" />
             </div>
-            {!collapsed && (
+            {!sidebarCollapsed && (
               <span className="animate-oma-blur-in font-serif text-xl font-semibold tracking-tight text-oma-text opacity-0">
                 Omakase
               </span>
             )}
+            {/* On mobile, always show title (sidebar always expanded on mobile) */}
+            {sidebarCollapsed && (
+              <span className="animate-oma-blur-in font-serif text-xl font-semibold tracking-tight text-oma-text opacity-0 md:hidden">
+                Omakase
+              </span>
+            )}
           </Link>
+          {/* Mobile close button */}
+          <button
+            onClick={() => setMobileDrawerOpen(false)}
+            className="flex size-10 items-center justify-center rounded-oma-sm text-oma-text-subtle transition-colors hover:text-oma-text md:hidden"
+            aria-label="Close menu"
+          >
+            <X className="size-5" />
+          </button>
         </div>
 
         {/* ── Sidebar content: cross-fade between normal and chat ── */}
@@ -460,9 +454,12 @@ export default function AppLayout({
           <div
             className={cn(
               "flex flex-1 flex-col transition-all duration-500",
-              isOnChatPage && !collapsed
+              isOnChatPage && !sidebarCollapsed
                 ? "pointer-events-none -translate-x-4 opacity-0"
                 : "translate-x-0 opacity-100",
+              // On mobile (drawer), chat sidebar also fades if on chat page
+              isOnChatPage && "max-md:pointer-events-none max-md:-translate-x-4 max-md:opacity-0",
+              !isOnChatPage && "max-md:translate-x-0 max-md:opacity-100",
             )}
           >
             {/* Navigation */}
@@ -477,6 +474,7 @@ export default function AppLayout({
                         href={item.href}
                         className={cn(
                           "group flex items-center gap-3 rounded-oma-sm px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                          "min-h-[44px] md:min-h-0", // Touch-friendly on mobile
                           isActive
                             ? "glass-primary text-oma-primary"
                             : "text-oma-text-muted hover:bg-white/[0.04] hover:text-oma-text"
@@ -488,7 +486,9 @@ export default function AppLayout({
                             isActive && "text-oma-primary"
                           )}
                         />
-                        {!collapsed && <span>{item.label}</span>}
+                        {/* On mobile, always show labels (expanded). On desktop, respect collapsed */}
+                        {!sidebarCollapsed && <span>{item.label}</span>}
+                        {sidebarCollapsed && <span className="md:hidden">{item.label}</span>}
                       </Link>
                     </li>
                   );
@@ -501,17 +501,23 @@ export default function AppLayout({
 
             {/* Agent status cards */}
             <div className="px-2 py-3">
-              {!collapsed && (
+              {!sidebarCollapsed && (
                 <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-widest text-oma-text-subtle">
                   Agents
                 </p>
               )}
-              <div className={cn("space-y-1.5", collapsed && "space-y-2")}>
+              {/* On mobile, always show "Agents" label */}
+              {sidebarCollapsed && (
+                <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-widest text-oma-text-subtle md:hidden">
+                  Agents
+                </p>
+              )}
+              <div className={cn("space-y-1.5", sidebarCollapsed && "md:space-y-2")}>
                 {AGENTS.map((agent, i) => (
                   <AgentStatusCard
                     key={agent.id}
                     agent={agent}
-                    collapsed={collapsed}
+                    collapsed={sidebarCollapsed}
                     index={i}
                     onOpenChat={handleOpenChat}
                   />
@@ -521,14 +527,16 @@ export default function AppLayout({
           </div>
 
           {/* Chat sidebar content (overlaid) */}
-          {isOnChatPage && !collapsed && (
+          {isOnChatPage && (
             <div
               className={cn(
                 "absolute inset-0 flex flex-col transition-all duration-500",
-                "translate-x-0 opacity-100",
+                !sidebarCollapsed ? "translate-x-0 opacity-100" : "pointer-events-none translate-x-4 opacity-0",
+                // On mobile, always show chat sidebar when on chat page
+                "max-md:translate-x-0 max-md:opacity-100 max-md:pointer-events-auto",
               )}
             >
-              <ChatSidebar agentName={chatRouteMatch} collapsed={collapsed} />
+              <ChatSidebar agentName={chatRouteMatch!} collapsed={false} />
             </div>
           )}
         </div>
@@ -538,28 +546,31 @@ export default function AppLayout({
           {/* User row with theme toggle */}
           <div className={cn(
             "flex items-center",
-            collapsed ? "flex-col gap-2" : "gap-3"
+            sidebarCollapsed ? "flex-col gap-2 max-md:flex-row max-md:gap-3" : "gap-3"
           )}>
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-oma-primary to-oma-secondary text-xs font-bold text-white">
               U
             </div>
-            {!collapsed && (
+            {!sidebarCollapsed && (
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-oma-text">
-                  User
-                </p>
-                <p className="truncate text-xs text-oma-text-subtle">
-                  Developer
-                </p>
+                <p className="truncate text-sm font-medium text-oma-text">User</p>
+                <p className="truncate text-xs text-oma-text-subtle">Developer</p>
+              </div>
+            )}
+            {/* On mobile, always show user info */}
+            {sidebarCollapsed && (
+              <div className="hidden min-w-0 flex-1 max-md:block">
+                <p className="truncate text-sm font-medium text-oma-text">User</p>
+                <p className="truncate text-xs text-oma-text-subtle">Developer</p>
               </div>
             )}
             <ThemeToggle />
           </div>
 
-          {/* Collapse button */}
+          {/* Collapse button — hidden on mobile (sidebar is always expanded on mobile) */}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="glass-sm flex w-full items-center justify-center rounded-oma-sm py-1.5 text-oma-text-subtle transition-all duration-200 hover:bg-white/[0.06] hover:text-oma-text"
+            className="glass-sm hidden w-full items-center justify-center rounded-oma-sm py-1.5 text-oma-text-subtle transition-all duration-200 hover:bg-white/[0.06] hover:text-oma-text md:flex"
           >
             {collapsed ? (
               <ChevronRight className="size-4" />
@@ -573,54 +584,83 @@ export default function AppLayout({
       {/* ── Main content ── */}
       <div
         className={cn(
-          "flex flex-1 flex-col transition-all duration-300",
-          collapsed ? "pl-16" : "pl-60"
+          "flex flex-1 flex-col overflow-x-hidden transition-all duration-300",
+          // Mobile: no sidebar offset (sidebar is overlay drawer)
+          "pl-0",
+          // Desktop: offset by sidebar width
+          sidebarCollapsed ? "md:pl-16" : "md:pl-60"
         )}
       >
         {/* Header */}
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between px-6 backdrop-blur-xl">
-          <nav className="flex items-center gap-2" aria-label="Breadcrumb">
-            {breadcrumbs.map((crumb, i) => {
-              const isLast = i === breadcrumbs.length - 1;
-              const isProjectId = i === 1 && pathname.startsWith("/projects/");
-              return (
-                <span key={crumb.href} className="flex items-center gap-2">
-                  {i > 0 && (
-                    <span className="text-[10px] text-oma-text-subtle/50">/</span>
-                  )}
-                  {isLast ? (
-                    <span className="text-xs font-medium uppercase tracking-widest text-oma-text-muted">
-                      {isProjectId ? (
-                        <ProjectBreadcrumbLabel projectId={crumb.label} />
-                      ) : (
-                        crumb.label
-                      )}
-                    </span>
-                  ) : (
-                    <Link
-                      href={crumb.href}
-                      className="text-xs font-medium uppercase tracking-widest text-oma-text-subtle transition-colors duration-200 hover:text-oma-text"
-                    >
-                      {isProjectId ? (
-                        <ProjectBreadcrumbLabel projectId={crumb.label} />
-                      ) : (
-                        crumb.label
-                      )}
-                    </Link>
-                  )}
-                </span>
-              );
-            })}
-          </nav>
-
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between px-4 backdrop-blur-xl md:px-6">
+          {/* Left: hamburger (mobile) + breadcrumbs */}
           <div className="flex items-center gap-3">
+            {/* Hamburger menu — mobile only */}
+            <button
+              onClick={() => setMobileDrawerOpen(true)}
+              className="flex size-10 items-center justify-center rounded-oma-sm text-oma-text-muted transition-colors hover:text-oma-text md:hidden"
+              aria-label="Open menu"
+            >
+              <Menu className="size-5" />
+            </button>
+
+            {/* Mobile: show only last breadcrumb as page title */}
+            <span className="text-sm font-medium capitalize text-oma-text md:hidden">
+              {breadcrumbs.length > 0 && (() => {
+                const last = breadcrumbs[breadcrumbs.length - 1];
+                const isProjectId = breadcrumbs.length > 1 && pathname.startsWith("/projects/");
+                if (isProjectId && breadcrumbs.length === 2) {
+                  return <ProjectBreadcrumbLabel projectId={last.label} />;
+                }
+                return last.label;
+              })()}
+            </span>
+
+            {/* Desktop: full breadcrumbs */}
+            <nav className="hidden items-center gap-2 md:flex" aria-label="Breadcrumb">
+              {breadcrumbs.map((crumb, i) => {
+                const isLast = i === breadcrumbs.length - 1;
+                const isProjectId = i === 1 && pathname.startsWith("/projects/");
+                return (
+                  <span key={crumb.href} className="flex items-center gap-2">
+                    {i > 0 && (
+                      <span className="text-[10px] text-oma-text-subtle/50">/</span>
+                    )}
+                    {isLast ? (
+                      <span className="text-xs font-medium uppercase tracking-widest text-oma-text-muted">
+                        {isProjectId ? (
+                          <ProjectBreadcrumbLabel projectId={crumb.label} />
+                        ) : (
+                          crumb.label
+                        )}
+                      </span>
+                    ) : (
+                      <Link
+                        href={crumb.href}
+                        className="text-xs font-medium uppercase tracking-widest text-oma-text-subtle transition-colors duration-200 hover:text-oma-text"
+                      >
+                        {isProjectId ? (
+                          <ProjectBreadcrumbLabel projectId={crumb.label} />
+                        ) : (
+                          crumb.label
+                        )}
+                      </Link>
+                    )}
+                  </span>
+                );
+              })}
+            </nav>
+          </div>
+
+          {/* Right: widgets — hidden on mobile */}
+          <div className="hidden items-center gap-3 md:flex">
             <WeatherWidget />
             <SpotifyNowPlaying />
           </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 p-8">{children}</main>
+        <main className="flex-1 p-4 md:p-8">{children}</main>
       </div>
 
       {/* Agent chat modal */}
@@ -628,7 +668,11 @@ export default function AppLayout({
         <DialogContent
           showCloseButton={false}
           className={cn(
-            "glass-lg flex h-[92vh] w-[85vw] max-w-[1100px] flex-col overflow-hidden rounded-oma-lg border bg-oma-bg-elevated p-0 shadow-oma-lg",
+            "glass-lg flex flex-col overflow-hidden border bg-oma-bg-elevated p-0 shadow-oma-lg",
+            // Mobile: full-screen
+            "h-[100dvh] w-screen max-w-none rounded-none",
+            // Desktop: centered dialog
+            "md:h-[92vh] md:w-[85vw] md:max-w-[1100px] md:rounded-oma-lg",
             chatTarget ? ROLE_MODAL_BORDER[chatTarget.agentRole] : "border-oma-glass-border",
           )}
         >

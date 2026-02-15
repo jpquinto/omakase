@@ -180,7 +180,7 @@ export function AgentStatsGrid({
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
       {stats.map((stat, i) => (
         <StatCard
           key={stat.label}

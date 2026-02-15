@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { auth0 } from "@/lib/auth0";
-import { apiFetch } from "@/lib/api-client";
 
 /**
  * POST /api/auth/sync
