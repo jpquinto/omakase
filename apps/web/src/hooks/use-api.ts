@@ -57,6 +57,13 @@ function usePollingQuery<T>(
   return { data, isLoading, error, refetch: fetchData };
 }
 
+export function useOrchestratorHealth() {
+  return usePollingQuery<{ status: string; uptime: number; timestamp: string }>(
+    "/health",
+    15000,
+  );
+}
+
 export function useProjects(userId: string | undefined) {
   return usePollingQuery<Project[]>(
     userId ? `/api/projects?userId=${userId}` : null,
