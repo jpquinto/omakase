@@ -4,6 +4,29 @@ import { cn } from "@/lib/utils";
 
 const RELEASES = [
   {
+    version: "v0.0.7",
+    title: "Linear Workspace Integration",
+    changes: {
+      added: [
+        "Workspace-level Linear OAuth — connect once, sync all projects",
+        "Automatic 1:1 project mapping between Linear and Omakase",
+        "Workspaces DynamoDB table with organization lookup GSI",
+        "Project sync endpoint to discover and import Linear projects",
+        "Webhook routing by Linear project ID instead of team ID",
+      ],
+      changed: [
+        "Linear tokens stored on workspace record instead of per-project",
+        "OAuth callback creates workspace and triggers project sync automatically",
+        "Feature watcher resolves Linear token from workspace",
+        "Ticket sync routes issues by linearProjectId via new GSI",
+      ],
+      fixed: [
+        "OAuth callback handling empty workspace lookup responses",
+        "Elysia null serialization returning empty body instead of valid JSON",
+      ],
+    },
+  },
+  {
     version: "v0.0.6",
     title: "GitHub Integration & Project Wizard",
     changes: {
