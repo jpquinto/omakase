@@ -101,17 +101,15 @@ export const WELCOME_GLOW: Record<AgentRunRole, string> = {
 
 export interface VoiceProfile {
   gender: "male" | "female";
-  pitch: number;
-  rate: number;
-  preferredVoice?: string;
+  elevenLabsVoiceId: string;
 }
 
-/** Per-agent voice profiles for TTS. Miso & Toro = male, Nori & Koji = female */
+/** Per-agent voice profiles for ElevenLabs TTS. Miso & Toro = male, Nori & Koji = female */
 export const VOICE_PROFILES: Record<AgentRunRole, VoiceProfile> = {
-  architect: { gender: "male", pitch: 1.0, rate: 0.9 },
-  coder: { gender: "female", pitch: 1.0, rate: 1.0 },
-  reviewer: { gender: "female", pitch: 1.1, rate: 1.0 },
-  tester: { gender: "male", pitch: 0.9, rate: 1.0 },
+  architect: { gender: "male", elevenLabsVoiceId: "UaYTS0wayjmO9KD1LR4R" },
+  coder: { gender: "female", elevenLabsVoiceId: "uYXf8XasLslADfZ2MB4u" },
+  reviewer: { gender: "female", elevenLabsVoiceId: "8quEMRkSpwEaWBzHvTLv" },
+  tester: { gender: "male", elevenLabsVoiceId: "UaYTS0wayjmO9KD1LR4R" },
 };
 
 /** Check if the browser supports SpeechRecognition (STT) */

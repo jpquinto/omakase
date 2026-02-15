@@ -35,33 +35,26 @@ function stripMarkdownForTTS(text: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Voice selection — find the best matching voice for an agent
+// ElevenLabs TTS — fetch audio from /api/tts proxy
 // ---------------------------------------------------------------------------
 
-function findVoiceForRole(role: AgentRunRole): SpeechSynthesisVoice | null {
-  const profile = VOICE_PROFILES[role];
-  const voices = speechSynthesis.getVoices();
-  if (voices.length === 0) return null;
-
-  if (profile.preferredVoice) {
-    const preferred = voices.find((v) => v.name === profile.preferredVoice);
-    if (preferred) return preferred;
+async function fetchTTSAudio(text: string, voiceId: string): Promise<string | null> {
+  try {
+    const res = await fetch("/api/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, voiceId }),
+    });
+    if (!res.ok) {
+      console.error("[VoiceChat] TTS API error:", res.status, await res.text().catch(() => ""));
+      return null;
+    }
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+  } catch (err) {
+    console.error("[VoiceChat] TTS fetch failed:", err);
+    return null;
   }
-
-  const enVoices = voices.filter((v) => v.lang.startsWith("en"));
-  const pool = enVoices.length > 0 ? enVoices : voices;
-
-  const maleKeywords = ["male", "guy", "man", "daniel", "james", "david", "thomas", "aaron", "gordon", "reed"];
-  const femaleKeywords = ["female", "woman", "girl", "samantha", "karen", "victoria", "fiona", "moira", "tessa", "zoe"];
-  const keywords = profile.gender === "male" ? maleKeywords : femaleKeywords;
-
-  const genderMatch = pool.find((v) => {
-    const lower = v.name.toLowerCase();
-    return keywords.some((kw) => lower.includes(kw));
-  });
-  if (genderMatch) return genderMatch;
-
-  return pool[0] ?? voices[0] ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -120,7 +113,6 @@ export function useVoiceChat({ role, onTranscript }: UseVoiceChatOptions): UseVo
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const speechBufferRef = useRef("");
-  const utteranceCountRef = useRef(0);
   const roleRef = useRef(role);
   roleRef.current = role;
 
@@ -131,6 +123,90 @@ export function useVoiceChat({ role, onTranscript }: UseVoiceChatOptions): UseVo
   // Keep a ref to transcript for stopListening
   const transcriptRef = useRef("");
   transcriptRef.current = transcript;
+
+  // -----------------------------------------------------------------------
+  // Audio queue — sequential playback of ElevenLabs audio segments
+  // -----------------------------------------------------------------------
+
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioQueueRef = useRef<string[]>([]);
+  const isPlayingRef = useRef(false);
+
+  // Create the Audio element eagerly so it's "unlocked" by user gesture.
+  // Call this during toggleTalkMode (user click) to satisfy autoplay policy.
+  function ensureAudioElement() {
+    if (!audioRef.current) {
+      const audio = new Audio();
+      // Play a silent buffer to unlock the element for future programmatic plays
+      audio.src = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAABhgC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAAYYoRBqpAAAAAAD/+1DEAAAG4AN39AAAIQQAZ/KAABEAAADSAAAAEIAAANIAAAARMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/7UMQnAAADSAAAAAAAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ==";
+      audio.play().then(() => {
+        audio.pause();
+        audio.src = "";
+      }).catch(() => {
+        // Ignore — will still work in most browsers
+      });
+      audioRef.current = audio;
+    }
+  }
+
+  function playNext() {
+    const url = audioQueueRef.current.shift();
+    if (!url) {
+      isPlayingRef.current = false;
+      setIsSpeaking(false);
+      return;
+    }
+
+    isPlayingRef.current = true;
+    setIsSpeaking(true);
+
+    ensureAudioElement();
+    const audio = audioRef.current!;
+
+    audio.onended = () => {
+      URL.revokeObjectURL(url);
+      playNext();
+    };
+    audio.onerror = () => {
+      URL.revokeObjectURL(url);
+      playNext();
+    };
+
+    audio.src = url;
+    audio.play().catch((err) => {
+      console.error("[VoiceChat] Audio play failed:", err);
+      URL.revokeObjectURL(url);
+      playNext();
+    });
+  }
+
+  function enqueueAudio(blobUrl: string) {
+    audioQueueRef.current.push(blobUrl);
+    setIsSpeaking(true);
+    if (!isPlayingRef.current) {
+      playNext();
+    }
+  }
+
+  function clearAudioQueue() {
+    // Stop current playback
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.onended = null;
+      audioRef.current.onerror = null;
+      if (audioRef.current.src && audioRef.current.src.startsWith("blob:")) {
+        URL.revokeObjectURL(audioRef.current.src);
+      }
+      audioRef.current.src = "";
+    }
+    // Revoke all queued URLs
+    for (const url of audioQueueRef.current) {
+      URL.revokeObjectURL(url);
+    }
+    audioQueueRef.current = [];
+    isPlayingRef.current = false;
+    setIsSpeaking(false);
+  }
 
   useEffect(() => {
     setSupported(isVoiceChatSupported());
@@ -191,34 +267,48 @@ export function useVoiceChat({ role, onTranscript }: UseVoiceChatOptions): UseVo
   }
 
   // -----------------------------------------------------------------------
-  // TTS — speak a single sentence
+  // TTS — batch sentences and send to ElevenLabs via /api/tts
   // -----------------------------------------------------------------------
 
-  function speakSentence(text: string) {
-    const stripped = stripMarkdownForTTS(text);
+  // Accumulate sentences and flush as a single TTS request when we have
+  // enough text (~200 chars or 3+ sentences). This reduces API calls and
+  // credit usage vs sending every sentence individually.
+  const sentenceBatchRef = useRef<string[]>([]);
+  const batchCharCountRef = useRef(0);
+  const BATCH_CHAR_THRESHOLD = 200;
+  const BATCH_SENTENCE_THRESHOLD = 3;
+
+  function flushSentenceBatch() {
+    if (sentenceBatchRef.current.length === 0) return;
+
+    const combined = sentenceBatchRef.current.join(" ");
+    sentenceBatchRef.current = [];
+    batchCharCountRef.current = 0;
+
+    const stripped = stripMarkdownForTTS(combined);
     if (!stripped) return;
 
-    const utterance = new SpeechSynthesisUtterance(stripped);
-    const matchedVoice = findVoiceForRole(roleRef.current);
-    if (matchedVoice) utterance.voice = matchedVoice;
-    const profile = VOICE_PROFILES[roleRef.current];
-    utterance.pitch = profile.pitch;
-    utterance.rate = profile.rate;
-
-    utteranceCountRef.current += 1;
+    const voiceId = VOICE_PROFILES[roleRef.current].elevenLabsVoiceId;
     setIsSpeaking(true);
 
-    const onDone = () => {
-      utteranceCountRef.current -= 1;
-      if (utteranceCountRef.current <= 0) {
-        utteranceCountRef.current = 0;
-        setIsSpeaking(false);
+    fetchTTSAudio(stripped, voiceId).then((blobUrl) => {
+      if (blobUrl) {
+        enqueueAudio(blobUrl);
       }
-    };
-    utterance.onend = onDone;
-    utterance.onerror = onDone;
+    });
+  }
 
-    speechSynthesis.speak(utterance);
+  function enqueueSentence(text: string) {
+    sentenceBatchRef.current.push(text);
+    batchCharCountRef.current += text.length;
+
+    // Flush when we have enough text for a natural chunk
+    if (
+      batchCharCountRef.current >= BATCH_CHAR_THRESHOLD ||
+      sentenceBatchRef.current.length >= BATCH_SENTENCE_THRESHOLD
+    ) {
+      flushSentenceBatch();
+    }
   }
 
   // -----------------------------------------------------------------------
@@ -226,13 +316,10 @@ export function useVoiceChat({ role, onTranscript }: UseVoiceChatOptions): UseVo
   // -----------------------------------------------------------------------
 
   const startListening = useCallback(() => {
-    if (!isTalkModeRef.current) return;
     // Pause TTS if speaking (anti-feedback)
-    if (speechSynthesis.speaking) {
-      speechSynthesis.cancel();
-      setIsSpeaking(false);
-      utteranceCountRef.current = 0;
-    }
+    clearAudioQueue();
+    sentenceBatchRef.current = [];
+    batchCharCountRef.current = 0;
     setError(null);
     setTranscript("");
     const recognition = getRecognition();
@@ -255,10 +342,10 @@ export function useVoiceChat({ role, onTranscript }: UseVoiceChatOptions): UseVo
   }, []);
 
   const stopSpeaking = useCallback(() => {
-    speechSynthesis.cancel();
+    clearAudioQueue();
     speechBufferRef.current = "";
-    utteranceCountRef.current = 0;
-    setIsSpeaking(false);
+    sentenceBatchRef.current = [];
+    batchCharCountRef.current = 0;
   }, []);
 
   const feedStreamingToken = useCallback((token: string) => {
@@ -267,28 +354,34 @@ export function useVoiceChat({ role, onTranscript }: UseVoiceChatOptions): UseVo
     const { sentences, remainder } = extractSentences(speechBufferRef.current);
     speechBufferRef.current = remainder;
     for (const sentence of sentences) {
-      speakSentence(sentence);
+      enqueueSentence(sentence);
     }
   }, []);
 
   const flushSpeechBuffer = useCallback(() => {
+    // Push any remaining buffer as a final sentence
     if (speechBufferRef.current.trim()) {
-      speakSentence(speechBufferRef.current.trim());
+      enqueueSentence(speechBufferRef.current.trim());
       speechBufferRef.current = "";
     }
+    // Flush whatever is batched (even if under threshold)
+    flushSentenceBatch();
   }, []);
 
   const toggleTalkMode = useCallback(() => {
     setIsTalkMode((prev) => {
       if (prev) {
         recognitionRef.current?.stop();
-        speechSynthesis.cancel();
+        clearAudioQueue();
         setIsListening(false);
-        setIsSpeaking(false);
         setTranscript("");
         speechBufferRef.current = "";
-        utteranceCountRef.current = 0;
+        sentenceBatchRef.current = [];
+        batchCharCountRef.current = 0;
         setError(null);
+      } else {
+        // Unlock the audio element during user gesture (autoplay policy)
+        ensureAudioElement();
       }
       return !prev;
     });
@@ -298,7 +391,7 @@ export function useVoiceChat({ role, onTranscript }: UseVoiceChatOptions): UseVo
   useEffect(() => {
     return () => {
       recognitionRef.current?.stop();
-      speechSynthesis.cancel();
+      clearAudioQueue();
     };
   }, []);
 
