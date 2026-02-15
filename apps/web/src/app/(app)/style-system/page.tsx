@@ -89,7 +89,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { VoiceBlob } from "@/components/chat/voice-blob";
-import { Mic } from "lucide-react";
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from "@/components/ui/resizable";
+import { Mic, GripVertical, PanelLeftClose } from "lucide-react";
 
 // ============================================================================
 // Custom Hooks
@@ -153,6 +158,7 @@ const TAB_SECTIONS: Record<string, { id: string; label: string; icon: typeof Pal
     { id: "icons", label: "Icons", icon: Image },
     { id: "motion", label: "Motion", icon: Play },
     { id: "voice", label: "Voice", icon: MessageSquare },
+    { id: "resizable", label: "Resizable", icon: PanelLeftClose },
     { id: "spotify", label: "Spotify", icon: Play },
   ],
 };
@@ -3338,6 +3344,223 @@ function VoiceSection() {
   );
 }
 
+function ResizableSection() {
+  return (
+    <section id="resizable" className="py-20">
+      <SectionHeader
+        title="Resizable Panels"
+        subtitle="Drag-to-resize panel layouts powered by react-resizable-panels. Used in the workspace file explorer alongside agent chat."
+      />
+
+      {/* Horizontal two-panel: chat + explorer */}
+      <GlassCard className="mb-8">
+        <SubHeading>Horizontal Split &mdash; Chat + Explorer</SubHeading>
+        <p className="mb-6 text-sm text-oma-text-muted">
+          Drag the grip handle to resize. Mimics the work mode layout with a chat pane and file explorer.
+        </p>
+        <div className="overflow-hidden rounded-oma-lg border border-oma-glass-border">
+          <ResizablePanelGroup direction="horizontal" className="min-h-[320px]">
+            <ResizablePanel defaultSize={65} minSize={30}>
+              <div className="flex h-full flex-col bg-oma-bg">
+                <div className="flex items-center gap-3 border-b border-oma-glass-border px-4 py-3">
+                  <span className="text-lg">🍙</span>
+                  <div>
+                    <p className="text-sm font-medium text-oma-text">Nori</p>
+                    <p className="text-xs text-oma-text-subtle">coder &middot; work mode</p>
+                  </div>
+                  <span className="ml-auto flex items-center gap-1 text-xs text-oma-done">
+                    <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-oma-done" />
+                    live
+                  </span>
+                </div>
+                <div className="flex flex-1 flex-col justify-end gap-3 p-4">
+                  <div className="glass-sm max-w-[80%] self-end rounded-oma px-3 py-2 text-xs text-oma-text-muted">
+                    Add a resizable panel component to the workspace explorer
+                  </div>
+                  <div className="glass-sm max-w-[80%] rounded-oma border-l-2 border-oma-indigo px-3 py-2 text-xs text-oma-text-muted">
+                    I&apos;ll implement that using react-resizable-panels. Let me update the layout...
+                  </div>
+                  <div className="glass-sm max-w-[60%] rounded-oma border-l-2 border-oma-indigo px-3 py-2 font-mono text-xs text-oma-text-subtle">
+                    <code>Editing: workspace-explorer.tsx</code>
+                  </div>
+                </div>
+              </div>
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={35} minSize={15}>
+              <div className="flex h-full flex-col bg-oma-bg-elevated">
+                <div className="flex items-center gap-2 border-b border-oma-glass-border px-4 py-3">
+                  <Folder className="h-4 w-4 text-oma-text-muted" />
+                  <span className="text-sm font-medium text-oma-text">Workspace</span>
+                </div>
+                <div className="flex-1 py-1">
+                  {["src/", "components/", "lib/", "package.json", "tsconfig.json", "README.md"].map((f) => (
+                    <div
+                      key={f}
+                      className="flex items-center gap-2 px-4 py-1.5 text-xs text-oma-text-muted hover:bg-oma-bg-surface"
+                    >
+                      {f.endsWith("/") ? (
+                        <Folder className="h-3.5 w-3.5 text-oma-gold" />
+                      ) : (
+                        <Code className="h-3.5 w-3.5 text-oma-text-subtle" />
+                      )}
+                      <span className="font-mono">{f}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </div>
+      </GlassCard>
+
+      {/* Vertical split */}
+      <GlassCard className="mb-8">
+        <SubHeading>Vertical Split</SubHeading>
+        <p className="mb-6 text-sm text-oma-text-muted">
+          Panels can also split vertically. Useful for editor + terminal layouts.
+        </p>
+        <div className="overflow-hidden rounded-oma-lg border border-oma-glass-border">
+          <ResizablePanelGroup direction="vertical" className="min-h-[320px]">
+            <ResizablePanel defaultSize={60} minSize={20}>
+              <div className="flex h-full flex-col bg-oma-bg p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <Code className="h-4 w-4 text-oma-indigo" />
+                  <span className="font-mono text-xs text-oma-text-muted">index.ts</span>
+                </div>
+                <pre className="flex-1 font-mono text-xs leading-relaxed text-oma-text-muted">
+{`import { Elysia } from "elysia";
+
+const app = new Elysia()
+  .get("/health", () => ({
+    status: "healthy",
+    uptime: process.uptime(),
+  }))
+  .listen(8080);`}
+                </pre>
+              </div>
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={40} minSize={20}>
+              <div className="flex h-full flex-col bg-oma-bg-deep p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <Terminal className="h-4 w-4 text-oma-jade" />
+                  <span className="font-mono text-xs text-oma-jade">terminal</span>
+                </div>
+                <pre className="flex-1 font-mono text-xs leading-relaxed text-oma-jade/70">
+{`$ bun run dev
+[orchestrator] Elysia server listening on port 8080
+[orchestrator] Execution mode: local
+[orchestrator] Poll interval: 30000ms
+[orchestrator] Orchestrator started successfully.`}
+                </pre>
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </div>
+      </GlassCard>
+
+      {/* Three-panel layout */}
+      <GlassCard className="mb-8">
+        <SubHeading>Three-Panel Layout</SubHeading>
+        <p className="mb-6 text-sm text-oma-text-muted">
+          Nested panels for complex IDE-like layouts. Sidebar, main content, and detail panel.
+        </p>
+        <div className="overflow-hidden rounded-oma-lg border border-oma-glass-border">
+          <ResizablePanelGroup direction="horizontal" className="min-h-[320px]">
+            <ResizablePanel defaultSize={20} minSize={12} maxSize={30}>
+              <div className="flex h-full flex-col bg-oma-bg-elevated">
+                <div className="border-b border-oma-glass-border px-3 py-2.5">
+                  <span className="text-xs font-medium uppercase tracking-wider text-oma-text-subtle">Agents</span>
+                </div>
+                <div className="flex-1 py-1">
+                  {[
+                    { name: "Miso", mascot: "\uD83C\uDF5C", color: "text-oma-gold" },
+                    { name: "Nori", mascot: "\uD83C\uDF59", color: "text-oma-indigo" },
+                    { name: "Koji", mascot: "\uD83C\uDF76", color: "text-oma-secondary" },
+                    { name: "Toro", mascot: "\uD83C\uDF63", color: "text-oma-jade" },
+                  ].map((a) => (
+                    <div
+                      key={a.name}
+                      className={cn(
+                        "flex items-center gap-2 px-3 py-2 text-xs transition-colors hover:bg-oma-bg-surface",
+                        a.name === "Nori" && "bg-oma-bg-surface",
+                      )}
+                    >
+                      <span>{a.mascot}</span>
+                      <span className={cn("font-medium", a.name === "Nori" ? "text-oma-text" : "text-oma-text-muted")}>{a.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </ResizablePanel>
+            <ResizableHandle />
+            <ResizablePanel defaultSize={50} minSize={30}>
+              <div className="flex h-full flex-col bg-oma-bg">
+                <div className="flex items-center gap-2 border-b border-oma-glass-border px-4 py-2.5">
+                  <span>🍙</span>
+                  <span className="text-sm font-medium text-oma-text">Nori</span>
+                  <span className="rounded-oma-full bg-oma-indigo/20 px-2 py-0.5 text-xs text-oma-indigo">coder</span>
+                </div>
+                <div className="flex flex-1 items-center justify-center p-4">
+                  <p className="text-sm text-oma-text-subtle">Chat messages appear here</p>
+                </div>
+              </div>
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={30} minSize={15}>
+              <div className="flex h-full flex-col bg-oma-bg-elevated">
+                <div className="border-b border-oma-glass-border px-4 py-2.5">
+                  <span className="text-xs font-medium uppercase tracking-wider text-oma-text-subtle">Details</span>
+                </div>
+                <div className="space-y-3 p-4">
+                  <div>
+                    <p className="text-xs text-oma-text-subtle">Status</p>
+                    <p className="flex items-center gap-1.5 text-sm text-oma-done">
+                      <span className="inline-block h-2 w-2 rounded-full bg-oma-done" />
+                      Active
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-oma-text-subtle">Session</p>
+                    <p className="font-mono text-xs text-oma-text-muted">work-abc-123</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-oma-text-subtle">Duration</p>
+                    <p className="text-sm text-oma-text-muted">12m 34s</p>
+                  </div>
+                </div>
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </div>
+      </GlassCard>
+
+      {/* API reference */}
+      <GlassCard>
+        <SubHeading>Usage</SubHeading>
+        <pre className="overflow-x-auto rounded-oma-lg bg-oma-bg-deep p-6 font-mono text-xs leading-relaxed text-oma-text-muted">
+{`import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from "@/components/ui/resizable";
+
+<ResizablePanelGroup direction="horizontal">
+  <ResizablePanel defaultSize={70} minSize={30}>
+    {/* Main content */}
+  </ResizablePanel>
+  <ResizableHandle withHandle />
+  <ResizablePanel defaultSize={30} minSize={15}>
+    {/* Side panel */}
+  </ResizablePanel>
+</ResizablePanelGroup>`}
+        </pre>
+      </GlassCard>
+    </section>
+  );
+}
+
 function SpotifySection() {
   return (
     <section id="spotify" className="py-20">
@@ -3468,6 +3691,7 @@ function PatternsPanel({ onSectionChange }: { onSectionChange: (id: string) => v
       <div ref={observe("icons")}><IconsSection /></div>
       <div ref={observe("motion")}><MotionSection /></div>
       <div ref={observe("voice")}><VoiceSection /></div>
+      <div ref={observe("resizable")}><ResizableSection /></div>
       <div ref={observe("spotify")}><SpotifySection /></div>
     </div>
   );
