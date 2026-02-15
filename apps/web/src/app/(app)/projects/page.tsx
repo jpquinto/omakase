@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useProjects, useFeatureStats, useActiveAgents } from "@/hooks/use-api";
 import { ScrollReveal } from "@/components/scroll-reveal";
+import { CreateProjectWizard } from "@/components/create-project-wizard";
 import type { Project } from "@omakase/db";
 
 // ---------------------------------------------------------------------------
@@ -17,17 +19,28 @@ import type { Project } from "@omakase/db";
 const CURRENT_USER_ID = "user_test_001";
 
 export default function ProjectsPage() {
-  const { data: projects, isLoading, error } = useProjects(CURRENT_USER_ID);
+  const { data: projects, isLoading, error, refetch } = useProjects(CURRENT_USER_ID);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   return (
     <div>
+      {/* Project creation wizard */}
+      <CreateProjectWizard
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        onCreated={() => refetch()}
+      />
+
       {/* Page header */}
       <ScrollReveal>
         <div className="mb-8 flex items-center justify-between">
           <h1 className="font-serif text-2xl font-semibold text-oma-text">
             Projects
           </h1>
-          <button className="rounded-oma bg-gradient-to-r from-oma-primary to-oma-primary-dim px-5 py-2.5 text-sm font-medium text-white shadow-oma-sm transition-all duration-200 hover:shadow-oma-glow-primary hover:brightness-110">
+          <button
+            onClick={() => setWizardOpen(true)}
+            className="rounded-oma bg-gradient-to-r from-oma-primary to-oma-primary-dim px-5 py-2.5 text-sm font-medium text-white shadow-oma-sm transition-all duration-200 hover:shadow-oma-glow-primary hover:brightness-110"
+          >
             + New Project
           </button>
         </div>

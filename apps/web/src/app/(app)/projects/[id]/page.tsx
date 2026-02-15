@@ -24,10 +24,12 @@ import {
   LiquidTabsContent,
 } from "@/components/ui/liquid-tabs";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
-import { useProject, useFeatureStats, useActiveAgents, useProjectFeatures, useDisconnectLinear } from "@/hooks/use-api";
-import { apiFetch } from "@/lib/api-client";
+import { useProject, useFeatureStats, useActiveAgents, useProjectFeatures, useDisconnectLinear, useDisconnectGitHub } from "@/hooks/use-api";
+import { GitHubRepoSelector } from "@/components/github-repo-selector";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/api-client";
+import { Github } from "lucide-react";
 import type { AgentRunRole, Feature } from "@omakase/db";
 
 // ---------------------------------------------------------------------------
@@ -229,9 +231,9 @@ export default function ProjectDetailPage() {
             maxConcurrency={project.maxConcurrency}
             linearTeamId={project.linearTeamId}
             hasLinearConnection={hasLinearConnection}
-            githubRepoOwner={project.repoUrl?.split("/").slice(-2, -1)[0]}
-            githubRepoName={project.repoUrl?.split("/").pop()?.replace(".git", "")}
-            hasGitHubConnection={!!project.repoUrl}
+            githubInstallationId={project.githubInstallationId}
+            githubRepoOwner={project.githubRepoOwner}
+            githubRepoName={project.githubRepoName}
           />
         </LiquidTabsContent>
       </LiquidTabs>
@@ -336,16 +338,41 @@ interface SettingsTabProps {
   maxConcurrency: number;
   linearTeamId?: string;
   hasLinearConnection: boolean;
+  githubInstallationId?: number;
   githubRepoOwner?: string;
   githubRepoName?: string;
-  hasGitHubConnection: boolean;
 }
 
-function SettingsTab({ projectId, projectName, projectDescription, maxConcurrency, linearTeamId, hasLinearConnection, githubRepoOwner, githubRepoName, hasGitHubConnection }: SettingsTabProps) {
+function SettingsTab({ projectId, projectName, projectDescription, maxConcurrency, linearTeamId, hasLinearConnection, githubInstallationId, githubRepoOwner, githubRepoName }: SettingsTabProps) {
   const [yoloEnabled, setYoloEnabled] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
   const disconnectLinear = useDisconnectLinear();
+  const disconnectGitHub = useDisconnectGitHub();
+
+  // Controlled state for editable project fields
+  const [name, setName] = useState(projectName);
+  const [description, setDescription] = useState(projectDescription);
+  const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const hasChanges = name !== projectName || description !== projectDescription;
+
+  const handleSaveGeneral = useCallback(async () => {
+    setSaving(true);
+    setSaveSuccess(false);
+    try {
+      await apiFetch(`/api/projects/${projectId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name, description }),
+      });
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
+    } catch {
+      // Error handling — could add error state if needed
+    } finally {
+      setSaving(false);
+    }
+  }, [projectId, name, description]);
 
   const handleDisconnect = useCallback(async () => {
     setDisconnecting(true);
@@ -364,13 +391,20 @@ function SettingsTab({ projectId, projectName, projectDescription, maxConcurrenc
   const handleGitHubDisconnect = useCallback(async () => {
     setDisconnectingGitHub(true);
     try {
-      // TODO: implement useDisconnectGitHub hook
+      await disconnectGitHub(projectId);
       setShowGitHubDisconnectConfirm(false);
       window.location.reload();
     } catch {
       setDisconnectingGitHub(false);
     }
-  }, [projectId]);
+  }, [disconnectGitHub, projectId]);
+
+  // Determine GitHub connection state:
+  // 1. No installationId  -> needs to install GitHub App
+  // 2. installationId but no repoName -> needs to select a repo
+  // 3. repoName is set -> fully connected
+  const hasGitHubApp = !!githubInstallationId;
+  const hasGitHubRepo = !!(githubRepoOwner && githubRepoName);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -454,14 +488,16 @@ function SettingsTab({ projectId, projectName, projectDescription, maxConcurrenc
             GitHub Integration
           </h3>
 
-          {hasGitHubConnection ? (
+          {hasGitHubRepo ? (
+            /* State 3: Fully connected — show repo info and disconnect */
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="inline-block h-2.5 w-2.5 rounded-full bg-oma-done" />
                   <div>
                     <p className="text-sm font-medium text-oma-text">Connected</p>
-                    <p className="text-[11px] text-oma-text-muted">
+                    <p className="flex items-center gap-1.5 text-[11px] text-oma-text-muted">
+                      <Github className="size-3.5" />
                       {githubRepoOwner}/{githubRepoName}
                     </p>
                   </div>
@@ -497,7 +533,25 @@ function SettingsTab({ projectId, projectName, projectDescription, maxConcurrenc
                 </div>
               )}
             </div>
+          ) : hasGitHubApp ? (
+            /* State 2: App installed but no repo selected — show repo selector */
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <span className="inline-block h-2.5 w-2.5 rounded-full bg-oma-pending" />
+                <div>
+                  <p className="text-sm font-medium text-oma-text">GitHub App installed</p>
+                  <p className="text-[11px] text-oma-text-muted">
+                    Select a repository to enable automated PR creation
+                  </p>
+                </div>
+              </div>
+              <GitHubRepoSelector
+                projectId={projectId}
+                onConnected={() => window.location.reload()}
+              />
+            </div>
           ) : (
+            /* State 1: No GitHub App — show connect link */
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-oma-text">Not connected</p>
@@ -535,7 +589,8 @@ function SettingsTab({ projectId, projectName, projectDescription, maxConcurrenc
               <input
                 id="project-name"
                 type="text"
-                defaultValue={projectName}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 className="glass-sm w-full rounded-oma border border-oma-glass-border bg-transparent px-3 py-2.5 text-sm text-oma-text outline-none transition-colors focus:border-oma-primary focus:ring-1 focus:ring-oma-primary/30"
               />
             </div>
@@ -551,9 +606,31 @@ function SettingsTab({ projectId, projectName, projectDescription, maxConcurrenc
               <textarea
                 id="project-desc"
                 rows={3}
-                defaultValue={projectDescription}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
                 className="glass-sm w-full resize-none rounded-oma border border-oma-glass-border bg-transparent px-3 py-2.5 text-sm text-oma-text outline-none transition-colors focus:border-oma-primary focus:ring-1 focus:ring-oma-primary/30"
               />
+            </div>
+
+            {/* Save button */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleSaveGeneral}
+                disabled={!hasChanges || saving || !name.trim()}
+                className={cn(
+                  "rounded-oma px-4 py-2 text-sm font-medium transition-all",
+                  hasChanges && name.trim()
+                    ? "glass-primary text-oma-primary hover:scale-105"
+                    : "glass text-oma-text-faint cursor-not-allowed opacity-50",
+                )}
+              >
+                {saving ? "Saving..." : "Save Changes"}
+              </button>
+              {saveSuccess && (
+                <span className="text-xs text-oma-success animate-oma-fade-up">
+                  Saved successfully
+                </span>
+              )}
             </div>
           </div>
         </div>

@@ -83,6 +83,7 @@ export function useFeatureStats(projectId: string) {
     total: number;
     pending: number;
     inProgress: number;
+    reviewReady: number;
     passing: number;
     failing: number;
   }>(
@@ -184,6 +185,19 @@ export function useAgentMemories(agentName: string | undefined) {
 // a single API call via `apiFetch`. The caller is responsible for triggering
 // a refetch of any dependent queries after a mutation succeeds.
 // ---------------------------------------------------------------------------
+
+/** Create a new project. */
+export function useCreateProject() {
+  return useCallback(
+    async (data: { name: string; description?: string; ownerId: string }) => {
+      return apiFetch<Project>(`/api/projects`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    [],
+  );
+}
 
 /** Create a new feature within a project. */
 export function useCreateFeature() {
@@ -293,6 +307,15 @@ export function useRemoveDependency() {
 export function useDisconnectLinear() {
   return useCallback(async (projectId: string) => {
     await apiFetch<void>(`/api/projects/${projectId}/linear-token`, {
+      method: "DELETE",
+    });
+  }, []);
+}
+
+/** Disconnect a project from its GitHub integration. */
+export function useDisconnectGitHub() {
+  return useCallback(async (projectId: string) => {
+    await apiFetch<void>(`/api/projects/${projectId}/github`, {
       method: "DELETE",
     });
   }, []);
