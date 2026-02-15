@@ -50,23 +50,27 @@ function buildHeatmapGrid(
   // Determine the max count to normalize into 4 levels
   const maxCount = Math.max(...Array.from(countMap.values()), 1);
 
-  // Build 52 weeks x 7 days, starting ~1 year ago from today
-  const today = new Date();
-  const startDate = new Date(today);
-  startDate.setDate(startDate.getDate() - 52 * 7 + 1);
+  // Build 52 weeks x 7 days, starting ~1 year ago from today.
+  // All arithmetic uses UTC to avoid timezone-related day shifts
+  // (local evening in US timezones becomes next-day UTC, which would
+  // cause grid dates to never match the UTC-based API data).
+  const now = new Date();
+  const DAY_MS = 86_400_000;
+  const todayMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const startMs = todayMs - (52 * 7 - 1) * DAY_MS;
 
-  // Align to the previous Monday so weeks start consistently
-  const dayOfWeek = startDate.getDay();
-  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  startDate.setDate(startDate.getDate() + mondayOffset);
+  // Align to the previous Monday (getUTCDay: 0=Sun, 1=Mon, ...)
+  const startDay = new Date(startMs).getUTCDay();
+  const mondayOffset = startDay === 0 ? -6 : 1 - startDay;
+  let cursorMs = startMs + mondayOffset * DAY_MS;
 
   const grid: number[][] = [];
-  const cursor = new Date(startDate);
 
   for (let w = 0; w < 52; w++) {
     const week: number[] = [];
     for (let d = 0; d < 7; d++) {
-      const dateStr = cursor.toISOString().split("T")[0];
+      const dt = new Date(cursorMs);
+      const dateStr = `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
       const count = countMap.get(dateStr) ?? 0;
 
       // Normalize count to 0–4 level
@@ -80,7 +84,7 @@ function buildHeatmapGrid(
       }
 
       week.push(level);
-      cursor.setDate(cursor.getDate() + 1);
+      cursorMs += DAY_MS;
     }
     grid.push(week);
   }

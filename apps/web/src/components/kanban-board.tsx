@@ -3,9 +3,10 @@
 // ---------------------------------------------------------------------------
 // Kanban Board Component
 //
-// Renders features across four status columns: Pending, In Progress, Passing,
-// and Failing. Each column uses a glass surface with a colored left-border
-// accent. Cards use the Omakase liquid glass design system.
+// Renders features across five status columns: Pending, In Progress,
+// Review Ready, Passing, and Failing. Each column uses a glass surface with
+// a colored left-border accent. Cards use the Omakase liquid glass design
+// system.
 // ---------------------------------------------------------------------------
 
 import { useProjectFeatures } from "@/hooks/use-api";
@@ -21,6 +22,7 @@ interface ColumnConfig {
 const COLUMNS: ColumnConfig[] = [
   { status: "pending", label: "Pending", borderColor: "border-oma-pending" },
   { status: "in_progress", label: "In Progress", borderColor: "border-oma-progress" },
+  { status: "review_ready", label: "Ready for Review", borderColor: "border-oma-review" },
   { status: "passing", label: "Passing", borderColor: "border-oma-done" },
   { status: "failing", label: "Failing", borderColor: "border-oma-fail" },
 ];
@@ -58,7 +60,7 @@ export function KanbanBoard({ projectId }: KanbanBoardProps) {
   const featureList = allFeatures ?? [];
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
       {COLUMNS.map((column) => {
         const features = featureList.filter((f) => f.status === column.status);
         return (

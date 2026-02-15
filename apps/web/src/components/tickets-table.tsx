@@ -56,6 +56,7 @@ const STATUS_OPTIONS: { value: FeatureStatus | "all"; label: string }[] = [
   { value: "all", label: "All" },
   { value: "pending", label: "Pending" },
   { value: "in_progress", label: "In Progress" },
+  { value: "review_ready", label: "Review Ready" },
   { value: "passing", label: "Passing" },
   { value: "failing", label: "Failing" },
 ];
@@ -64,6 +65,7 @@ const STATUS_OPTIONS: { value: FeatureStatus | "all"; label: string }[] = [
 const EDITABLE_STATUS_OPTIONS: { value: FeatureStatus; label: string }[] = [
   { value: "pending", label: "Pending" },
   { value: "in_progress", label: "In Progress" },
+  { value: "review_ready", label: "Review Ready" },
   { value: "passing", label: "Passing" },
   { value: "failing", label: "Failing" },
 ];
@@ -103,6 +105,7 @@ function statusColor(status: FeatureStatus): string {
   const colors: Record<FeatureStatus, string> = {
     pending: "bg-oma-pending/20 text-oma-pending",
     in_progress: "bg-oma-progress/20 text-oma-progress",
+    review_ready: "bg-oma-review/20 text-oma-review",
     passing: "bg-oma-done/20 text-oma-done",
     failing: "bg-oma-fail/20 text-oma-fail",
   };
@@ -114,6 +117,7 @@ function statusLabel(status: FeatureStatus): string {
   const labels: Record<FeatureStatus, string> = {
     pending: "Pending",
     in_progress: "In Progress",
+    review_ready: "Review Ready",
     passing: "Passing",
     failing: "Failing",
   };
@@ -418,8 +422,9 @@ export function TicketsTable({
             const statusOrder: Record<FeatureStatus, number> = {
               pending: 0,
               in_progress: 1,
-              passing: 2,
-              failing: 3,
+              review_ready: 2,
+              passing: 3,
+              failing: 4,
             };
             comparison = (statusOrder[a.status] ?? 0) - (statusOrder[b.status] ?? 0);
             break;

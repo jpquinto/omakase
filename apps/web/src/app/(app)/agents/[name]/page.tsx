@@ -33,6 +33,7 @@ const AGENT_META: Record<
   string,
   {
     mascot: string;
+    displayName: string;
     role: string;
     color: string;
     accentColor: string;
@@ -43,6 +44,7 @@ const AGENT_META: Record<
 > = {
   miso: {
     mascot: "\u{1F35C}",
+    displayName: "Miso",
     role: "Architect",
     color: "from-oma-gold/20 to-oma-gold/5",
     accentColor: "text-oma-gold",
@@ -51,6 +53,7 @@ const AGENT_META: Record<
   },
   nori: {
     mascot: "\u{1F359}",
+    displayName: "Nori",
     role: "Coder",
     color: "from-oma-indigo/20 to-oma-indigo/5",
     accentColor: "text-oma-indigo",
@@ -59,6 +62,7 @@ const AGENT_META: Record<
   },
   koji: {
     mascot: "\u{1F376}",
+    displayName: "Koji",
     role: "Reviewer",
     color: "from-oma-secondary/20 to-oma-secondary/5",
     accentColor: "text-oma-secondary",
@@ -67,6 +71,7 @@ const AGENT_META: Record<
   },
   toro: {
     mascot: "\u{1F363}",
+    displayName: "Toro",
     role: "Tester",
     color: "from-oma-jade/20 to-oma-jade/5",
     accentColor: "text-oma-jade",
@@ -301,7 +306,7 @@ export default function AgentProfilePage() {
       ) : (
         <AgentProfileHero
           agentName={name}
-          displayName={profile?.displayName ?? meta.role}
+          displayName={profile?.displayName ?? meta.displayName}
           mascot={meta.mascot}
           role={meta.role}
           traits={profile?.traits ?? []}

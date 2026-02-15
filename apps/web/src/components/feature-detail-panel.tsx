@@ -45,6 +45,7 @@ interface FeatureDetailPanelProps {
 const FEATURE_STATUSES: { value: FeatureStatus; label: string; color: string }[] = [
   { value: "pending", label: "Pending", color: "bg-oma-pending/20 text-oma-pending" },
   { value: "in_progress", label: "In Progress", color: "bg-oma-progress/20 text-oma-progress" },
+  { value: "review_ready", label: "Review Ready", color: "bg-oma-review/20 text-oma-review" },
   { value: "passing", label: "Passing", color: "bg-oma-done/20 text-oma-done" },
   { value: "failing", label: "Failing", color: "bg-oma-fail/20 text-oma-fail" },
 ];

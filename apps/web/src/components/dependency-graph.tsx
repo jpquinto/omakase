@@ -15,7 +15,7 @@ import dagre from "dagre";
 interface GraphFeature {
   id: string;
   name: string;
-  status: "pending" | "in_progress" | "passing" | "failing";
+  status: "pending" | "in_progress" | "review_ready" | "passing" | "failing";
   dependencies: string[];
 }
 
@@ -37,6 +37,7 @@ function statusColor(status: GraphFeature["status"]): string {
   const colors: Record<GraphFeature["status"], string> = {
     pending: "#fbbf24",     // oma-pending
     in_progress: "#38bdf8", // oma-progress
+    review_ready: "#fbbf24", // oma-review (gold — needs attention)
     passing: "#4ade80",     // oma-done
     failing: "#f87171",     // oma-fail
   };
@@ -48,6 +49,7 @@ function statusLabel(status: GraphFeature["status"]): string {
   const labels: Record<GraphFeature["status"], string> = {
     pending: "Pending",
     in_progress: "In Progress",
+    review_ready: "Review Ready",
     passing: "Passing",
     failing: "Failing",
   };
@@ -180,7 +182,7 @@ export function DependencyGraph() {
     <div ref={containerRef} className="glass overflow-hidden rounded-oma-lg p-5">
       {/* Legend */}
       <div className="mb-4 flex items-center gap-5 px-1">
-        {(["pending", "in_progress", "passing", "failing"] as const).map((status) => (
+        {(["pending", "in_progress", "review_ready", "passing", "failing"] as const).map((status) => (
           <div key={status} className="flex items-center gap-1.5">
             <div
               className="h-3 w-3 rounded-oma-full"
