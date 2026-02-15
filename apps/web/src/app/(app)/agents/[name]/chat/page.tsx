@@ -5,10 +5,12 @@ import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { useAgentChat } from "@/hooks/use-agent-chat";
 import { useAgentThreads } from "@/hooks/use-agent-threads";
 import { useVoiceChat } from "@/hooks/use-voice-chat";
+import { useProjects } from "@/hooks/use-api";
 import { ConversationModeSelector } from "@/components/conversation-mode-selector";
 import { ChatMessageArea } from "@/components/chat/chat-message-area";
 import { ChatInput } from "@/components/chat/chat-input";
 import { ChatHeader } from "@/components/chat/chat-header";
+import { WorkspaceExplorer } from "@/components/chat/workspace-explorer";
 import { cn } from "@/lib/utils";
 import {
   ROLE_PALETTE,
@@ -50,6 +52,19 @@ export default function AgentChatPage() {
   const [pendingMode, setPendingMode] = useState<AgentThreadMode>("chat");
   const titleInputRef = useRef<HTMLInputElement>(null);
 
+  // Project selector (persisted per agent)
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem(`omakase:project:${name}`) ?? null;
+  });
+  const { data: projects } = useProjects("user_test_001");
+
+  const handleProjectChange = useCallback((id: string | null) => {
+    setSelectedProjectId(id);
+    if (id) localStorage.setItem(`omakase:project:${name}`, id);
+    else localStorage.removeItem(`omakase:project:${name}`);
+  }, [name]);
+
   const { threads, createThread, updateThread, refetch: refetchThreads, hasMore, loadMore } = useAgentThreads(name, null);
 
   // Resolve selected thread object
@@ -63,12 +78,23 @@ export default function AgentChatPage() {
       threadId: selectedThreadId ?? undefined,
       mode: currentMode,
       agentName: name,
+      projectId: selectedProjectId ?? undefined,
     },
   );
 
   // Voice chat
   const voice = useVoiceChat({ role: agentMeta?.agentRole ?? "architect" });
   const prevStreamContentRef = useRef("");
+
+  // When TTS mode is toggled on, sync the ref to current content
+  // so we don't read back everything that's already been streamed
+  const prevTalkModeRef = useRef(voice.isTalkMode);
+  useEffect(() => {
+    if (voice.isTalkMode && !prevTalkModeRef.current) {
+      prevStreamContentRef.current = streamingContent;
+    }
+    prevTalkModeRef.current = voice.isTalkMode;
+  }, [voice.isTalkMode, streamingContent]);
 
   // Feed streaming tokens to TTS when talk mode is active
   useEffect(() => {
@@ -99,6 +125,7 @@ export default function AgentChatPage() {
   const [input, setInput] = useState("");
   const [isScrolledUp, setIsScrolledUp] = useState(false);
   const [gameMenuOpen, setGameMenuOpen] = useState(false);
+  const [explorerOpen, setExplorerOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const prevMessageCount = useRef(0);
@@ -318,8 +345,10 @@ export default function AgentChatPage() {
   const hasMessages = messages.length > 0 || isThinking || streamingContent.length > 0;
   const canSend = true; // full-screen chat always allows sending (synthetic chat runId)
 
-  return (
-    <div className="-m-8 flex h-[calc(100vh-3.5rem)] flex-col">
+  const showExplorer = hasActiveWorkSession && explorerOpen && !!workSessionRunId;
+
+  const chatColumn = (
+    <div className="flex h-full min-w-0 flex-1 flex-col">
       <ChatHeader
         agent={agent}
         isWorkMode={isWorkMode}
@@ -340,6 +369,11 @@ export default function AgentChatPage() {
         onLaunchQuiz={handleLaunchQuiz}
         variant="fullscreen"
         onNewConversation={handleNewConversation}
+        explorerOpen={explorerOpen}
+        onToggleExplorer={hasActiveWorkSession ? () => setExplorerOpen((v) => !v) : undefined}
+        projects={projects}
+        selectedProjectId={selectedProjectId}
+        onProjectChange={handleProjectChange}
       />
 
       <ChatMessageArea
@@ -397,6 +431,27 @@ export default function AgentChatPage() {
         onStopSpeaking={voice.stopSpeaking}
         onVoiceSend={handleVoiceSend}
       />
+    </div>
+  );
+
+  if (!showExplorer) {
+    return (
+      <div className="-m-8 flex h-[calc(100vh-3.5rem)]">
+        {chatColumn}
+      </div>
+    );
+  }
+
+  return (
+    <div className="-m-8 flex h-[calc(100vh-3.5rem)]">
+      {chatColumn}
+      <div className={cn("h-full w-[380px] shrink-0 border-l", palette.border)}>
+        <WorkspaceExplorer
+          runId={workSessionRunId!}
+          role={agentMeta.agentRole}
+          onClose={() => setExplorerOpen(false)}
+        />
+      </div>
     </div>
   );
 }

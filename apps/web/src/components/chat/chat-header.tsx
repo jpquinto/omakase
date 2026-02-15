@@ -1,10 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { ROLE_PALETTE } from "@/lib/chat-constants";
 import type { AgentInfo } from "@/lib/chat-constants";
-import { Square, Gamepad2, Maximize2, Plus } from "lucide-react";
-import type { AgentThread } from "@omakase/db";
+import { Square, Gamepad2, Maximize2, Plus, FolderOpen, Briefcase, ChevronDown, Check } from "lucide-react";
+import type { AgentThread, Project } from "@omakase/db";
 
 // ---------------------------------------------------------------------------
 // ChatHeader — agent header bar for modal and fullscreen variants
@@ -36,6 +37,16 @@ interface ChatHeaderProps {
   onNavigateFullscreen?: () => void;
   /** Callback to start a new conversation (fullscreen only) */
   onNewConversation?: () => void;
+  /** Whether the workspace file explorer is open */
+  explorerOpen?: boolean;
+  /** Toggle workspace explorer (only shown when defined) */
+  onToggleExplorer?: () => void;
+  /** Available projects for the project selector */
+  projects?: Project[];
+  /** Currently selected project ID */
+  selectedProjectId?: string | null;
+  /** Callback when the user selects a different project */
+  onProjectChange?: (projectId: string | null) => void;
 }
 
 export function ChatHeader({
@@ -61,8 +72,15 @@ export function ChatHeader({
   fullscreenHref,
   onNavigateFullscreen,
   onNewConversation,
+  explorerOpen,
+  onToggleExplorer,
+  projects,
+  selectedProjectId,
+  onProjectChange,
 }: ChatHeaderProps) {
   const palette = ROLE_PALETTE[agent.role];
+  const [projectMenuOpen, setProjectMenuOpen] = useState(false);
+  const selectedProject = projects?.find((p) => p.id === selectedProjectId);
 
   return (
     <div className={cn(
@@ -132,6 +150,72 @@ export function ChatHeader({
           </button>
         )}
 
+        {/* Project selector */}
+        {onProjectChange && (
+          <div className="relative">
+            <button
+              onClick={() => !hasActiveWorkSession && setProjectMenuOpen(!projectMenuOpen)}
+              disabled={hasActiveWorkSession}
+              className={cn(
+                "glass-sm flex items-center gap-1.5 rounded-oma px-3 py-1.5 text-xs font-medium transition-all",
+                selectedProject
+                  ? "text-oma-text"
+                  : "text-oma-text-muted",
+                hasActiveWorkSession
+                  ? "cursor-not-allowed opacity-50"
+                  : "hover:text-oma-text",
+                projectMenuOpen && "bg-oma-bg-surface text-oma-text",
+              )}
+              aria-label="Select project"
+              title={hasActiveWorkSession ? "Cannot change project during a work session" : "Select project"}
+            >
+              <Briefcase className="h-3.5 w-3.5" />
+              <span className="max-w-[120px] truncate">
+                {selectedProject ? selectedProject.name : "No project"}
+              </span>
+              <ChevronDown className="h-3 w-3 opacity-50" />
+            </button>
+            {projectMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setProjectMenuOpen(false)} />
+                <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-oma-lg border border-oma-glass-border bg-oma-bg-elevated p-1.5 shadow-oma-lg animate-oma-scale-in">
+                  <button
+                    onClick={() => { onProjectChange(null); setProjectMenuOpen(false); }}
+                    className={cn(
+                      "flex w-full items-center gap-2.5 rounded-oma px-3 py-2 text-left text-sm transition-colors hover:bg-oma-bg-surface",
+                      !selectedProjectId && "text-oma-text",
+                      selectedProjectId && "text-oma-text-muted",
+                    )}
+                  >
+                    <span className="flex h-4 w-4 items-center justify-center">
+                      {!selectedProjectId && <Check className="h-3.5 w-3.5 text-oma-primary" />}
+                    </span>
+                    No project
+                  </button>
+                  {projects && projects.length > 0 && (
+                    <div className="my-1 border-t border-oma-glass-border" />
+                  )}
+                  {projects?.map((project) => (
+                    <button
+                      key={project.id}
+                      onClick={() => { onProjectChange(project.id); setProjectMenuOpen(false); }}
+                      className={cn(
+                        "flex w-full items-center gap-2.5 rounded-oma px-3 py-2 text-left text-sm transition-colors hover:bg-oma-bg-surface",
+                        selectedProjectId === project.id ? "text-oma-text" : "text-oma-text-muted",
+                      )}
+                    >
+                      <span className="flex h-4 w-4 items-center justify-center">
+                        {selectedProjectId === project.id && <Check className="h-3.5 w-3.5 text-oma-primary" />}
+                      </span>
+                      <span className="truncate">{project.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         {/* Game menu — chat mode only */}
         {!isWorkMode && (
           <div className="relative">
@@ -164,6 +248,20 @@ export function ChatHeader({
               </>
             )}
           </div>
+        )}
+        {/* Workspace explorer toggle (work mode only) */}
+        {onToggleExplorer && (
+          <button
+            onClick={onToggleExplorer}
+            className={cn(
+              "flex h-9 w-9 items-center justify-center rounded-oma text-oma-text-muted transition-all hover:text-oma-text",
+              explorerOpen && "bg-oma-bg-surface text-oma-text",
+            )}
+            aria-label={explorerOpen ? "Close file explorer" : "Open file explorer"}
+            title="Workspace files"
+          >
+            <FolderOpen className="h-4.5 w-4.5" />
+          </button>
         )}
         {hasActiveWorkSession && (
           <button

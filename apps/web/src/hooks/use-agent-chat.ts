@@ -234,11 +234,13 @@ export function useAgentChat(runId: string | null, options?: UseAgentChatOptions
           // Auto-create a thread if one doesn't exist yet
           let resolvedThreadId = threadId;
           if (!resolvedThreadId) {
+            // Derive title from first few words of the message
+            const title = content.split(/\s+/).slice(0, 6).join(" ").slice(0, 50) || "New conversation";
             const thread = await apiFetch<{ threadId: string }>(
               `/api/agents/${agentName}/threads`,
               {
                 method: "POST",
-                body: JSON.stringify({ projectId, mode: "work" }),
+                body: JSON.stringify({ projectId, title, mode: "work" }),
               },
             );
             resolvedThreadId = thread.threadId;
