@@ -5,8 +5,9 @@
  * the relevant data into Omakase features stored in DynamoDB via the
  * orchestrator API.
  *
- * Only issues that carry the configured trigger label (e.g. "omakase")
- * are ingested -- all other issues are silently ignored.
+ * Projects are resolved by matching the issue's Linear projectId to an
+ * Omakase project via the `by_linear_project` GSI.
+ * Issues without a Linear project are skipped.
  */
 
 import { apiFetch } from "@/lib/api-client";
@@ -47,9 +48,6 @@ export interface LinearTeam {
 
 /**
  * Shape of the `data` object for Issue webhook events from Linear.
- *
- * This is a subset of the fields Linear includes -- only the ones
- * relevant to Omakase are typed explicitly.
  */
 export interface LinearIssueEvent {
   id: string;
@@ -68,25 +66,12 @@ export interface LinearIssueEvent {
 }
 
 // -----------------------------------------------------------------------
-// Configuration
-// -----------------------------------------------------------------------
-
-/**
- * The Linear label name that marks an issue for ingestion into Omakase.
- * Only issues carrying this label will be synced as features.
- */
-const TRIGGER_LABEL = process.env.LINEAR_TRIGGER_LABEL ?? "omakase";
-
-// -----------------------------------------------------------------------
 // Priority Mapping
 // -----------------------------------------------------------------------
 
 /**
  * Map Linear priority (0 = no priority, 1 = urgent, 4 = low) to
  * Omakase priority (1 = critical, 5 = minor).
- *
- * Linear priority 0 (no priority) maps to Omakase 3 (medium) as a
- * reasonable default.
  */
 function mapLinearPriority(linearPriority: number): number {
   const mapping: Record<number, number> = {
@@ -103,20 +88,9 @@ function mapLinearPriority(linearPriority: number): number {
 // Status Mapping (Linear -> Omakase)
 // -----------------------------------------------------------------------
 
-/**
- * Map a Linear workflow state to an Omakase feature status.
- *
- * Linear states have both a `type` (category: unstarted, started,
- * completed, cancelled) and a human-readable `name`. We match on
- * the type first (more reliable), then fall back to well-known names.
- *
- * Returns `null` when the state cannot be mapped, signalling that no
- * status update should be applied.
- */
 function mapLinearStateToFeatureStatus(
   state: LinearState,
 ): FeatureStatus | null {
-  // Match on the workflow state type (most reliable).
   switch (state.type) {
     case "unstarted":
       return "pending";
@@ -128,7 +102,6 @@ function mapLinearStateToFeatureStatus(
       return "failing";
   }
 
-  // Fall back to well-known state names for non-standard types.
   const nameLower = state.name.toLowerCase();
   if (nameLower === "todo" || nameLower === "backlog") return "pending";
   if (nameLower === "in progress") return "in_progress";
@@ -141,21 +114,26 @@ function mapLinearStateToFeatureStatus(
 // Helpers
 // -----------------------------------------------------------------------
 
-/** Check whether the issue carries the trigger label. */
-function hasTriggerLabel(labels: LinearLabel[]): boolean {
-  return labels.some(
-    (label) => label.name.toLowerCase() === TRIGGER_LABEL.toLowerCase(),
-  );
+function toIssueEvent(data: Record<string, unknown>): LinearIssueEvent {
+  return data as unknown as LinearIssueEvent;
 }
 
 /**
- * Narrow an unknown webhook `data` payload to the typed issue shape.
- *
- * Linear sends the full issue object under `data`; we cast defensively
- * so callers get type safety.
+ * Resolve the Omakase project for a Linear issue by its Linear project ID.
+ * Returns null if the issue has no projectId or no matching Omakase project exists.
  */
-function toIssueEvent(data: Record<string, unknown>): LinearIssueEvent {
-  return data as unknown as LinearIssueEvent;
+async function resolveProjectByLinearProjectId(
+  linearProjectId: string | undefined,
+): Promise<Project | null> {
+  if (!linearProjectId) {
+    return null;
+  }
+
+  try {
+    return await apiFetch<Project>(`/api/projects/by-linear-project/${linearProjectId}`);
+  } catch {
+    return null;
+  }
 }
 
 // -----------------------------------------------------------------------
@@ -165,42 +143,28 @@ function toIssueEvent(data: Record<string, unknown>): LinearIssueEvent {
 /**
  * Handle an Issue.create event from Linear.
  *
- * If the issue carries the trigger label, a corresponding feature is
- * created in DynamoDB (via the orchestrator API) with fields mapped
- * from the Linear issue.
+ * Routes the issue to an Omakase project by matching the issue's Linear
+ * projectId. Issues without a Linear project are skipped.
  */
 export async function handleIssueCreated(
   data: Record<string, unknown>,
 ): Promise<void> {
   const event = toIssueEvent(data);
 
-  if (!hasTriggerLabel(event.labels)) {
+  // Only issues assigned to a Linear project are tracked (1:1 mapping)
+  if (!event.projectId) {
+    console.log(`[Linear Sync] Issue ${event.identifier} has no Linear project — skipping.`);
     return;
   }
 
-  // Resolve project from team ID
-  if (!event.team?.id) {
-    console.warn(`[Linear Sync] Issue ${event.identifier} has no team ID — skipping.`);
-    return;
-  }
-
-  let project: Project;
-  try {
-    project = await apiFetch<Project>(`/api/projects/by-linear-team/${event.team.id}`);
-  } catch {
-    console.warn(`[Linear Sync] No project found for Linear team ${event.team.id} — skipping.`);
-    return;
-  }
-
-  // If the project is scoped to a specific Linear project, skip issues from other projects
-  if (project.linearProjectId && event.projectId && event.projectId !== project.linearProjectId) {
+  const project = await resolveProjectByLinearProjectId(event.projectId);
+  if (!project) {
+    console.warn(`[Linear Sync] No Omakase project found for Linear project ${event.projectId} — skipping.`);
     return;
   }
 
   const labelNames = event.labels.map((l) => l.name);
-  const category = labelNames
-    .filter((l) => l.toLowerCase() !== TRIGGER_LABEL.toLowerCase())
-    .join(", ") || undefined;
+  const category = labelNames.join(", ") || undefined;
 
   await apiFetch<Feature>("/api/features/from-linear", {
     method: "POST",
@@ -227,8 +191,8 @@ export async function handleIssueCreated(
 /**
  * Handle an Issue.update event from Linear.
  *
- * Finds the corresponding feature by `linearIssueId` and updates the
- * name, description, and priority if they have changed.
+ * Finds the corresponding feature by `linearIssueId` and updates it.
+ * If the issue isn't tracked yet but belongs to a mapped project, creates it.
  */
 export async function handleIssueUpdated(
   data: Record<string, unknown>,
@@ -244,9 +208,9 @@ export async function handleIssueUpdated(
   }
 
   if (!feature) {
-    // The issue may not have been ingested (e.g. label was added later).
-    // Check if it now has the trigger label and create it.
-    if (hasTriggerLabel(event.labels)) {
+    // The issue may not have been ingested yet. Try to create it if it
+    // belongs to a mapped Linear project.
+    if (event.projectId) {
       await handleIssueCreated(data);
     }
     return;

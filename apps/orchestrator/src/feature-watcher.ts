@@ -17,6 +17,7 @@ import { ECSClient } from "@aws-sdk/client-ecs";
 import {
   listActiveProjects,
   getReadyFeatures,
+  getWorkspace,
 } from "@omakase/dynamodb";
 
 import { ConcurrencyManager } from "./concurrency.js";
@@ -38,8 +39,8 @@ interface Project {
   status: "active" | "archived";
   repoUrl?: string;
   maxConcurrency: number;
-  linearAccessToken?: string;
-  linearTeamId?: string;
+  workspaceId?: string;
+  linearProjectId?: string;
   githubInstallationId?: number;
   githubRepoOwner?: string;
   githubRepoName?: string;
@@ -293,36 +294,51 @@ export class FeatureWatcher {
     // Acquire concurrency slot before starting
     this.concurrency.acquire(project.id, feature.id);
 
-    // Parse repo owner/name from the repo URL for PR creation
-    const { owner: repoOwner, name: repoName } = parseRepoUrl(project.repoUrl ?? "");
+    // Resolve Linear token from workspace, then build and run pipeline
+    this.resolvePipelineAndRun(project, feature);
+  }
 
-    const pipelineConfig: PipelineConfig = {
-      featureId: feature.id,
-      projectId: project.id,
-      featureName: feature.name,
-      featureDescription: feature.description ?? "",
-      repoUrl: project.repoUrl ?? "",
-      repoOwner: project.githubRepoOwner ?? repoOwner,
-      repoName: project.githubRepoName ?? repoName,
-      githubToken: this.githubToken ?? "",
-      baseBranch: project.githubDefaultBranch,
-      linearIssueId: feature.linearIssueId,
-      linearIssueUrl: feature.linearIssueUrl,
-      linearAccessToken: project.linearAccessToken,
-      githubInstallationId: project.githubInstallationId,
-      executionMode: this.executionMode,
-      localWorkspaceRoot: this.localWorkspaceRoot,
+  /**
+   * Resolve the Linear access token from the workspace and launch the pipeline.
+   */
+  private resolvePipelineAndRun(project: Project, feature: Feature): void {
+    // Resolve workspace token asynchronously
+    const resolveToken = async (): Promise<string | undefined> => {
+      if (!project.workspaceId) return undefined;
+      const workspace = await getWorkspace({ workspaceId: project.workspaceId });
+      return workspace?.linearAccessToken;
     };
 
-    const pipeline = new AgentPipeline(
-      pipelineConfig,
-      this.ecsConfig,
-      this.ecsClient,
-    );
+    resolveToken()
+      .then((linearAccessToken) => {
+        const { owner: repoOwner, name: repoName } = parseRepoUrl(project.repoUrl ?? "");
 
-    // Run the pipeline asynchronously. Release the concurrency slot when done.
-    pipeline
-      .execute()
+        const pipelineConfig: PipelineConfig = {
+          featureId: feature.id,
+          projectId: project.id,
+          featureName: feature.name,
+          featureDescription: feature.description ?? "",
+          repoUrl: project.repoUrl ?? "",
+          repoOwner: project.githubRepoOwner ?? repoOwner,
+          repoName: project.githubRepoName ?? repoName,
+          githubToken: this.githubToken ?? "",
+          baseBranch: project.githubDefaultBranch,
+          linearIssueId: feature.linearIssueId,
+          linearIssueUrl: feature.linearIssueUrl,
+          linearAccessToken,
+          githubInstallationId: project.githubInstallationId,
+          executionMode: this.executionMode,
+          localWorkspaceRoot: this.localWorkspaceRoot,
+        };
+
+        const pipeline = new AgentPipeline(
+          pipelineConfig,
+          this.ecsConfig,
+          this.ecsClient,
+        );
+
+        return pipeline.execute();
+      })
       .then((result) => {
         if (result.success) {
           console.log(

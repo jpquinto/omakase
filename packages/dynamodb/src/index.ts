@@ -9,7 +9,7 @@ export {
 export {
   createProject,
   getProject,
-  getByLinearTeamId,
+  getByLinearProjectId,
   listProjects,
   listActiveProjects,
   updateProject,
@@ -57,9 +57,12 @@ export {
 } from "./agent-runs.js";
 
 export {
-  syncTicket,
-  updateTicketStatus,
-} from "./tickets.js";
+  createWorkspace,
+  getWorkspace,
+  getByLinearOrgId,
+  updateWorkspace,
+  clearLinearConnection,
+} from "./workspaces.js";
 
 export {
   createMessage,

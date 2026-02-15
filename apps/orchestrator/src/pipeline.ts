@@ -67,7 +67,7 @@ export interface PipelineConfig {
   linearIssueId?: string;
   /** Linear issue URL for reference in comments (optional). */
   linearIssueUrl?: string;
-  /** Linear OAuth access token for API calls (optional). */
+  /** Linear OAuth access token for API calls (resolved from workspace, optional). */
   linearAccessToken?: string;
   /** GitHub App installation ID for per-project token generation (optional). */
   githubInstallationId?: number;

@@ -303,13 +303,26 @@ export function useRemoveDependency() {
   );
 }
 
-/** Disconnect a project from its Linear integration. */
+/** Disconnect a workspace from Linear (clears the token). */
 export function useDisconnectLinear() {
-  return useCallback(async (projectId: string) => {
-    await apiFetch<void>(`/api/projects/${projectId}/linear-token`, {
+  return useCallback(async (workspaceId: string) => {
+    await apiFetch<void>(`/api/workspaces/${workspaceId}/linear-token`, {
       method: "DELETE",
     });
   }, []);
+}
+
+/** Sync Linear projects to Omakase projects for a workspace. */
+export function useSyncLinearProjects() {
+  return useCallback(
+    async (workspaceId: string) => {
+      return apiFetch<{ synced: number; created: number; updated: number }>(
+        `/api/workspaces/${workspaceId}/sync-projects`,
+        { method: "POST" },
+      );
+    },
+    [],
+  );
 }
 
 /** Trigger a bulk sync of Linear issues to project features. */

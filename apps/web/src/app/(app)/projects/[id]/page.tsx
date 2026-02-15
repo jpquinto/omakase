@@ -94,7 +94,7 @@ export default function ProjectDetailPage() {
   const featuresPassing = stats?.passing ?? 0;
   const featuresTotal = stats?.total ?? 0;
   const activeAgents = activeAgentRuns?.length ?? 0;
-  const hasLinearConnection = !!(project?.linearTeamId && project?.linearAccessToken);
+  const hasLinearConnection = !!(project?.workspaceId && project?.linearProjectId);
 
   const handleOpenChat = useCallback((target: ChatTarget) => {
     setChatTarget(target);
@@ -229,8 +229,7 @@ export default function ProjectDetailPage() {
             projectName={project.name}
             projectDescription={project.description ?? ""}
             maxConcurrency={project.maxConcurrency}
-            linearTeamId={project.linearTeamId}
-            linearAccessToken={project.linearAccessToken}
+            workspaceId={project.workspaceId}
             linearProjectId={project.linearProjectId}
             linearProjectName={project.linearProjectName}
             hasLinearConnection={hasLinearConnection}
@@ -339,8 +338,7 @@ interface SettingsTabProps {
   projectName: string;
   projectDescription: string;
   maxConcurrency: number;
-  linearTeamId?: string;
-  linearAccessToken?: string;
+  workspaceId?: string;
   linearProjectId?: string;
   linearProjectName?: string;
   hasLinearConnection: boolean;
@@ -349,7 +347,7 @@ interface SettingsTabProps {
   githubRepoName?: string;
 }
 
-function SettingsTab({ projectId, projectName, projectDescription, maxConcurrency, linearTeamId, linearAccessToken: _linearAccessToken, linearProjectId, linearProjectName, hasLinearConnection, githubInstallationId, githubRepoOwner, githubRepoName }: SettingsTabProps) {
+function SettingsTab({ projectId, projectName, projectDescription, maxConcurrency, workspaceId, linearProjectId, linearProjectName, hasLinearConnection, githubInstallationId, githubRepoOwner, githubRepoName }: SettingsTabProps) {
   const [yoloEnabled, setYoloEnabled] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
@@ -362,7 +360,7 @@ function SettingsTab({ projectId, projectName, projectDescription, maxConcurrenc
   const [savingLinearProject, setSavingLinearProject] = useState(false);
 
   const loadLinearProjects = useCallback(async () => {
-    if (!linearTeamId) return;
+    if (!workspaceId) return;
     setLoadingLinearProjects(true);
     try {
       const projects = await apiFetch<Array<{ id: string; name: string }>>(`/api/linear/projects?projectId=${projectId}`);
@@ -372,7 +370,7 @@ function SettingsTab({ projectId, projectName, projectDescription, maxConcurrenc
     } finally {
       setLoadingLinearProjects(false);
     }
-  }, [linearTeamId, projectId]);
+  }, [workspaceId, projectId]);
 
   const handleSelectLinearProject = useCallback(async (lpId: string, lpName: string) => {
     setSavingLinearProject(true);
@@ -412,15 +410,16 @@ function SettingsTab({ projectId, projectName, projectDescription, maxConcurrenc
   }, [projectId, name, description]);
 
   const handleDisconnect = useCallback(async () => {
+    if (!workspaceId) return;
     setDisconnecting(true);
     try {
-      await disconnectLinear(projectId);
+      await disconnectLinear(workspaceId);
       setShowDisconnectConfirm(false);
       window.location.reload();
     } catch {
       setDisconnecting(false);
     }
-  }, [disconnectLinear, projectId]);
+  }, [disconnectLinear, workspaceId]);
 
   const [disconnectingGitHub, setDisconnectingGitHub] = useState(false);
   const [showGitHubDisconnectConfirm, setShowGitHubDisconnectConfirm] = useState(false);
@@ -464,7 +463,7 @@ function SettingsTab({ projectId, projectName, projectDescription, maxConcurrenc
                   <div>
                     <p className="text-sm font-medium text-oma-text">Connected</p>
                     <p className="text-[11px] text-oma-text-muted">
-                      Team ID: {linearTeamId}
+                      Project: {linearProjectName || linearProjectId}
                     </p>
                   </div>
                 </div>
@@ -547,7 +546,7 @@ function SettingsTab({ projectId, projectName, projectDescription, maxConcurrenc
                 </p>
               </div>
               <a
-                href={`/api/auth/linear?projectId=${projectId}`}
+                href="/api/auth/linear"
                 className="rounded-oma bg-oma-primary px-4 py-2 text-xs font-medium text-white transition-colors duration-200 hover:bg-oma-primary-dim"
               >
                 Connect Linear

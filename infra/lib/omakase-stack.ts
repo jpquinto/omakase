@@ -169,8 +169,46 @@ export class OmakaseStack extends cdk.Stack {
       "# Install Claude Code CLI",
       "npm install -g @anthropic-ai/claude-code",
       "",
-      "# Install CloudWatch agent",
+      "# Install and configure CloudWatch agent",
       "dnf install -y amazon-cloudwatch-agent",
+      "",
+      "# CloudWatch agent config — ship orchestrator + agent logs",
+      "mkdir -p /opt/aws/amazon-cloudwatch-agent/etc",
+      "cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json << 'CWCONFIG'",
+      '{',
+      '  "logs": {',
+      '    "logs_collected": {',
+      '      "journald": {',
+      '        "collect_list": [',
+      '          {',
+      '            "unit": "omakase-orchestrator",',
+      `            "log_group_name": "${orchestratorLogGroup.logGroupName}",`,
+      '            "log_stream_name": "{instance_id}/orchestrator"',
+      '          }',
+      '        ]',
+      '      },',
+      '      "files": {',
+      '        "collect_list": [',
+      '          {',
+      '            "file_path": "/opt/omakase/workspaces/*/agent-*.log",',
+      `            "log_group_name": "${orchestratorLogGroup.logGroupName}",`,
+      '            "log_stream_name": "{instance_id}/agents",',
+      '            "auto_removal": true',
+      '          },',
+      '          {',
+      '            "file_path": "/var/log/user-data.log",',
+      `            "log_group_name": "${orchestratorLogGroup.logGroupName}",`,
+      '            "log_stream_name": "{instance_id}/bootstrap"',
+      '          }',
+      '        ]',
+      '      }',
+      '    }',
+      '  }',
+      '}',
+      "CWCONFIG",
+      "",
+      "# Start CloudWatch agent",
+      "/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json",
       "",
       "# Create app directory",
       "mkdir -p /opt/omakase",
@@ -189,6 +227,9 @@ export class OmakaseStack extends cdk.Stack {
       "ExecStart=/usr/local/bin/bun run start",
       "Restart=always",
       "RestartSec=5",
+      "StandardOutput=journal",
+      "StandardError=journal",
+      "SyslogIdentifier=omakase-orchestrator",
       "Environment=PORT=8080",
       "Environment=EXECUTION_MODE=local",
       "Environment=LOCAL_WORKSPACE_ROOT=/opt/omakase/workspaces",
@@ -251,6 +292,14 @@ export class OmakaseStack extends cdk.Stack {
     // Tables are managed outside of this stack (already exist in AWS).
     // The orchestrator references them by name via DYNAMODB_TABLE_PREFIX.
     // See packages/dynamodb/ for table schemas and GSI definitions.
+    //
+    // Required tables:
+    //   omakase-workspaces  (PK: id, GSI by_linear_org: linearOrganizationId)
+    //   omakase-projects    (PK: id, GSI by_status: status, GSI by_linear_project: linearProjectId)
+    //   omakase-features    (PK: id, GSI by_project: projectId, GSI by_linearIssueId: linearIssueId)
+    //   omakase-agent-runs  (PK: id)
+    //   omakase-users       (PK: id, GSI by_auth0Id: auth0Id, GSI by_email: email)
+    //   omakase-agent-messages, omakase-agent-threads, omakase-agent-memories, omakase-agent-personalities
 
     // ---------------------------------------------------------------
     // Stack Outputs

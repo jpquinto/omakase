@@ -5,16 +5,16 @@ import { apiFetch } from "@/lib/api-client";
 /**
  * GET /api/auth/linear/callback
  *
- * Handles the OAuth 2.0 callback from Linear after the user has authorised
- * (or denied) access.
+ * Handles the OAuth 2.0 callback from Linear. Stores the token at the
+ * workspace level (not per-project) and triggers project sync.
  *
  * Flow:
- * 1. Validate the `state` parameter against the value stored in the cookie
- *    to prevent CSRF attacks.
- * 2. Exchange the authorisation `code` for an access token via the Linear
- *    token endpoint.
- * 3. Store the access token via the orchestrator API (placeholder).
- * 4. Redirect the user to /projects with a success indicator.
+ * 1. Validate the `state` parameter against the cookie.
+ * 2. Exchange the authorisation `code` for an access token.
+ * 3. Fetch organization and team info from Linear.
+ * 4. Create or update the workspace record via the orchestrator.
+ * 5. Trigger project sync to discover Linear projects.
+ * 6. Redirect to /projects with a success indicator.
  *
  * Required environment variables:
  *   LINEAR_CLIENT_ID      - OAuth application client ID
@@ -56,11 +56,8 @@ export async function GET(request: NextRequest) {
   const cookieStore = await cookies();
   const storedState = cookieStore.get("linear_oauth_state")?.value;
 
-  const projectId = cookieStore.get("linear_oauth_project_id")?.value;
-
-  // Clear the OAuth cookies immediately -- they are single-use.
+  // Clear the OAuth cookie immediately -- it is single-use.
   cookieStore.delete("linear_oauth_state");
-  cookieStore.delete("linear_oauth_project_id");
 
   if (!storedState || storedState !== state) {
     return NextResponse.json(
@@ -106,17 +103,12 @@ export async function GET(request: NextRequest) {
   const tokenData: LinearTokenResponse = await tokenResponse.json();
 
   // ------------------------------------------------------------------
-  // 3. Store the access token via the orchestrator API
+  // 3. Fetch organization and team info from Linear
   // ------------------------------------------------------------------
-  if (!projectId) {
-    console.error("[Linear OAuth] No projectId found in OAuth state cookie.");
-    const redirectUrl = new URL("/projects", request.url);
-    redirectUrl.searchParams.set("linear_error", "Missing project context for OAuth flow");
-    return NextResponse.redirect(redirectUrl);
-  }
+  let organizationId = "";
+  let organizationName = "";
+  let defaultTeamId = "";
 
-  // Fetch the user's default team from Linear to store alongside the token.
-  let linearTeamId: string | undefined;
   try {
     const viewerResponse = await fetch("https://api.linear.app/graphql", {
       method: "POST",
@@ -125,35 +117,98 @@ export async function GET(request: NextRequest) {
         Authorization: `Bearer ${tokenData.access_token}`,
       },
       body: JSON.stringify({
-        query: `{ viewer { organization { teams { nodes { id key name } } } } }`,
+        query: `{
+          viewer {
+            organization {
+              id
+              name
+              teams { nodes { id key name } }
+            }
+          }
+        }`,
       }),
     });
     const viewerData = await viewerResponse.json() as {
-      data?: { viewer: { organization: { teams: { nodes: { id: string; key: string; name: string }[] } } } };
+      data?: {
+        viewer: {
+          organization: {
+            id: string;
+            name: string;
+            teams: { nodes: { id: string; key: string; name: string }[] };
+          };
+        };
+      };
     };
-    linearTeamId = viewerData.data?.viewer?.organization?.teams?.nodes?.[0]?.id;
+    const org = viewerData.data?.viewer?.organization;
+    organizationId = org?.id ?? "";
+    organizationName = org?.name ?? "";
+    defaultTeamId = org?.teams?.nodes?.[0]?.id ?? "";
   } catch (err) {
-    console.warn("[Linear OAuth] Failed to fetch team from Linear:", err);
+    console.warn("[Linear OAuth] Failed to fetch organization from Linear:", err);
   }
 
+  // ------------------------------------------------------------------
+  // 4. Create or update workspace via orchestrator
+  // ------------------------------------------------------------------
+  let workspaceId: string | undefined;
+
   try {
-    await apiFetch(`/api/projects/${projectId}/linear-token`, {
-      method: "POST",
-      body: JSON.stringify({
-        linearAccessToken: tokenData.access_token,
-        linearTeamId: linearTeamId ?? "",
-      }),
-    });
-    console.log("[Linear OAuth] Access token persisted for project:", projectId);
+    // Check if a workspace already exists for this Linear organization.
+    if (organizationId) {
+      const existingRes = await apiFetch<{ id: string } | null>(
+        `/api/workspaces/by-linear-org/${organizationId}`,
+      );
+      if (existingRes?.id) {
+        workspaceId = existingRes.id;
+        // Update the existing workspace with the new token.
+        await apiFetch(`/api/workspaces/${workspaceId}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            linearAccessToken: tokenData.access_token,
+            linearOrganizationName: organizationName,
+            linearDefaultTeamId: defaultTeamId,
+          }),
+        });
+      }
+    }
+
+    if (!workspaceId) {
+      // Create a new workspace.
+      const newWorkspace = await apiFetch<{ id: string }>(`/api/workspaces`, {
+        method: "POST",
+        body: JSON.stringify({
+          linearAccessToken: tokenData.access_token,
+          linearOrganizationId: organizationId,
+          linearOrganizationName: organizationName,
+          linearDefaultTeamId: defaultTeamId,
+        }),
+      });
+      workspaceId = newWorkspace.id;
+    }
+
+    console.log("[Linear OAuth] Workspace stored:", workspaceId);
   } catch (err) {
-    console.error("[Linear OAuth] Failed to persist access token:", err);
+    console.error("[Linear OAuth] Failed to persist workspace:", err);
     const redirectUrl = new URL("/projects", request.url);
     redirectUrl.searchParams.set("linear_error", "Failed to save Linear credentials");
     return NextResponse.redirect(redirectUrl);
   }
 
   // ------------------------------------------------------------------
-  // 4. Redirect to /projects with a success message
+  // 5. Trigger project sync to discover Linear projects
+  // ------------------------------------------------------------------
+  try {
+    await apiFetch(`/api/workspaces/${workspaceId}/sync-projects`, {
+      method: "POST",
+    });
+    console.log("[Linear OAuth] Project sync triggered for workspace:", workspaceId);
+  } catch (err) {
+    // Non-critical — project sync can be done manually later.
+    console.warn("[Linear OAuth] Project sync failed:", err);
+  }
+
+  // ------------------------------------------------------------------
+  // 6. Redirect to /projects with a success message
   // ------------------------------------------------------------------
   const redirectUrl = new URL("/projects", request.url);
   redirectUrl.searchParams.set("linear_connected", "true");

@@ -1,31 +1,21 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
 /**
  * GET /api/auth/linear
  *
- * Initiates the Linear OAuth 2.0 authorization code flow.
+ * Initiates the Linear OAuth 2.0 authorization code flow at the workspace level.
+ * No projectId is required — the connection is workspace-scoped.
  *
  * 1. Generates a cryptographically random state token for CSRF protection.
- * 2. Stores the state in an HTTP-only cookie so it can be validated in the
- *    callback handler.
+ * 2. Stores the state in an HTTP-only cookie.
  * 3. Redirects the user to the Linear authorization page.
  *
  * Required environment variables:
- *   LINEAR_CLIENT_ID   - OAuth application client ID from Linear
+ *   LINEAR_CLIENT_ID    - OAuth application client ID from Linear
  *   LINEAR_REDIRECT_URI - Must match the registered redirect URI
  */
-export async function GET(request: NextRequest) {
-  const { searchParams } = request.nextUrl;
-  const projectId = searchParams.get("projectId");
-
-  if (!projectId) {
-    return NextResponse.json(
-      { error: "Missing required query parameter: projectId" },
-      { status: 400 },
-    );
-  }
-
+export async function GET() {
   const clientId = process.env.LINEAR_CLIENT_ID;
   const redirectUri = process.env.LINEAR_REDIRECT_URI;
 
@@ -43,8 +33,7 @@ export async function GET(request: NextRequest) {
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 
-  // Persist the state and projectId in HTTP-only cookies so the callback
-  // can verify the state and associate the token with the correct project.
+  // Persist the state in an HTTP-only cookie so the callback can verify it.
   const cookieStore = await cookies();
   const cookieOptions = {
     httpOnly: true,
@@ -54,7 +43,6 @@ export async function GET(request: NextRequest) {
     maxAge: 600,
   };
   cookieStore.set("linear_oauth_state", state, cookieOptions);
-  cookieStore.set("linear_oauth_project_id", projectId, cookieOptions);
 
   const params = new URLSearchParams({
     client_id: clientId,
@@ -62,7 +50,6 @@ export async function GET(request: NextRequest) {
     response_type: "code",
     scope: "read,write",
     state,
-    // Prompt the user each time to ensure explicit consent.
     prompt: "consent",
   });
 

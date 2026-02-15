@@ -60,8 +60,7 @@ export async function updateProject(params: {
   description?: string;
   status?: string;
   repoUrl?: string;
-  linearTeamId?: string;
-  linearAccessToken?: string;
+  workspaceId?: string;
   linearProjectId?: string;
   linearProjectName?: string;
   githubInstallationId?: number;
@@ -99,11 +98,12 @@ export async function updateProject(params: {
   }));
 }
 
-export async function getByLinearTeamId(params: { linearTeamId: string }): Promise<Project | null> {
-  const result = await docClient.send(new ScanCommand({
+export async function getByLinearProjectId(params: { linearProjectId: string }): Promise<Project | null> {
+  const result = await docClient.send(new QueryCommand({
     TableName: TABLE(),
-    FilterExpression: "linearTeamId = :linearTeamId",
-    ExpressionAttributeValues: { ":linearTeamId": params.linearTeamId },
+    IndexName: "by_linear_project",
+    KeyConditionExpression: "linearProjectId = :linearProjectId",
+    ExpressionAttributeValues: { ":linearProjectId": params.linearProjectId },
     Limit: 1,
   }));
   return (result.Items?.[0] as Project) ?? null;

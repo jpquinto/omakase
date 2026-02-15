@@ -3,7 +3,7 @@ export type { Project, ProjectStatus, NewProject } from "./projects.js";
 export type { Feature, FeatureStatus, NewFeature } from "./features.js";
 export type { Agent, AgentRole, AgentStatus, NewAgent } from "./agents.js";
 export type { AgentRun, AgentRunRole, AgentRunStatus, NewAgentRun } from "./agent-runs.js";
-export type { Ticket, NewTicket } from "./tickets.js";
+export type { Workspace, NewWorkspace } from "./workspaces.js";
 export type { AgentMessage, AgentMessageSender, AgentMessageType, NewAgentMessage, QuizMetadata, QuizPhase, QuizQuestion } from "./agent-messages.js";
 export type { AgentMemory, AgentMemorySource, NewAgentMemory } from "./agent-memories.js";
 export type { AgentPersonality, NewAgentPersonality } from "./agent-personalities.js";

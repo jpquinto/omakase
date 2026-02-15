@@ -8,8 +8,7 @@ export interface Project {
   members: string[];
   repoUrl?: string;
   status: ProjectStatus;
-  linearTeamId?: string;
-  linearAccessToken?: string;
+  workspaceId?: string;
   linearProjectId?: string;
   linearProjectName?: string;
   githubInstallationId?: number;

@@ -47,8 +47,13 @@ import {
   bulkSyncFromLinear,
   updateFeature,
   deleteFeature,
-  getByLinearTeamId,
+  getByLinearProjectId,
   updateProject,
+  createWorkspace,
+  getWorkspace,
+  getByLinearOrgId,
+  updateWorkspace as updateWorkspaceRecord,
+  clearLinearConnection as clearWorkspaceLinear,
   markFeatureInProgress,
   clearGitHubConnection,
   clearGitHubInstallation,
@@ -78,7 +83,7 @@ import type { AgentMessageSender, AgentMessageType, AgentRunRole, AgentThreadMod
 
 import { FeatureWatcher, type FeatureWatcherConfig } from "./feature-watcher.js";
 import { AgentPipeline, type EcsConfig, type ExecutionMode } from "./pipeline.js";
-import { fetchAllTeamIssues } from "@omakase/shared";
+import { fetchAllTeamIssues, listLinearTeams, listLinearProjects } from "@omakase/shared";
 import { generateAgentResponse } from "./agent-responder.js";
 import { handleQuizMessage } from "./quiz-handler.js";
 import { subscribe } from "./stream-bus.js";
@@ -249,24 +254,117 @@ const app = new Elysia()
     await updateFromLinear({ featureId: params.featureId, name, description, priority, linearStateName, linearLabels, linearAssigneeName });
     return { success: true };
   })
-  .post("/api/projects/:projectId/linear-token", async ({ params, body }) => {
-    const { linearAccessToken, linearTeamId } = body as {
+  // Workspace CRUD endpoints
+  .post("/api/workspaces", async ({ body, set }) => {
+    const { linearAccessToken, linearOrganizationId, linearOrganizationName, linearDefaultTeamId, ownerId } = body as {
       linearAccessToken: string;
-      linearTeamId: string;
+      linearOrganizationId: string;
+      linearOrganizationName: string;
+      linearDefaultTeamId: string;
+      ownerId?: string;
     };
-    await updateProject({ projectId: params.projectId, linearAccessToken, linearTeamId });
+    const workspace = await createWorkspace({
+      ownerId: ownerId ?? "system",
+      linearAccessToken,
+      linearOrganizationId,
+      linearOrganizationName,
+      linearDefaultTeamId,
+    });
+    set.status = 201;
+    return workspace;
+  })
+  .get("/api/workspaces/:id", async ({ params }) => {
+    const workspace = await getWorkspace({ workspaceId: params.id });
+    if (!workspace) {
+      return new Response(JSON.stringify({ error: "Workspace not found" }), { status: 404 });
+    }
+    return workspace;
+  })
+  .get("/api/workspaces/by-linear-org/:orgId", async ({ params }) => {
+    const workspace = await getByLinearOrgId({ linearOrganizationId: params.orgId });
+    if (!workspace) {
+      return new Response(JSON.stringify({ error: "Workspace not found" }), { status: 404 });
+    }
+    return workspace;
+  })
+  .patch("/api/workspaces/:id", async ({ params, body }) => {
+    const { linearAccessToken, linearOrganizationName, linearDefaultTeamId } = body as {
+      linearAccessToken?: string;
+      linearOrganizationName?: string;
+      linearDefaultTeamId?: string;
+    };
+    await updateWorkspaceRecord({ workspaceId: params.id, linearAccessToken, linearOrganizationName, linearDefaultTeamId });
     return { success: true };
   })
-  .patch("/api/projects/:projectId/linear/project", async ({ params, body }) => {
-    const { linearProjectId, linearProjectName } = body as {
-      linearProjectId: string;
-      linearProjectName: string;
-    };
-    await updateProject({ projectId: params.projectId, linearProjectId, linearProjectName });
+  .delete("/api/workspaces/:id/linear-token", async ({ params }) => {
+    await clearWorkspaceLinear({ workspaceId: params.id });
     return { success: true };
   })
-  .get("/api/projects/by-linear-team/:teamId", async ({ params }) => {
-    const project = await getByLinearTeamId({ linearTeamId: params.teamId });
+  // Sync Linear projects to Omakase projects
+  .post("/api/workspaces/:id/sync-projects", async ({ params, set }) => {
+    const workspace = await getWorkspace({ workspaceId: params.id });
+    if (!workspace) {
+      set.status = 404;
+      return { error: "Workspace not found" };
+    }
+    if (!workspace.linearAccessToken) {
+      set.status = 400;
+      return { error: "Workspace is not connected to Linear" };
+    }
+
+    try {
+      // Fetch all teams and their projects from Linear
+      const teams = await listLinearTeams(workspace.linearAccessToken);
+      let created = 0;
+      let updated = 0;
+
+      for (const team of teams) {
+        const linearProjects = await listLinearProjects({
+          accessToken: workspace.linearAccessToken,
+          teamId: team.id,
+        });
+
+        for (const lp of linearProjects) {
+          // Check if an Omakase project already exists for this Linear project
+          const existing = await getByLinearProjectId({ linearProjectId: lp.id });
+          if (existing) {
+            // Update name if changed
+            if (existing.name !== lp.name || existing.linearProjectName !== lp.name) {
+              await updateProject({ projectId: existing.id, name: lp.name, linearProjectName: lp.name });
+              updated++;
+            }
+          } else {
+            // Create a new Omakase project mapped to this Linear project
+            const project = await createProject({
+              name: lp.name,
+              description: lp.description ?? undefined,
+              ownerId: workspace.ownerId,
+            });
+            await updateProject({
+              projectId: project.id,
+              workspaceId: workspace.id,
+              linearProjectId: lp.id,
+              linearProjectName: lp.name,
+            });
+            created++;
+          }
+        }
+      }
+
+      return { synced: created + updated, created, updated };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes("401") || message.includes("Unauthorized")) {
+        set.status = 401;
+        return { error: "Linear access token is expired or revoked. Please reconnect Linear." };
+      }
+      set.status = 500;
+      return { error: `Project sync failed: ${message}` };
+    }
+  })
+  // Project lookup by Linear project ID
+  .get("/api/projects/by-linear-project/:linearProjectId", async ({ params }) => {
+    const project = await getByLinearProjectId({ linearProjectId: params.linearProjectId });
     if (!project) {
       return new Response(JSON.stringify({ error: "Project not found" }), { status: 404 });
     }
@@ -407,16 +505,22 @@ const app = new Elysia()
       set.status = 404;
       return { error: "Project not found" };
     }
-    if (!project.linearAccessToken || !project.linearTeamId) {
+    if (!project.workspaceId || !project.linearProjectId) {
       set.status = 400;
       return { error: "Project is not connected to Linear" };
     }
 
+    // Resolve token from workspace
+    const workspace = await getWorkspace({ workspaceId: project.workspaceId });
+    if (!workspace?.linearAccessToken) {
+      set.status = 401;
+      return { error: "Linear access token not found. Please reconnect Linear in workspace settings." };
+    }
+
     try {
       const issues = await fetchAllTeamIssues({
-        accessToken: project.linearAccessToken,
-        teamId: project.linearTeamId,
-        label: "omakase",
+        accessToken: workspace.linearAccessToken,
+        teamId: workspace.linearDefaultTeamId,
         projectId: project.linearProjectId,
       });
 
@@ -499,6 +603,13 @@ const app = new Elysia()
       throw err;
     }
 
+    // Resolve Linear token from workspace
+    let linearAccessToken: string | undefined;
+    if (project.workspaceId) {
+      const ws = await getWorkspace({ workspaceId: project.workspaceId });
+      linearAccessToken = ws?.linearAccessToken;
+    }
+
     // Build pipeline config and launch
     const repoOwner = project.githubRepoOwner ?? "";
     const repoName = project.githubRepoName ?? "";
@@ -524,7 +635,7 @@ const app = new Elysia()
       baseBranch: project.githubDefaultBranch,
       linearIssueId: feature.linearIssueId,
       linearIssueUrl: feature.linearIssueUrl,
-      linearAccessToken: project.linearAccessToken,
+      linearAccessToken,
       githubInstallationId: project.githubInstallationId,
       executionMode: EXECUTION_MODE,
       localWorkspaceRoot: EXECUTION_MODE === "local" ? LOCAL_WORKSPACE_ROOT : undefined,
@@ -546,9 +657,9 @@ const app = new Elysia()
     set.status = 202;
     return { success: true, featureId: feature.id, assignedTo: agentName };
   })
-  // Linear disconnect endpoint
-  .delete("/api/projects/:projectId/linear-token", async ({ params }) => {
-    await updateProject({ projectId: params.projectId, linearAccessToken: "", linearTeamId: "", linearProjectId: "", linearProjectName: "" });
+  // Linear disconnect endpoint (clears project's Linear mapping)
+  .delete("/api/projects/:projectId/linear", async ({ params }) => {
+    await updateProject({ projectId: params.projectId, linearProjectId: "", linearProjectName: "", workspaceId: "" });
     return { success: true };
   })
   // GitHub App integration endpoints
