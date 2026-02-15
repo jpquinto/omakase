@@ -282,7 +282,7 @@ const app = new Elysia()
   })
   .get("/api/workspaces/by-linear-org/:orgId", async ({ params }) => {
     const workspace = await getByLinearOrgId({ linearOrganizationId: params.orgId });
-    return workspace ?? null;
+    return workspace ?? { id: null };
   })
   .patch("/api/workspaces/:id", async ({ params, body }) => {
     const { linearAccessToken, linearOrganizationName, linearDefaultTeamId } = body as {
