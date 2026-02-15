@@ -74,7 +74,7 @@ export class LinearSyncHook {
     try {
       await syncFeatureStatusToLinear({
         linearIssueId: this.config.linearIssueId!,
-        featureStatus: "passing",
+        featureStatus: "review_ready",
         linearAccessToken: this.config.linearAccessToken!,
       });
     } catch (error: unknown) {

@@ -23,14 +23,19 @@
 import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { ECSClient } from "@aws-sdk/client-ecs";
+import { join, resolve } from "path";
+import { readdir, stat, readFile } from "fs/promises";
 import {
+  createProject,
   listProjects,
+  listActiveProjects,
   getProject,
   listFeatures,
   getFeatureStats,
   listActiveAgents,
   getAgentLogs,
   getAgentRun,
+  getFeature,
   createFromLinear,
   createFeature,
   createFeaturesBulk,
@@ -40,6 +45,9 @@ import {
   deleteFeature,
   getByLinearTeamId,
   updateProject,
+  clearGitHubConnection,
+  clearGitHubInstallation,
+  transitionReviewReadyToPassing,
   addDependency,
   removeDependency,
   createMessage,
@@ -69,6 +77,12 @@ import { generateAgentResponse } from "./agent-responder.js";
 import { handleQuizMessage } from "./quiz-handler.js";
 import { subscribe } from "./stream-bus.js";
 import { WorkSessionManager } from "./work-session-manager.js";
+import {
+  isGitHubAppConfigured,
+  getInstallationToken,
+  listInstallationRepos,
+} from "./github-app.js";
+import { createPullRequest, buildPrBody } from "./pr-creator.js";
 
 // ---------------------------------------------------------------------------
 // Environment configuration
@@ -155,12 +169,29 @@ const app = new Elysia()
     if (!userId) return { error: "userId query parameter required" };
     return await listProjects({ userId });
   })
+  .post("/api/projects", async ({ body, set }) => {
+    const { name, description, ownerId } = body as {
+      name: string;
+      description?: string;
+      ownerId: string;
+    };
+    if (!name || !ownerId) {
+      set.status = 400;
+      return { error: "name and ownerId are required" };
+    }
+    return await createProject({ name, description, ownerId });
+  })
   .get("/api/projects/:projectId", async ({ params }) => {
     const project = await getProject({ projectId: params.projectId });
     if (!project) {
       return new Response(JSON.stringify({ error: "Project not found" }), { status: 404 });
     }
     return project;
+  })
+  .patch("/api/projects/:projectId", async ({ params, body }) => {
+    const { name, description } = body as { name?: string; description?: string };
+    await updateProject({ projectId: params.projectId, name, description });
+    return { success: true };
   })
   .get("/api/projects/:projectId/features", async ({ params }) => {
     return await listFeatures({ projectId: params.projectId });
@@ -317,7 +348,7 @@ const app = new Elysia()
       name,
       description,
       priority,
-      status: status as "pending" | "in_progress" | "passing" | "failing" | undefined,
+      status: status as "pending" | "in_progress" | "review_ready" | "passing" | "failing" | undefined,
       category,
     });
     return { success: true };
@@ -353,6 +384,161 @@ const app = new Elysia()
   .delete("/api/projects/:projectId/linear-token", async ({ params }) => {
     await updateProject({ projectId: params.projectId, linearAccessToken: "", linearTeamId: "" });
     return { success: true };
+  })
+  // GitHub App integration endpoints
+  .post("/api/projects/:projectId/github/install", async ({ params, body, set }) => {
+    const { githubInstallationId } = body as { githubInstallationId: number };
+    if (!githubInstallationId) {
+      set.status = 400;
+      return { error: "githubInstallationId is required" };
+    }
+    await updateProject({ projectId: params.projectId, githubInstallationId });
+    return { success: true };
+  })
+  .get("/api/projects/:projectId/github/repos", async ({ params, set }) => {
+    if (!isGitHubAppConfigured()) {
+      set.status = 503;
+      return { error: "GitHub App not configured" };
+    }
+    const project = await getProject({ projectId: params.projectId });
+    if (!project) {
+      set.status = 404;
+      return { error: "Project not found" };
+    }
+    if (!project.githubInstallationId) {
+      set.status = 400;
+      return { error: "Project has no GitHub App installation" };
+    }
+    const repos = await listInstallationRepos(project.githubInstallationId);
+    return repos;
+  })
+  .post("/api/projects/:projectId/github/connect-repo", async ({ params, body, set }) => {
+    const { owner, name, defaultBranch } = body as {
+      owner: string;
+      name: string;
+      defaultBranch: string;
+    };
+    if (!owner || !name) {
+      set.status = 400;
+      return { error: "owner and name are required" };
+    }
+    await updateProject({
+      projectId: params.projectId,
+      githubRepoOwner: owner,
+      githubRepoName: name,
+      githubDefaultBranch: defaultBranch || "main",
+      repoUrl: `https://github.com/${owner}/${name}.git`,
+    });
+    return { success: true };
+  })
+  .post("/api/projects/:projectId/github/disconnect", async ({ params }) => {
+    await clearGitHubConnection({ projectId: params.projectId });
+    return { success: true };
+  })
+  .delete("/api/github/installations/:installationId", async ({ params }) => {
+    await clearGitHubInstallation({ installationId: parseInt(params.installationId, 10) });
+    return { success: true };
+  })
+  .post("/api/github/installations/:installationId/repos-removed", async ({ params, body }) => {
+    const { removedRepos } = body as { removedRepos: string[] };
+    const installationId = parseInt(params.installationId, 10);
+    // Find projects with this installation and check if their repo was removed
+    const allProjects = await listActiveProjects();
+    for (const project of allProjects) {
+      if (
+        project.githubInstallationId === installationId &&
+        project.githubRepoOwner &&
+        project.githubRepoName
+      ) {
+        const fullName = `${project.githubRepoOwner}/${project.githubRepoName}`;
+        if (removedRepos.includes(fullName)) {
+          await clearGitHubConnection({ projectId: project.id });
+        }
+      }
+    }
+    return { success: true };
+  })
+  // PR creation endpoint (chat-triggered)
+  .post("/api/agent-runs/:runId/create-pr", async ({ params, set }) => {
+    const run = await getAgentRun({ runId: params.runId });
+    if (!run) {
+      set.status = 404;
+      return { error: "Agent run not found" };
+    }
+    const feature = await getFeature({ featureId: run.featureId });
+    if (!feature) {
+      set.status = 404;
+      return { error: "Feature not found" };
+    }
+    if (feature.status !== "review_ready") {
+      set.status = 409;
+      return { error: "Feature is not ready for PR creation" };
+    }
+    const project = await getProject({ projectId: run.projectId });
+    if (!project) {
+      set.status = 404;
+      return { error: "Project not found" };
+    }
+    if (!project.githubInstallationId) {
+      set.status = 400;
+      return { error: "Project has no GitHub connection" };
+    }
+    if (!project.githubRepoOwner || !project.githubRepoName) {
+      set.status = 400;
+      return { error: "Project has no connected repository" };
+    }
+
+    try {
+      const token = await getInstallationToken(project.githubInstallationId);
+      const baseBranch = project.githubDefaultBranch || "main";
+      const featureBranch = `agent/${feature.id}`;
+
+      const prBody = buildPrBody({
+        featureDescription: feature.description ?? feature.name,
+        implementationPlanSummary: "See branch for implementation details.",
+        testResultsSummary: "All tests passed.",
+      });
+
+      const result = await createPullRequest({
+        repoOwner: project.githubRepoOwner,
+        repoName: project.githubRepoName,
+        featureBranch,
+        baseBranch,
+        title: `feat: ${feature.name}`,
+        body: prBody,
+        githubToken: token,
+      });
+
+      // Transition feature from review_ready to passing
+      await transitionReviewReadyToPassing({ featureId: feature.id });
+
+      // Post pr_created message to chat
+      await createMessage({
+        runId: params.runId,
+        featureId: feature.id,
+        projectId: run.projectId,
+        sender: "system",
+        role: run.role,
+        content: `Pull request created: [#${result.number}](${result.url})`,
+        type: "pr_created",
+      });
+
+      return { success: true, prUrl: result.url, prNumber: result.number };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      // Post error message to chat
+      await createMessage({
+        runId: params.runId,
+        featureId: feature.id,
+        projectId: run.projectId,
+        sender: "system",
+        role: run.role,
+        content: `Failed to create pull request: ${message}`,
+        type: "error",
+      });
+      set.status = 500;
+      return { error: `PR creation failed: ${message}` };
+    }
   })
   // Agent chat endpoints
   .post("/api/agent-runs/:runId/messages", async ({ params, body, set }) => {
@@ -456,12 +642,24 @@ const app = new Elysia()
         }
 
         if (isWorkMode) {
-          // Route to WorkSessionManager
+          // Route to WorkSessionManager for follow-up messages.
+          // The initial prompt is already sent by startSession().
+          // Only forward messages that are genuine follow-ups (session must exist and not be busy with initial prompt).
           const session = workSessionManager.getSession(params.runId);
           if (session) {
-            workSessionManager.sendMessage(params.runId, content).catch((err) =>
-              console.error("[orchestrator] Work session message error:", err)
-            );
+            const sessionAge = Date.now() - new Date(session.startedAt).getTime();
+            if (sessionAge > 5_000) {
+              // This is a genuine follow-up message
+              console.log(`[orchestrator] Routing work follow-up to session runId=${params.runId}`);
+              workSessionManager.sendMessage(params.runId, content).catch((err) =>
+                console.error("[orchestrator] Work session message error:", err)
+              );
+            } else {
+              // Session was just created — initial prompt already sent, skip duplicate
+              console.log(`[orchestrator] Skipping duplicate send — session just started (${sessionAge}ms ago)`);
+            }
+          } else {
+            console.warn(`[orchestrator] Work mode but no session for runId=${params.runId}`);
           }
         } else {
           // Route to Anthropic API personality chat
@@ -485,13 +683,23 @@ const app = new Elysia()
     const url = new URL(request.url);
     const threadId = url.searchParams.get("threadId") ?? undefined;
 
+    console.log(`[sse] New SSE connection: runId=${runId} threadId=${threadId ?? "none"} lastEventId=${lastEventId ?? "none"}`);
+
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
         let lastTimestamp = lastEventId ?? "";
         let closed = false;
+        let eventsSent = 0;
 
         const send = (event: string, data: string, id?: string) => {
+          eventsSent++;
+          if (eventsSent <= 10) {
+            const preview = data.length > 80 ? data.slice(0, 80) + "..." : data;
+            console.log(`[sse] send #${eventsSent} runId=${runId} event=${event} data=${preview}`);
+          } else if (eventsSent === 11) {
+            console.log(`[sse] (suppressing further SSE send logs for runId=${runId})`);
+          }
           let payload = "";
           if (event !== "message") payload += `event: ${event}\n`;
           if (id) payload += `id: ${id}\n`;
@@ -503,6 +711,7 @@ const app = new Elysia()
         const initial = threadId
           ? await listMessagesByThread({ threadId, since: lastTimestamp || undefined })
           : await listMessages({ runId, since: lastTimestamp || undefined });
+        console.log(`[sse] Sending ${initial.length} initial messages for runId=${runId}`);
         for (const msg of initial) {
           send("message", JSON.stringify(msg), msg.timestamp);
           lastTimestamp = msg.timestamp;
@@ -555,6 +764,7 @@ const app = new Elysia()
 
         // Clean up when client disconnects
         request.signal.addEventListener("abort", () => {
+          console.log(`[sse] Client disconnected: runId=${runId} eventsSent=${eventsSent}`);
           clearInterval(interval);
           unsubscribe();
           if (!closed) {
@@ -707,8 +917,9 @@ const app = new Elysia()
       set.status = 400;
       return { error: "threadId and prompt are required" };
     }
-    // Look up project to get repoUrl (optional — if no project, run in workspace root)
+    // Look up project to get repoUrl and GitHub token (optional)
     let repoUrl: string | undefined;
+    let githubToken: string | undefined;
     if (projectId) {
       const project = await getProject({ projectId });
       if (!project) {
@@ -716,18 +927,30 @@ const app = new Elysia()
         return { error: "Project not found" };
       }
       repoUrl = project.repoUrl;
+      // Generate installation token if GitHub App is configured
+      if (project.githubInstallationId && isGitHubAppConfigured()) {
+        try {
+          githubToken = await getInstallationToken(project.githubInstallationId);
+        } catch (err) {
+          console.warn("[orchestrator] Failed to get GitHub installation token:", err);
+        }
+      }
     }
     try {
+      console.log(`[orchestrator] Starting work session: agent=${params.agentName} project=${projectId ?? "none"} thread=${threadId} repoUrl=${repoUrl ?? "none"}`);
       const result = await workSessionManager.startSession({
         agentName: params.agentName,
         projectId,
         threadId,
         prompt,
         repoUrl,
+        githubToken,
       });
+      console.log(`[orchestrator] Work session result: runId=${result.runId} status=${result.status}`);
       set.status = result.status === "existing" ? 200 : 201;
       return result;
     } catch (err) {
+      console.error(`[orchestrator] Work session start failed:`, err);
       set.status = 500;
       return { error: err instanceof Error ? err.message : String(err) };
     }
@@ -756,10 +979,114 @@ const app = new Elysia()
       return { active: false };
     }
     const session = workSessionManager.findSessionByThread(threadId);
-    if (session && session.process.exitCode === null) {
+    if (session) {
       return { active: true, runId: session.runId };
     }
     return { active: false };
+  })
+  // Workspace file browser endpoints
+  .get("/api/work-sessions/:runId/files", async ({ params, query, set }) => {
+    const cwd = workSessionManager.getSessionCwd(params.runId);
+    if (!cwd) {
+      set.status = 404;
+      return { error: "Work session not found" };
+    }
+    const reqPath = (query as Record<string, string>).path ?? "/";
+
+    // Prevent directory traversal
+    if (reqPath.includes("..")) {
+      set.status = 400;
+      return { error: "Invalid path" };
+    }
+
+    const EXCLUDED_DIRS = new Set([".git", "node_modules", ".next", ".claude", "__pycache__", ".turbo"]);
+    const fullPath = join(cwd, reqPath);
+
+    // Ensure resolved path is within the workspace
+    const resolved = resolve(fullPath);
+    if (!resolved.startsWith(resolve(cwd))) {
+      set.status = 400;
+      return { error: "Path outside workspace" };
+    }
+
+    try {
+      const dirents = await readdir(resolved, { withFileTypes: true });
+      const entries: Array<{ name: string; type: "file" | "dir"; size: number; modifiedAt: string }> = [];
+
+      for (const dirent of dirents) {
+        if (EXCLUDED_DIRS.has(dirent.name)) continue;
+        if (dirent.name.startsWith(".") && dirent.name !== ".env.example") continue;
+
+        try {
+          const entryPath = join(resolved, dirent.name);
+          const s = await stat(entryPath);
+          entries.push({
+            name: dirent.name,
+            type: dirent.isDirectory() ? "dir" : "file",
+            size: s.size,
+            modifiedAt: s.mtime.toISOString(),
+          });
+        } catch {
+          // Skip entries we can't stat
+        }
+      }
+
+      // Sort: directories first, then files, alphabetically
+      entries.sort((a, b) => {
+        if (a.type !== b.type) return a.type === "dir" ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+
+      return { entries };
+    } catch {
+      set.status = 404;
+      return { error: "Directory not found" };
+    }
+  })
+  .get("/api/work-sessions/:runId/file", async ({ params, query, set }) => {
+    const cwd = workSessionManager.getSessionCwd(params.runId);
+    if (!cwd) {
+      set.status = 404;
+      return { error: "Work session not found" };
+    }
+    const reqPath = (query as Record<string, string>).path;
+    if (!reqPath) {
+      set.status = 400;
+      return { error: "path query parameter is required" };
+    }
+
+    // Prevent directory traversal
+    if (reqPath.includes("..")) {
+      set.status = 400;
+      return { error: "Invalid path" };
+    }
+
+    const fullPath = join(cwd, reqPath);
+    const resolved = resolve(fullPath);
+    if (!resolved.startsWith(resolve(cwd))) {
+      set.status = 400;
+      return { error: "Path outside workspace" };
+    }
+
+    const MAX_FILE_SIZE = 100 * 1024; // 100KB
+
+    try {
+      const s = await stat(resolved);
+      if (s.isDirectory()) {
+        set.status = 400;
+        return { error: "Path is a directory" };
+      }
+      if (s.size > MAX_FILE_SIZE) {
+        set.status = 413;
+        return { error: "File too large", size: s.size, maxSize: MAX_FILE_SIZE };
+      }
+
+      const content = await readFile(resolved, "utf-8");
+      return { content, path: reqPath, size: s.size };
+    } catch {
+      set.status = 404;
+      return { error: "File not found" };
+    }
   })
   // Agent profile endpoints
   .get("/api/agents/:agentName/profile", async ({ params }) => {

@@ -50,19 +50,35 @@ echo "  Workspace  : ${WORKSPACE}"
 echo ""
 
 # ---------------------------------------------------------------------------
+# Configure authenticated URL if GITHUB_TOKEN is provided
+# ---------------------------------------------------------------------------
+
+CLONE_URL="${REPO_URL}"
+
+if [ -n "${GITHUB_TOKEN:-}" ]; then
+  # Replace https://github.com/... with https://x-access-token:{token}@github.com/...
+  CLONE_URL=$(echo "${REPO_URL}" | sed "s|https://github.com/|https://x-access-token:${GITHUB_TOKEN}@github.com/|")
+  echo "Using authenticated GitHub URL for clone/fetch."
+fi
+
+# ---------------------------------------------------------------------------
 # Clone the repository
 # ---------------------------------------------------------------------------
 
 if [ -d "${WORKSPACE}/.git" ]; then
   echo "Workspace already contains a git repository. Fetching latest changes..."
   cd "${WORKSPACE}"
+  # Update remote URL with fresh token if provided
+  if [ -n "${GITHUB_TOKEN:-}" ]; then
+    git remote set-url origin "${CLONE_URL}"
+  fi
   git fetch origin
 else
   echo "Cloning repository..."
   if [ "${GIT_DEPTH}" -gt 0 ] 2>/dev/null; then
-    git clone --depth "${GIT_DEPTH}" "${REPO_URL}" "${WORKSPACE}"
+    git clone --depth "${GIT_DEPTH}" "${CLONE_URL}" "${WORKSPACE}"
   else
-    git clone "${REPO_URL}" "${WORKSPACE}"
+    git clone "${CLONE_URL}" "${WORKSPACE}"
   fi
   cd "${WORKSPACE}"
 fi

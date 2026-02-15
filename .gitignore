@@ -1,3 +1,6 @@
+# Private keys
+*.pem
+
 # Agent-generated output directories
 generations/
 automaker/

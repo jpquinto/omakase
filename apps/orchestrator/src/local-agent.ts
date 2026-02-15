@@ -44,6 +44,8 @@ export interface StartLocalAgentOptions {
   baseBranch?: string;
   /** Root directory for local workspaces (default: /tmp/omakase-agents). */
   workspaceRoot?: string;
+  /** GitHub installation token for authenticated clone/fetch (optional). */
+  githubToken?: string;
 }
 
 /** Result of a successful local agent launch. */
@@ -102,6 +104,7 @@ export async function startLocalAgent(
     featureDescription,
     baseBranch = "main",
     workspaceRoot = DEFAULT_WORKSPACE_ROOT,
+    githubToken,
   } = options;
 
   // Create a shared workspace directory for this feature (all roles reuse it)
@@ -122,6 +125,7 @@ export async function startLocalAgent(
       FEATURE_DESCRIPTION: featureDescription,
       BASE_BRANCH: baseBranch,
       WORKSPACE: workspace,
+      ...(githubToken ? { GITHUB_TOKEN: githubToken } : {}),
     },
     stdout: "inherit",
     stderr: "inherit",

@@ -81,7 +81,12 @@ export async function generateAgentResponse(runId: string, userMessage: string, 
   }
 
   systemParts.push(
-    "\nKeep responses concise and conversational. " +
+    "\nCRITICAL RULE — BREVITY: You MUST keep responses extremely short. " +
+    "For casual or conversational messages (greetings, small talk, simple questions), reply in 1 sentence only. " +
+    "For straightforward questions, reply in 1–2 sentences max. " +
+    "Only write longer responses when the user explicitly asks for detailed explanation, code, or in-depth analysis. " +
+    "Think of yourself as a teammate texting — not writing an email. " +
+    "Never sign off with your name or a signature line. " +
     "When discussing code, use markdown formatting. " +
     "Stay in character and focus on your role's area of expertise."
   );
@@ -131,7 +136,7 @@ export async function generateAgentResponse(runId: string, userMessage: string, 
 
     const stream = getClient().messages.stream({
       model: "claude-sonnet-4-5-20250929",
-      max_tokens: 1024,
+      max_tokens: 512,
       system: systemParts.join("\n"),
       messages: merged,
     });

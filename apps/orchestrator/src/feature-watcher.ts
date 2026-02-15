@@ -40,6 +40,10 @@ interface Project {
   maxConcurrency: number;
   linearAccessToken?: string;
   linearTeamId?: string;
+  githubInstallationId?: number;
+  githubRepoOwner?: string;
+  githubRepoName?: string;
+  githubDefaultBranch?: string;
 }
 
 /** Minimal feature shape returned from the DynamoDB query. */
@@ -298,12 +302,14 @@ export class FeatureWatcher {
       featureName: feature.name,
       featureDescription: feature.description ?? "",
       repoUrl: project.repoUrl ?? "",
-      repoOwner,
-      repoName,
+      repoOwner: project.githubRepoOwner ?? repoOwner,
+      repoName: project.githubRepoName ?? repoName,
       githubToken: this.githubToken ?? "",
+      baseBranch: project.githubDefaultBranch,
       linearIssueId: feature.linearIssueId,
       linearIssueUrl: feature.linearIssueUrl,
       linearAccessToken: project.linearAccessToken,
+      githubInstallationId: project.githubInstallationId,
       executionMode: this.executionMode,
       localWorkspaceRoot: this.localWorkspaceRoot,
     };

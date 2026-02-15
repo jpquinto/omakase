@@ -17,10 +17,11 @@
 
 import { ECSClient } from "@aws-sdk/client-ecs";
 import {
-  markFeaturePassing as dbMarkFeaturePassing,
+  markFeatureReviewReady as dbMarkFeatureReviewReady,
   markFeatureFailing as dbMarkFeatureFailing,
   createAgentRun as dbCreateAgentRun,
   completeAgentRun as dbCompleteAgentRun,
+  createMessage as dbCreateMessage,
   listMessages,
 } from "@omakase/dynamodb";
 import type { AgentMessage } from "@omakase/db";
@@ -28,8 +29,8 @@ import type { AgentMessage } from "@omakase/db";
 import { startAgent, stopAgent, releaseFeature, type AgentRole } from "./ecs-agent.js";
 import { AgentMonitor, type AgentCompletionResult } from "./agent-monitor.js";
 import { startLocalAgent, LocalAgentMonitor } from "./local-agent.js";
-import { createPullRequest, buildPrBody } from "./pr-creator.js";
 import { LinearSyncHook } from "./linear-sync.js";
+import { getInstallationToken, isGitHubAppConfigured } from "./github-app.js";
 
 // ---------------------------------------------------------------------------
 // Execution mode
@@ -68,6 +69,8 @@ export interface PipelineConfig {
   linearIssueUrl?: string;
   /** Linear OAuth access token for API calls (optional). */
   linearAccessToken?: string;
+  /** GitHub App installation ID for per-project token generation (optional). */
+  githubInstallationId?: number;
   /** Execution mode: "ecs" for Fargate tasks, "local" for subprocesses. */
   executionMode?: ExecutionMode;
   /** Root directory for local agent workspaces (only used when executionMode is "local"). */
@@ -149,6 +152,9 @@ export class AgentPipeline {
   private readonly executionMode: ExecutionMode;
   private readonly linearSync: LinearSyncHook;
 
+  /** GitHub App installation ID for per-step token refresh. */
+  private readonly githubInstallationId: number | undefined;
+
   /** Timestamp of the last between-step message check. */
   private lastMessageCheck = "";
 
@@ -166,6 +172,7 @@ export class AgentPipeline {
     this.ecsConfig = ecsConfig;
     this.ecsClient = ecsClient;
     this.executionMode = config.executionMode ?? "ecs";
+    this.githubInstallationId = config.githubInstallationId;
     this.linearSync = new LinearSyncHook({
       linearAccessToken: config.linearAccessToken,
       linearIssueId: config.linearIssueId,
@@ -229,20 +236,19 @@ export class AgentPipeline {
       }
       console.log(`[pipeline] Tester step completed for feature ${this.featureId}`);
 
-      // All steps passed -- mark feature as passing and create PR
-      await this.markFeaturePassing();
-      const prUrl = await this.createPullRequest();
+      // All steps passed -- mark feature as review_ready (user triggers PR via chat)
+      await this.markFeatureReviewReady();
+      await this.postPrReadyMessage(testerResult.agentRunId);
 
-      // Notify Linear of success
-      await this.linearSync.onPipelineSuccess(prUrl ?? undefined);
+      // Notify Linear of success (no PR URL yet — user triggers it)
+      await this.linearSync.onPipelineSuccess(undefined);
 
       console.log(
-        `[pipeline] Pipeline SUCCEEDED for feature ${this.featureId}. PR: ${prUrl ?? "none"}`
+        `[pipeline] Pipeline SUCCEEDED for feature ${this.featureId}. Awaiting user PR creation.`
       );
 
       return {
         success: true,
-        prUrl: prUrl ?? undefined,
       };
     } catch (error: unknown) {
       // Unexpected error outside of the step retry logic
@@ -337,9 +343,9 @@ export class AgentPipeline {
   }
 
   /**
-   * Run a single pipeline step: create an agent run, launch the agent
-   * (ECS task or local subprocess), monitor it to completion, and return
-   * the result.
+   * Run a single pipeline step: create an agent run, generate a fresh
+   * GitHub installation token (if applicable), launch the agent (ECS task
+   * or local subprocess), monitor it to completion, and return the result.
    *
    * @param role - The agent role for this step.
    * @returns The step result.
@@ -348,16 +354,27 @@ export class AgentPipeline {
     // Create the agent run record in DynamoDB
     const agentRunId = await this.createAgentRun(role);
 
-    if (this.executionMode === "local") {
-      return this.runStepLocal(role, agentRunId);
+    // Generate a fresh installation token for this step (if available)
+    let stepGithubToken = this.config.githubToken;
+    if (this.githubInstallationId && isGitHubAppConfigured()) {
+      try {
+        stepGithubToken = await getInstallationToken(this.githubInstallationId);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.warn(`[pipeline] Failed to get installation token, falling back to global token: ${msg}`);
+      }
     }
-    return this.runStepEcs(role, agentRunId);
+
+    if (this.executionMode === "local") {
+      return this.runStepLocal(role, agentRunId, stepGithubToken);
+    }
+    return this.runStepEcs(role, agentRunId, stepGithubToken);
   }
 
   /**
    * Run a step via ECS Fargate task.
    */
-  private async runStepEcs(role: AgentRole, agentRunId: string): Promise<StepResult> {
+  private async runStepEcs(role: AgentRole, agentRunId: string, _githubToken?: string): Promise<StepResult> {
     // Launch the ECS task
     let taskArn: string;
     try {
@@ -414,7 +431,7 @@ export class AgentPipeline {
   /**
    * Run a step via local subprocess.
    */
-  private async runStepLocal(role: AgentRole, agentRunId: string): Promise<StepResult> {
+  private async runStepLocal(role: AgentRole, agentRunId: string, githubToken?: string): Promise<StepResult> {
     try {
       const launchResult = await startLocalAgent({
         featureId: this.featureId,
@@ -425,6 +442,7 @@ export class AgentPipeline {
         featureDescription: this.config.featureDescription,
         baseBranch: this.config.baseBranch,
         workspaceRoot: this.config.localWorkspaceRoot,
+        githubToken,
       });
 
       const monitor = new LocalAgentMonitor({
@@ -565,15 +583,15 @@ export class AgentPipeline {
   }
 
   /**
-   * Mark the feature as passing in DynamoDB.
+   * Mark the feature as review_ready in DynamoDB (awaiting user PR creation).
    */
-  private async markFeaturePassing(): Promise<void> {
+  private async markFeatureReviewReady(): Promise<void> {
     try {
-      await dbMarkFeaturePassing({ featureId: this.featureId });
+      await dbMarkFeatureReviewReady({ featureId: this.featureId });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(
-        `[pipeline] Failed to mark feature ${this.featureId} as passing: ${message}`
+        `[pipeline] Failed to mark feature ${this.featureId} as review_ready: ${message}`
       );
     }
   }
@@ -644,56 +662,43 @@ export class AgentPipeline {
   }
 
   // -------------------------------------------------------------------------
-  // PR creation
+  // PR-ready notification
   // -------------------------------------------------------------------------
 
   /**
-   * Create a GitHub pull request for the completed feature.
+   * Post a pr_ready message to the agent chat, signaling that the pipeline
+   * completed and the user can now create a PR via the chat UI.
    *
-   * @returns The PR URL, or null if PR creation failed (non-fatal).
+   * @param lastRunId - The agent run ID of the last step (tester).
    */
-  private async createPullRequest(): Promise<string | null> {
-    const { repoOwner, repoName, githubToken, baseBranch = "main" } = this.config;
-
-    // Skip PR creation if GitHub credentials are not configured
-    if (!githubToken || !repoOwner || !repoName) {
-      console.warn(
-        `[pipeline] Skipping PR creation for feature ${this.featureId}: ` +
-          "GitHub credentials not configured."
-      );
-      return null;
-    }
-
+  private async postPrReadyMessage(lastRunId: string): Promise<void> {
     const featureBranch = `agent/${this.featureId}`;
+    const baseBranch = this.config.baseBranch ?? "main";
 
-    const body = buildPrBody({
-      featureDescription: this.config.featureDescription,
-      // TODO: Extract actual summaries from agent run outputs once
-      // CloudWatch log integration is available.
-      implementationPlanSummary: "See branch for implementation details.",
-      testResultsSummary: "All tests passed.",
-    });
+    const content = [
+      `Pipeline completed successfully for **${this.config.featureName}**.`,
+      "",
+      `**Branch:** \`${featureBranch}\` → \`${baseBranch}\``,
+      `**Tests:** All passed`,
+      "",
+      "Click **Create PR** when you're ready to open a pull request.",
+    ].join("\n");
 
     try {
-      const result = await createPullRequest({
-        repoOwner,
-        repoName,
-        featureBranch,
-        baseBranch,
-        title: `feat: ${this.config.featureName}`,
-        body,
-        githubToken,
+      await dbCreateMessage({
+        runId: lastRunId,
+        featureId: this.featureId,
+        projectId: this.projectId,
+        sender: "system",
+        role: "tester",
+        content,
+        type: "pr_ready",
       });
-
-      console.log(`[pipeline] PR created: ${result.url}`);
-      return result.url;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(
-        `[pipeline] Failed to create PR for feature ${this.featureId}: ${message}`
+        `[pipeline] Failed to post pr_ready message for feature ${this.featureId}: ${message}`
       );
-      // PR creation failure is non-fatal -- the feature is already marked as passing
-      return null;
     }
   }
 }
