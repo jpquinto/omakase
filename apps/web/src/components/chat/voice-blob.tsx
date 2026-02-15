@@ -15,11 +15,13 @@ interface VoiceBlobProps {
   mascot: string;
   /** Called when the user taps the overlay to stop speaking */
   onStop?: () => void;
+  /** Live caption text (streaming content) displayed below the blob */
+  caption?: string;
   /** Additional class names on the root overlay */
   className?: string;
 }
 
-export function VoiceBlob({ active, colorRgb, mascot, onStop, className }: VoiceBlobProps) {
+export function VoiceBlob({ active, colorRgb, mascot, onStop, caption, className }: VoiceBlobProps) {
   if (!active) return null;
 
   return (
@@ -36,6 +38,15 @@ export function VoiceBlob({ active, colorRgb, mascot, onStop, className }: Voice
     >
       {/* Frosted glass backdrop */}
       <div className="absolute inset-0 bg-oma-bg/60 backdrop-blur-xl" />
+
+      {/* Live caption */}
+      {caption && (
+        <div className="absolute bottom-14 left-1/2 -translate-x-1/2 w-[80%] max-w-md pointer-events-none">
+          <p className="text-center text-sm leading-relaxed text-oma-text-muted line-clamp-3">
+            {caption}
+          </p>
+        </div>
+      )}
 
       {/* Hint text */}
       <span className="absolute bottom-6 left-1/2 -translate-x-1/2 text-xs text-oma-text-faint animate-[oma-fade-up_0.6s_ease-out_0.5s_both]">

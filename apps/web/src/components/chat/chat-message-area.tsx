@@ -70,6 +70,12 @@ export function ChatMessageArea({
           colorRgb={glowRgb}
           mascot={agent.mascot}
           onStop={onStopSpeaking}
+          caption={
+            streamingContent ||
+            (isSpeaking
+              ? messages.filter((m) => m.sender === "agent").at(-1)?.content
+              : undefined)
+          }
         />
 
         {/* Chat messages (scrollable) */}

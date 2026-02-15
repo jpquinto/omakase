@@ -4,10 +4,10 @@ import { useCallback, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ROLE_PALETTE, WELCOME_GLOW } from "@/lib/chat-constants";
 import type { AgentInfo } from "@/lib/chat-constants";
-import { Mic, MicOff, Volume2, VolumeOff } from "lucide-react";
+import { Mic, Speech } from "lucide-react";
 
 // ---------------------------------------------------------------------------
-// ChatInput — textarea + send button + voice toggle + status banners
+// ChatInput — textarea + send button + TTS toggle + mic button
 // ---------------------------------------------------------------------------
 
 interface ChatInputProps {
@@ -141,8 +141,37 @@ export function ChatInput({
         palette.border,
         showWelcome && "opacity-0 pointer-events-none",
       )}>
-        <div className="flex items-end gap-3">
-          {/* Talk mode toggle — left of input */}
+        {/* Listening overlay — shown when mic is active */}
+        {isListening && (
+          <div
+            className={cn(
+              "mb-3 flex items-center gap-3 rounded-oma-lg border px-4 py-3",
+              palette.border,
+              "border-opacity-60 glass-sm",
+            )}
+          >
+            {/* Waveform bars */}
+            <div className="flex items-center gap-[3px]">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <span
+                  key={i}
+                  className="inline-block w-[3px] rounded-full origin-bottom"
+                  style={{
+                    backgroundColor: `rgba(${glowRgb}, 0.8)`,
+                    animation: `voice-bar 0.8s ease-in-out ${i * 0.12}s infinite`,
+                    height: "16px",
+                  }}
+                />
+              ))}
+            </div>
+            <span className="flex-1 text-sm text-oma-text-muted italic truncate">
+              {displayTranscript || "Listening..."}
+            </span>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2">
+          {/* TTS toggle — left of input */}
           {voiceSupported && onToggleTalkMode && (
             <button
               onClick={onToggleTalkMode}
@@ -152,84 +181,41 @@ export function ChatInput({
                   ? "glass text-oma-text shadow-oma-sm"
                   : "text-oma-text-muted hover:text-oma-text",
               )}
-              aria-label={isTalkMode ? "Switch to text mode" : "Switch to voice mode"}
-              title={isTalkMode ? "Switch to text mode" : "Switch to voice mode"}
+              aria-label={isTalkMode ? "Disable voice responses" : "Enable voice responses"}
+              title={isTalkMode ? "Disable voice responses" : "Enable voice responses"}
             >
-              {isTalkMode ? (
-                <Volume2 className="h-4.5 w-4.5" />
-              ) : (
-                <VolumeOff className="h-4.5 w-4.5" />
-              )}
+              <Speech className={cn("h-4.5 w-4.5", !isTalkMode && "opacity-50")} />
             </button>
           )}
 
-          {/* Text input or transcript display */}
-          {isTalkMode && isListening ? (
-            <div
-              className={cn(
-                "glass-sm flex flex-1 items-center gap-3 rounded-oma-lg border px-4 py-3 transition-colors",
-                palette.border,
-                "border-opacity-60",
-              )}
-              style={{ "--voice-color": `rgba(${glowRgb}, 0.4)` } as React.CSSProperties}
-            >
-              {/* Listening waveform */}
-              <div className="flex items-center gap-[3px]">
-                {[0, 1, 2, 3, 4].map((i) => (
-                  <span
-                    key={i}
-                    className="inline-block w-[3px] rounded-full origin-bottom"
-                    style={{
-                      backgroundColor: `rgba(${glowRgb}, 0.8)`,
-                      animation: `voice-bar 0.8s ease-in-out ${i * 0.12}s infinite`,
-                      height: "16px",
-                    }}
-                  />
-                ))}
-              </div>
-              <span className="flex-1 text-base text-oma-text-muted italic truncate">
-                {displayTranscript || "Listening..."}
-              </span>
-            </div>
-          ) : isTalkMode ? (
-            <div
-              className={cn(
-                "glass-sm flex flex-1 items-center rounded-oma-lg border px-4 py-3 text-base transition-colors",
-                palette.border,
-                displayTranscript ? "text-oma-text" : "text-oma-text-faint",
-              )}
-            >
-              {displayTranscript || (isHolding ? "Release to send..." : `Hold mic or tap to talk to ${agent.name}...`)}
-            </div>
-          ) : (
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={onKeyDown}
-              disabled={!canSend}
-              placeholder={
-                isWorkMode
-                  ? hasActiveWorkSession
-                    ? `Send a follow-up to ${agent.name}...`
-                    : `Start a work session with ${agent.name}...`
-                  : canSend
-                    ? `Message ${agent.name}...`
-                    : "Agent is no longer active"
-              }
-              rows={1}
-              className={cn(
-                "glass-sm flex-1 resize-none rounded-oma-lg border bg-transparent px-4 py-3 text-base text-oma-text outline-none transition-colors",
-                palette.border,
-                "placeholder:text-oma-text-faint",
-                "focus:border-oma-primary focus:ring-1 focus:ring-oma-primary/30",
-                isWorkMode && "focus:border-oma-jade focus:ring-oma-jade/30",
-                "disabled:cursor-not-allowed disabled:opacity-50",
-              )}
-            />
-          )}
+          {/* Text input — always visible */}
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={onKeyDown}
+            disabled={!canSend}
+            placeholder={
+              isWorkMode
+                ? hasActiveWorkSession
+                  ? `Send a follow-up to ${agent.name}...`
+                  : `Start a work session with ${agent.name}...`
+                : canSend
+                  ? `Message ${agent.name}...`
+                  : "Agent is no longer active"
+            }
+            rows={1}
+            className={cn(
+              "glass-sm flex-1 resize-none rounded-oma-lg border bg-transparent px-4 py-3 text-base text-oma-text outline-none transition-colors",
+              palette.border,
+              "placeholder:text-oma-text-faint",
+              "focus:border-oma-primary focus:ring-1 focus:ring-oma-primary/30",
+              isWorkMode && "focus:border-oma-jade focus:ring-oma-jade/30",
+              "disabled:cursor-not-allowed disabled:opacity-50",
+            )}
+          />
 
-          {/* Action button — send or mic */}
-          {isTalkMode ? (
+          {/* Mic button — hold-to-talk or tap-to-toggle */}
+          {voiceSupported && (
             <div className="relative">
               {/* Ripple rings when listening */}
               {isListening && (
@@ -248,13 +234,6 @@ export function ChatInput({
                       animation: "voice-ripple 1.5s ease-out 0.5s infinite",
                     }}
                   />
-                  <span
-                    className="pointer-events-none absolute inset-0 rounded-oma-lg"
-                    style={{
-                      backgroundColor: `rgba(${glowRgb}, 0.1)`,
-                      animation: "voice-ripple 1.5s ease-out 1s infinite",
-                    }}
-                  />
                 </>
               )}
 
@@ -262,7 +241,6 @@ export function ChatInput({
                 onMouseDown={handleMicDown}
                 onMouseUp={handleMicUp}
                 onMouseLeave={() => {
-                  // Cancel hold if mouse leaves button
                   if (holdTimerRef.current) {
                     clearTimeout(holdTimerRef.current);
                     holdTimerRef.current = null;
@@ -278,7 +256,7 @@ export function ChatInput({
                 }}
                 onTouchStart={handleMicDown}
                 onTouchEnd={(e) => {
-                  e.preventDefault(); // Prevent ghost click
+                  e.preventDefault();
                   handleMicUp();
                 }}
                 disabled={!canSend}
@@ -295,56 +273,39 @@ export function ChatInput({
                   animation: "voice-glow-breathe 1.5s ease-in-out infinite",
                   "--voice-color": `rgba(${glowRgb}, 0.3)`,
                 } as React.CSSProperties : {
-                  color: `rgb(${glowRgb})`,
+                  color: `rgba(${glowRgb}, 0.6)`,
                 }}
                 aria-label={isListening ? "Stop listening" : "Start listening"}
+                title="Hold to talk, tap to toggle"
               >
-                {isListening ? (
-                  <Mic className="h-5 w-5" />
-                ) : (
-                  <Mic className="h-5 w-5 opacity-70" />
-                )}
+                <Mic className={cn("h-5 w-5", !isListening && "opacity-70")} />
               </button>
             </div>
-          ) : (
-            <button
-              onClick={onSend}
-              disabled={!canSend || !input.trim()}
-              className={cn(
-                "flex h-11 w-11 shrink-0 items-center justify-center rounded-oma-lg transition-all",
-                isWorkMode
-                  ? "glass bg-oma-jade/10 text-oma-jade hover:scale-105"
-                  : "glass-primary text-oma-primary hover:scale-105",
-                "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100",
-              )}
-              aria-label="Send message"
-            >
-              <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
-                <path
-                  d="M14.5 1.5L7 9M14.5 1.5L10 14.5L7 9M14.5 1.5L1.5 6L7 9"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
           )}
 
-          {/* Stop speaking button — shown when TTS is active */}
-          {isTalkMode && isSpeaking && onStopSpeaking && (
-            <button
-              onClick={onStopSpeaking}
-              className={cn(
-                "flex h-11 w-11 shrink-0 items-center justify-center rounded-oma-lg transition-all",
-                "glass text-oma-text-muted hover:text-oma-text hover:scale-105",
-              )}
-              aria-label="Stop speaking"
-              title="Stop speaking"
-            >
-              <MicOff className="h-4.5 w-4.5" />
-            </button>
-          )}
+          {/* Send button */}
+          <button
+            onClick={onSend}
+            disabled={!canSend || !input.trim()}
+            className={cn(
+              "flex h-11 w-11 shrink-0 items-center justify-center rounded-oma-lg transition-all",
+              isWorkMode
+                ? "glass bg-oma-jade/10 text-oma-jade hover:scale-105"
+                : "glass-primary text-oma-primary hover:scale-105",
+              "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100",
+            )}
+            aria-label="Send message"
+          >
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M14.5 1.5L7 9M14.5 1.5L10 14.5L7 9M14.5 1.5L1.5 6L7 9"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
         </div>
       </div>
     </>

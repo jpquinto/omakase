@@ -65,6 +65,16 @@ export function AgentChatPanel({ runId, agent, featureName, projectId, isActive,
   const voice = useVoiceChat({ role: agent.role });
   const prevStreamContentRef = useRef("");
 
+  // When TTS mode is toggled on, sync the ref to current content
+  // so we don't read back everything that's already been streamed
+  const prevTalkModeRef = useRef(voice.isTalkMode);
+  useEffect(() => {
+    if (voice.isTalkMode && !prevTalkModeRef.current) {
+      prevStreamContentRef.current = streamingContent;
+    }
+    prevTalkModeRef.current = voice.isTalkMode;
+  }, [voice.isTalkMode, streamingContent]);
+
   // Feed streaming tokens to TTS when talk mode is active
   useEffect(() => {
     if (!voice.isTalkMode || !streamingContent) return;
