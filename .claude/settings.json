@@ -18,6 +18,15 @@
             "command": "entire hooks claude-code post-todo"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'echo \"$TOOL_INPUT\" | grep -q \"git commit\" && entire hooks claude-code post-commit || true'"
+          }
+        ]
       }
     ],
     "PreToolUse": [
