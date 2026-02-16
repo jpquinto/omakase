@@ -23,10 +23,10 @@ export function useAgentQueue(agentName: AgentName): UseAgentQueueResult {
 
   const fetchData = useCallback(async () => {
     try {
-      const result = await apiFetch<{ jobs: QueuedJob[] }>(
+      const result = await apiFetch<QueuedJob[]>(
         `/api/agents/${agentName}/queue`,
       );
-      setQueue(result.jobs);
+      setQueue(Array.isArray(result) ? result : []);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));

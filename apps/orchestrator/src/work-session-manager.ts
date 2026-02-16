@@ -252,8 +252,8 @@ export class WorkSessionManager {
     this.parseOutputStream(runId, proc);
     this.readStderr(runId, proc);
 
-    // Handle process exit
-    proc.exited.then((exitCode) => {
+    // Handle process exit — auto-end session so agent returns to "idle"
+    proc.exited.then(async (exitCode) => {
       console.log(`[work-session] Process exited: runId=${runId} pid=${proc.pid} exitCode=${exitCode}`);
       session.busy = false;
       session.activeProcess = null;
@@ -261,6 +261,15 @@ export class WorkSessionManager {
       if (exitCode !== 0 && exitCode !== null) {
         console.error(`[work-session] Non-zero exit: ${exitCode}`);
         emit(runId, { type: "stream_error", error: `Claude Code exited with code ${exitCode}` });
+      }
+
+      // Wait briefly for any final result events to be processed
+      await new Promise((r) => setTimeout(r, 2000));
+
+      // Clean up the session so the agent status returns to idle
+      if (this.sessions.has(runId)) {
+        console.log(`[work-session] Auto-ending session after process exit: runId=${runId}`);
+        await this.endSession(runId);
       }
     });
   }
