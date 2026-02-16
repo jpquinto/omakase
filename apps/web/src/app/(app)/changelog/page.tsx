@@ -4,6 +4,34 @@ import { cn } from "@/lib/utils";
 
 const RELEASES = [
   {
+    version: "v0.0.9",
+    title: "Agent Job Queues",
+    changes: {
+      added: [
+        "Per-agent job queue system — dispatching to a busy agent enqueues instead of rejecting",
+        "DynamoDB queue repository with gap-numbered positioning for efficient reordering",
+        "Queue manager orchestrator that auto-processes next job when a session completes",
+        "Queue API endpoints: list, enqueue, remove, reorder, and cross-agent queue summaries",
+        "useAgentQueue hook with 5-second polling and optimistic updates for remove/reorder",
+        "Queue depth badge on mission control agent cards showing \"+N queued\" when agents are busy",
+        "Agent profile queue list with position display, reorder controls, and remove buttons",
+        "Ticket assignment popover shows \"Queue (#N)\" for busy agents instead of disabling them",
+        "Ticket row badges showing \"Queued #N\" with agent mascot for features waiting in queue",
+      ],
+      changed: [
+        "Feature assignment endpoint returns HTTP 202 with queue position instead of 409/429 when agent is busy or at capacity",
+        "Agent status endpoint includes queueDepth and nextJob preview for each agent",
+        "useAgentDispatch hook enqueues jobs for busy agents with success toast instead of throwing errors",
+        "Work sessions auto-end when Claude Code subprocess exits, returning agents to idle status",
+      ],
+      fixed: [
+        "Queue processNext resolving project repoUrl and GitHub token so agents work in the correct repo directory",
+        "DynamoDB Limit + FilterExpression interaction causing queued jobs to be invisible behind completed items",
+        "SSE streaming through nginx — added initial heartbeat comment to flush Bun response headers",
+      ],
+    },
+  },
+  {
     version: "v0.0.8",
     title: "Settings & Orchestrator Health",
     changes: {
