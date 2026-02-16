@@ -566,8 +566,11 @@ const app = new Elysia()
     }
   })
   // Feature assignment endpoint — manually assign a feature to an agent
+  // Supports two modes:
+  //   mode="pipeline" (default) — full 4-step agent pipeline
+  //   mode="direct" — single agent work session via Claude Code CLI
   .post("/api/features/:featureId/assign", async ({ params, body, set }) => {
-    const { agentName } = body as { agentName: string };
+    const { agentName, mode = "pipeline" } = body as { agentName: string; mode?: "pipeline" | "direct" };
     const KNOWN_AGENTS = ["miso", "nori", "koji", "toro"];
     if (!agentName || !KNOWN_AGENTS.includes(agentName)) {
       set.status = 400;
@@ -626,6 +629,62 @@ const app = new Elysia()
       throw err;
     }
 
+    // Resolve GitHub token
+    let githubToken = GITHUB_TOKEN ?? "";
+    if (project.githubInstallationId && isGitHubAppConfigured()) {
+      try {
+        githubToken = await getInstallationToken(project.githubInstallationId);
+      } catch {
+        // Fall through to GITHUB_TOKEN
+      }
+    }
+
+    // --- Direct mode: single agent work session ---
+    if (mode === "direct") {
+      const prompt = `Implement feature: ${feature.name}\n\n${feature.description ?? ""}`.trim();
+      const thread = await createThread({
+        agentName,
+        projectId: project.id,
+        title: feature.name,
+        mode: "work",
+      });
+
+      // End any stale/idle sessions for this project so startSession creates a
+      // fresh one. Without this, startSession returns { status: "existing" }
+      // and silently drops the prompt.
+      const existingSession = workSessionManager.findSessionByProject(project.id);
+      if (existingSession && !existingSession.busy) {
+        console.log(`[orchestrator] Ending stale session ${existingSession.runId} before direct dispatch`);
+        await workSessionManager.endSession(existingSession.runId);
+      }
+
+      try {
+        const sessionResult = await workSessionManager.startSession({
+          agentName,
+          projectId: project.id,
+          threadId: thread.threadId,
+          prompt,
+          repoUrl: project.repoUrl,
+          githubToken: githubToken || undefined,
+        });
+
+        set.status = 202;
+        return {
+          success: true,
+          featureId: feature.id,
+          assignedTo: agentName,
+          runId: sessionResult.runId,
+          threadId: thread.threadId,
+        };
+      } catch (err) {
+        console.error(`[orchestrator] Direct work session failed for feature ${feature.id}:`, err);
+        set.status = 500;
+        return { error: err instanceof Error ? err.message : String(err) };
+      }
+    }
+
+    // --- Pipeline mode (default): full 4-step agent pipeline ---
+
     // Resolve Linear token from workspace
     let linearAccessToken: string | undefined;
     if (project.workspaceId) {
@@ -636,15 +695,6 @@ const app = new Elysia()
     // Build pipeline config and launch
     const repoOwner = project.githubRepoOwner ?? "";
     const repoName = project.githubRepoName ?? "";
-
-    let githubToken = GITHUB_TOKEN ?? "";
-    if (project.githubInstallationId && isGitHubAppConfigured()) {
-      try {
-        githubToken = await getInstallationToken(project.githubInstallationId);
-      } catch {
-        // Fall through to GITHUB_TOKEN
-      }
-    }
 
     const pipelineConfig: import("./pipeline.js").PipelineConfig = {
       featureId: feature.id,
@@ -1614,6 +1664,208 @@ const app = new Elysia()
     }
     await queueManager.reorder(params.agentName as AgentName, params.jobId, position);
     return { success: true };
+  })
+  // Agent workspace browsing endpoints (no active work session required)
+  .get("/api/agents/:agentName/workspace/files", async ({ params, query, set }) => {
+    const KNOWN_AGENTS = ["miso", "nori", "koji", "toro"];
+    if (!KNOWN_AGENTS.includes(params.agentName)) {
+      set.status = 404;
+      return { error: "Agent not found" };
+    }
+    const { projectId, path: reqPath = "/" } = query as Record<string, string>;
+    if (!projectId) {
+      set.status = 400;
+      return { error: "projectId query parameter is required" };
+    }
+    if (reqPath.includes("..")) {
+      set.status = 400;
+      return { error: "Invalid path" };
+    }
+
+    const workspacePath = resolve(LOCAL_WORKSPACE_ROOT, "work", projectId);
+    const fullPath = join(workspacePath, reqPath);
+    const resolved = resolve(fullPath);
+    if (!resolved.startsWith(resolve(workspacePath))) {
+      set.status = 400;
+      return { error: "Path outside workspace" };
+    }
+
+    const EXCLUDED_DIRS = new Set([".git", "node_modules", ".next", ".claude", "__pycache__", ".turbo"]);
+
+    try {
+      const dirents = await readdir(resolved, { withFileTypes: true });
+      const entries: Array<{ name: string; type: "file" | "dir"; size: number; modifiedAt: string }> = [];
+
+      for (const dirent of dirents) {
+        if (EXCLUDED_DIRS.has(dirent.name)) continue;
+        if (dirent.name.startsWith(".") && dirent.name !== ".env.example") continue;
+        try {
+          const entryPath = join(resolved, dirent.name);
+          const s = await stat(entryPath);
+          entries.push({
+            name: dirent.name,
+            type: dirent.isDirectory() ? "dir" : "file",
+            size: s.size,
+            modifiedAt: s.mtime.toISOString(),
+          });
+        } catch {
+          // Skip entries we can't stat
+        }
+      }
+
+      entries.sort((a, b) => {
+        if (a.type !== b.type) return a.type === "dir" ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+
+      return { entries };
+    } catch {
+      set.status = 404;
+      return { error: "Workspace not found" };
+    }
+  })
+  .get("/api/agents/:agentName/workspace/file", async ({ params, query, set }) => {
+    const KNOWN_AGENTS = ["miso", "nori", "koji", "toro"];
+    if (!KNOWN_AGENTS.includes(params.agentName)) {
+      set.status = 404;
+      return { error: "Agent not found" };
+    }
+    const { projectId, path: reqPath } = query as Record<string, string>;
+    if (!projectId) {
+      set.status = 400;
+      return { error: "projectId query parameter is required" };
+    }
+    if (!reqPath) {
+      set.status = 400;
+      return { error: "path query parameter is required" };
+    }
+    if (reqPath.includes("..")) {
+      set.status = 400;
+      return { error: "Invalid path" };
+    }
+
+    const workspacePath = resolve(LOCAL_WORKSPACE_ROOT, "work", projectId);
+    const fullPath = join(workspacePath, reqPath);
+    const resolved = resolve(fullPath);
+    if (!resolved.startsWith(resolve(workspacePath))) {
+      set.status = 400;
+      return { error: "Path outside workspace" };
+    }
+
+    const MAX_FILE_SIZE = 100 * 1024;
+
+    try {
+      const s = await stat(resolved);
+      if (s.isDirectory()) {
+        set.status = 400;
+        return { error: "Path is a directory" };
+      }
+      if (s.size > MAX_FILE_SIZE) {
+        set.status = 413;
+        return { error: "File too large", size: s.size, maxSize: MAX_FILE_SIZE };
+      }
+      const content = await readFile(resolved, "utf-8");
+      return { content, path: reqPath, size: s.size };
+    } catch {
+      set.status = 404;
+      return { error: "File not found" };
+    }
+  })
+  // -----------------------------------------------------------------------
+  // Project workspace browsing (global — not agent-scoped)
+  // -----------------------------------------------------------------------
+  .get("/api/workspace/files", async ({ query, set }) => {
+    const { projectId, path: reqPath = "/" } = query as Record<string, string>;
+    if (!projectId) {
+      set.status = 400;
+      return { error: "projectId query parameter is required" };
+    }
+    if (reqPath.includes("..")) {
+      set.status = 400;
+      return { error: "Invalid path" };
+    }
+
+    const workspacePath = resolve(LOCAL_WORKSPACE_ROOT, "work", projectId);
+    const fullPath = join(workspacePath, reqPath);
+    const resolved = resolve(fullPath);
+    if (!resolved.startsWith(resolve(workspacePath))) {
+      set.status = 400;
+      return { error: "Path outside workspace" };
+    }
+
+    const EXCLUDED_DIRS = new Set([".git", "node_modules", ".next", ".claude", "__pycache__", ".turbo"]);
+
+    try {
+      const dirents = await readdir(resolved, { withFileTypes: true });
+      const entries: Array<{ name: string; type: "file" | "dir"; size: number; modifiedAt: string }> = [];
+
+      for (const dirent of dirents) {
+        if (EXCLUDED_DIRS.has(dirent.name)) continue;
+        if (dirent.name.startsWith(".") && dirent.name !== ".env.example") continue;
+        try {
+          const entryPath = join(resolved, dirent.name);
+          const s = await stat(entryPath);
+          entries.push({
+            name: dirent.name,
+            type: dirent.isDirectory() ? "dir" : "file",
+            size: s.size,
+            modifiedAt: s.mtime.toISOString(),
+          });
+        } catch {
+          // Skip entries we can't stat
+        }
+      }
+
+      entries.sort((a, b) => {
+        if (a.type !== b.type) return a.type === "dir" ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+
+      return { entries };
+    } catch {
+      set.status = 404;
+      return { error: "Workspace not found" };
+    }
+  })
+  .get("/api/workspace/file", async ({ query, set }) => {
+    const { projectId, path: reqPath } = query as Record<string, string>;
+    if (!projectId) {
+      set.status = 400;
+      return { error: "projectId query parameter is required" };
+    }
+    if (!reqPath) {
+      set.status = 400;
+      return { error: "path query parameter is required" };
+    }
+    if (reqPath.includes("..")) {
+      set.status = 400;
+      return { error: "Invalid path" };
+    }
+
+    const workspacePath = resolve(LOCAL_WORKSPACE_ROOT, "work", projectId);
+    const fullPath = join(workspacePath, reqPath);
+    const resolved = resolve(fullPath);
+    if (!resolved.startsWith(resolve(workspacePath))) {
+      set.status = 400;
+      return { error: "Path outside workspace" };
+    }
+
+    try {
+      const s = await stat(resolved);
+      if (s.isDirectory()) {
+        set.status = 400;
+        return { error: "Path is a directory" };
+      }
+      if (s.size > 100 * 1024) {
+        set.status = 413;
+        return { error: "File too large" };
+      }
+      const content = await Bun.file(resolved).text();
+      return { content, path: reqPath, size: s.size };
+    } catch {
+      set.status = 404;
+      return { error: "File not found" };
+    }
   })
   // Catch-all error handler
   .onError(({ set, error, code }) => {

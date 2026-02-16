@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api-client";
 import {
@@ -35,17 +35,54 @@ interface TreeNode extends FileEntry {
 }
 
 // ---------------------------------------------------------------------------
+// Props — supports three modes:
+//   1. runId mode (chat sidebar): uses /api/work-sessions/:runId/files
+//   2. agent workspace mode: uses /api/agents/:agentName/workspace/files
+//   3. project workspace mode (global): uses /api/workspace/files
+// ---------------------------------------------------------------------------
+
+type WorkspaceExplorerProps = {
+  role?: AgentRunRole;
+  onClose?: () => void;
+  /** Hide the header bar (useful when embedded in a page with its own header) */
+  hideHeader?: boolean;
+} & (
+  | { runId: string; agentName?: undefined; projectId?: undefined }
+  | { runId?: undefined; agentName: string; projectId: string }
+  | { runId?: undefined; agentName?: undefined; projectId: string }
+);
+
+// ---------------------------------------------------------------------------
+// URL helpers — build API paths based on which mode we're in
+// ---------------------------------------------------------------------------
+
+function makeFilesUrl(props: { runId?: string; agentName?: string; projectId?: string }, path: string): string {
+  if (props.runId) {
+    return `/api/work-sessions/${props.runId}/files?path=${encodeURIComponent(path)}`;
+  }
+  if (props.agentName) {
+    return `/api/agents/${props.agentName}/workspace/files?projectId=${encodeURIComponent(props.projectId!)}&path=${encodeURIComponent(path)}`;
+  }
+  return `/api/workspace/files?projectId=${encodeURIComponent(props.projectId!)}&path=${encodeURIComponent(path)}`;
+}
+
+function makeFileUrl(props: { runId?: string; agentName?: string; projectId?: string }, path: string): string {
+  if (props.runId) {
+    return `/api/work-sessions/${props.runId}/file?path=${encodeURIComponent(path)}`;
+  }
+  if (props.agentName) {
+    return `/api/agents/${props.agentName}/workspace/file?projectId=${encodeURIComponent(props.projectId!)}&path=${encodeURIComponent(path)}`;
+  }
+  return `/api/workspace/file?projectId=${encodeURIComponent(props.projectId!)}&path=${encodeURIComponent(path)}`;
+}
+
+// ---------------------------------------------------------------------------
 // WorkspaceExplorer — collapsible file tree + file viewer panel
 // ---------------------------------------------------------------------------
 
-interface WorkspaceExplorerProps {
-  runId: string;
-  role: AgentRunRole;
-  onClose: () => void;
-}
-
-export function WorkspaceExplorer({ runId, role, onClose }: WorkspaceExplorerProps) {
-  const palette = ROLE_PALETTE[role];
+export function WorkspaceExplorer(props: WorkspaceExplorerProps) {
+  const { role, onClose, hideHeader } = props;
+  const palette = role ? ROLE_PALETTE[role] : null;
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,20 +91,30 @@ export function WorkspaceExplorer({ runId, role, onClose }: WorkspaceExplorerPro
   const [viewingFile, setViewingFile] = useState<{ path: string; content: string; size: number } | null>(null);
   const [fileLoading, setFileLoading] = useState(false);
 
+  // Stable key for endpoint identity — changes when source switches
+  const endpointKey = useMemo(
+    () => props.runId ?? (props.agentName ? `${props.agentName}:${props.projectId}` : props.projectId ?? ""),
+    [props.runId, props.agentName, props.projectId],
+  );
+
   // Fetch directory entries
   const fetchDir = useCallback(
     async (path: string): Promise<FileEntry[]> => {
-      const result = await apiFetch<{ entries: FileEntry[] }>(
-        `/api/work-sessions/${runId}/files?path=${encodeURIComponent(path)}`,
-      );
+      const result = await apiFetch<{ entries: FileEntry[] }>(makeFilesUrl(props, path));
       return result.entries;
     },
-    [runId],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [endpointKey],
   );
 
-  // Load root directory on mount
+  // Load root directory on mount or when source changes
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setError(null);
+    setTree([]);
+    setViewingFile(null);
+
     (async () => {
       try {
         const entries = await fetchDir("/");
@@ -157,7 +204,7 @@ export function WorkspaceExplorer({ runId, role, onClose }: WorkspaceExplorerPro
       setFileLoading(true);
       try {
         const result = await apiFetch<{ content: string; path: string; size: number }>(
-          `/api/work-sessions/${runId}/file?path=${encodeURIComponent(path)}`,
+          makeFileUrl(props, path),
         );
         setViewingFile(result);
       } catch {
@@ -166,37 +213,42 @@ export function WorkspaceExplorer({ runId, role, onClose }: WorkspaceExplorerPro
         setFileLoading(false);
       }
     },
-    [runId],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [endpointKey],
   );
 
   return (
     <div className="flex h-full flex-col bg-oma-bg-elevated">
-      {/* Header */}
-      <div className={cn("flex items-center justify-between border-b px-4 py-3", palette.border)}>
-        <div className="flex items-center gap-2">
-          {viewingFile ? (
+      {/* Header — optional */}
+      {!hideHeader && (
+        <div className={cn("flex items-center justify-between border-b px-4 py-3", palette?.border ?? "border-oma-glass-border")}>
+          <div className="flex items-center gap-2">
+            {viewingFile ? (
+              <button
+                onClick={() => setViewingFile(null)}
+                className="flex items-center gap-1.5 text-xs text-oma-text-muted transition-colors hover:text-oma-text"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Back
+              </button>
+            ) : (
+              <>
+                <FolderOpen className="h-4 w-4 text-oma-text-muted" />
+                <span className="text-sm font-medium text-oma-text">Workspace</span>
+              </>
+            )}
+          </div>
+          {onClose && (
             <button
-              onClick={() => setViewingFile(null)}
-              className="flex items-center gap-1.5 text-xs text-oma-text-muted transition-colors hover:text-oma-text"
+              onClick={onClose}
+              className="flex h-7 w-7 items-center justify-center rounded-oma text-oma-text-muted transition-colors hover:bg-oma-bg-surface hover:text-oma-text"
+              aria-label="Close file explorer"
             >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Back
+              <X className="h-3.5 w-3.5" />
             </button>
-          ) : (
-            <>
-              <FolderOpen className="h-4 w-4 text-oma-text-muted" />
-              <span className="text-sm font-medium text-oma-text">Workspace</span>
-            </>
           )}
         </div>
-        <button
-          onClick={onClose}
-          className="flex h-7 w-7 items-center justify-center rounded-oma text-oma-text-muted transition-colors hover:bg-oma-bg-surface hover:text-oma-text"
-          aria-label="Close file explorer"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
-      </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
@@ -210,7 +262,7 @@ export function WorkspaceExplorer({ runId, role, onClose }: WorkspaceExplorerPro
             <p className="text-xs text-oma-text-muted">{error}</p>
           </div>
         ) : viewingFile ? (
-          <FileViewer file={viewingFile} loading={fileLoading} />
+          <FileViewer file={viewingFile} loading={fileLoading} onBack={() => setViewingFile(null)} />
         ) : (
           <div className="py-1">
             {tree.map((node) => (
@@ -318,9 +370,11 @@ function TreeEntry({
 function FileViewer({
   file,
   loading,
+  onBack,
 }: {
   file: { path: string; content: string; size: number };
   loading: boolean;
+  onBack?: () => void;
 }) {
   const fileName = file.path.split("/").pop() ?? file.path;
 
@@ -336,7 +390,17 @@ function FileViewer({
     <div className="flex flex-col">
       {/* File info bar */}
       <div className="flex items-center justify-between border-b border-oma-glass-border px-4 py-2">
-        <span className="truncate font-mono text-xs text-oma-text">{fileName}</span>
+        <div className="flex items-center gap-2">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="flex items-center gap-1 text-xs text-oma-text-muted transition-colors hover:text-oma-text"
+            >
+              <ArrowLeft className="h-3 w-3" />
+            </button>
+          )}
+          <span className="truncate font-mono text-xs text-oma-text">{fileName}</span>
+        </div>
         <span className="shrink-0 text-xs text-oma-text-subtle">
           {file.size < 1024
             ? `${file.size} B`

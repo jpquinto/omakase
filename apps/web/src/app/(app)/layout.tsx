@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Folder,
+  FolderOpen,
   Bot,
   Palette,
   BarChart3,
@@ -37,6 +38,7 @@ import { useAgentStatus } from "@/hooks/use-agent-status";
 const NAV_ITEMS = [
   { href: "/projects", label: "Projects", icon: Folder },
   { href: "/agents", label: "Agents", icon: Bot },
+  { href: "/workspace", label: "Workspace", icon: FolderOpen },
   { href: "/style-system", label: "Style System", icon: Palette },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Settings },

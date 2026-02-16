@@ -11,6 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import { useCallback, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   ArrowDown,
   ArrowUp,
@@ -23,12 +24,13 @@ import {
   UserPlus,
   X,
 } from "lucide-react";
-import type { Feature, FeatureStatus, AgentLiveStatusWorking, AgentName } from "@omakase/db";
+import type { Feature, FeatureStatus, AgentName } from "@omakase/db";
 import { cn } from "@/lib/utils";
-import { useAssignFeature, useCreateFeature, useDeleteFeature, useSyncLinear, useUpdateFeature } from "@/hooks/use-api";
+import { useCreateFeature, useDeleteFeature, useSyncLinear, useUpdateFeature } from "@/hooks/use-api";
 import { useAgentQueue } from "@/hooks/use-agent-queue";
 import { useAgentStatus } from "@/hooks/use-agent-status";
 import { LinearTicketBadge } from "@/components/linear-ticket-badge";
+import { DispatchModal, AGENT_DEFS, type DispatchResult } from "@/components/dispatch-modal";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -142,13 +144,7 @@ function formatDate(dateString: string): string {
   }
 }
 
-/** Agent definitions used in the assignment popover. */
-const AGENT_DEFS = [
-  { name: "miso" as AgentName, label: "Miso", mascot: "\uD83C\uDF5C", role: "Architect", color: "text-oma-gold", dotColor: "bg-oma-gold" },
-  { name: "nori" as AgentName, label: "Nori", mascot: "\uD83C\uDF59", role: "Coder", color: "text-oma-indigo", dotColor: "bg-oma-indigo" },
-  { name: "koji" as AgentName, label: "Koji", mascot: "\uD83C\uDF76", role: "Reviewer", color: "text-oma-secondary", dotColor: "bg-oma-secondary" },
-  { name: "toro" as AgentName, label: "Toro", mascot: "\uD83C\uDF63", role: "Tester", color: "text-oma-jade", dotColor: "bg-oma-jade" },
-] as const;
+// AGENT_DEFS imported from dispatch-modal.tsx
 
 /** Full Tailwind class strings for queue position badges, keyed by agent name.
  *  Uses complete class names so Tailwind's JIT compiler can detect them. */
@@ -378,6 +374,8 @@ export function TicketsTable({
   onBrowseLinear,
   hasLinearConnection,
 }: TicketsTableProps) {
+  const router = useRouter();
+
   // --- Agent live status ---
   const { agents: agentStatuses } = useAgentStatus();
 
@@ -418,8 +416,7 @@ export function TicketsTable({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncCooldown, setSyncCooldown] = useState(0);
-  const [assigningFeatureId, setAssigningFeatureId] = useState<string | null>(null);
-  const [assignError, setAssignError] = useState<string | null>(null);
+  const [dispatchFeature, setDispatchFeature] = useState<Feature | null>(null);
 
   // --- New feature form state ---
   const [newName, setNewName] = useState("");
@@ -432,7 +429,6 @@ export function TicketsTable({
   const updateFeature = useUpdateFeature();
   const deleteFeature = useDeleteFeature();
   const syncLinear = useSyncLinear();
-  const assignFeature = useAssignFeature();
 
   // --- Unique Linear state names for filter dropdown ---
   const linearStateOptions = useMemo(() => {
@@ -472,23 +468,6 @@ export function TicketsTable({
       setIsSyncing(false);
     }
   }, [syncLinear, projectId, onRefetch, startCooldown]);
-
-  // --- Agent assignment handler ---
-  const handleAssign = useCallback(
-    async (featureId: string, agentName: string) => {
-      setAssignError(null);
-      try {
-        await assignFeature(featureId, agentName);
-        setAssigningFeatureId(null);
-        onRefetch();
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Assignment failed";
-        setAssignError(message);
-        onRefetch();
-      }
-    },
-    [assignFeature, onRefetch],
-  );
 
   // --- Sorting handler ---
   const handleSort = useCallback(
@@ -704,22 +683,6 @@ export function TicketsTable({
           </Button>
         )}
       </div>
-
-      {/* ----------------------------------------------------------------- */}
-      {/* Assignment error toast                                            */}
-      {/* ----------------------------------------------------------------- */}
-      {assignError && (
-        <div className="glass flex items-center gap-3 rounded-oma border border-oma-fail/30 bg-oma-fail/10 px-4 py-2">
-          <span className="flex-1 text-sm text-oma-fail">{assignError}</span>
-          <button
-            type="button"
-            onClick={() => setAssignError(null)}
-            className="shrink-0 rounded-oma-sm p-1 text-oma-fail/70 hover:text-oma-fail"
-          >
-            <X className="size-3.5" />
-          </button>
-        </div>
-      )}
 
       {/* ----------------------------------------------------------------- */}
       {/* Mobile: Card view                                                 */}
@@ -947,7 +910,6 @@ export function TicketsTable({
                   onClick={() => onSelectFeature(feature)}
                   className={cn(
                     "glass-sm cursor-pointer border-b border-oma-glass-border transition-colors hover:bg-white/[0.04]",
-                    assigningFeatureId === feature.id && "relative z-10",
                   )}
                 >
                   {/* Name (inline editable on double-click) */}
@@ -1053,80 +1015,17 @@ export function TicketsTable({
                     <div className="flex items-center justify-end gap-1">
                       {/* Assign to agent (pending features only) */}
                       {feature.status === "pending" && (
-                        <div className="relative">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setAssignError(null);
-                              setAssigningFeatureId(
-                                assigningFeatureId === feature.id ? null : feature.id,
-                              );
-                            }}
-                            className="inline-flex items-center justify-center rounded-oma-sm p-1.5 text-oma-text-subtle transition-colors hover:bg-oma-primary/10 hover:text-oma-primary"
-                            title="Assign to agent"
-                          >
-                            <UserPlus className="size-3.5" />
-                          </button>
-                          {/* Agent selection popover with live status */}
-                          {assigningFeatureId === feature.id && (
-                            <div
-                              className="glass-lg absolute right-0 top-full z-50 mt-1 w-56 rounded-oma border border-oma-glass-border-bright p-1"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {AGENT_DEFS.map((agent) => {
-                                const live = agentStatuses[agent.name];
-                                const isBusy = live?.status === "working";
-                                const isErrored = live?.status === "errored";
-                                const working = isBusy ? (live as AgentLiveStatusWorking) : null;
-                                // Queue depth from live status — used to show the position this job would get
-                                const queueDepth = live?.queueDepth ?? 0;
-
-                                return (
-                                  <button
-                                    key={agent.name}
-                                    type="button"
-                                    onClick={() => void handleAssign(feature.id, agent.name)}
-                                    className={cn(
-                                      "flex w-full items-center gap-2 rounded-oma-sm px-3 py-2 text-left text-sm transition-colors",
-                                      "hover:bg-white/[0.06]",
-                                    )}
-                                  >
-                                    {/* Status dot */}
-                                    <span
-                                      className={cn(
-                                        "inline-block size-2 shrink-0 rounded-full",
-                                        isBusy ? `${agent.dotColor} animate-pulse` : "",
-                                        isErrored ? "bg-oma-fail" : "",
-                                        !isBusy && !isErrored ? "bg-oma-text-faint" : "",
-                                      )}
-                                    />
-                                    <span className={cn("font-medium", agent.color)}>
-                                      {agent.label}
-                                    </span>
-                                    <span className="flex-1 text-xs text-oma-text-muted">
-                                      {agent.role}
-                                    </span>
-                                    {/* Busy agents: show queue position the job would receive */}
-                                    {isBusy && working && (
-                                      <span className={cn(
-                                        "rounded-oma-full px-1.5 py-0.5 text-[10px] font-medium bg-white/[0.06]",
-                                        agent.color,
-                                      )}>
-                                        Queue #{queueDepth + 1}
-                                      </span>
-                                    )}
-                                    {isErrored && (
-                                      <span className="text-[10px] text-oma-fail">
-                                        Failed
-                                      </span>
-                                    )}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDispatchFeature(feature);
+                          }}
+                          className="inline-flex items-center justify-center rounded-oma-sm p-1.5 text-oma-text-subtle transition-colors hover:bg-oma-primary/10 hover:text-oma-primary"
+                          title="Dispatch to agent"
+                        >
+                          <UserPlus className="size-3.5" />
+                        </button>
                       )}
                       <button
                         type="button"
@@ -1204,6 +1103,24 @@ export function TicketsTable({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ----------------------------------------------------------------- */}
+      {/* Dispatch modal                                                    */}
+      {/* ----------------------------------------------------------------- */}
+      {dispatchFeature && (
+        <DispatchModal
+          feature={dispatchFeature}
+          open={!!dispatchFeature}
+          onOpenChange={(open) => !open && setDispatchFeature(null)}
+          onDispatched={(result: DispatchResult) => {
+            onRefetch();
+            // Navigate to the agent's chat page for direct dispatches
+            if (result.mode === "direct") {
+              router.push(`/agents/${result.agentName}`);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

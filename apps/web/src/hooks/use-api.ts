@@ -345,15 +345,15 @@ export function useSyncLinear() {
   );
 }
 
-/** Assign a pending feature to a specific agent, triggering the pipeline. */
+/** Assign a pending feature to a specific agent via direct mode or full pipeline. */
 export function useAssignFeature() {
   return useCallback(
-    async (featureId: string, agentName: string) => {
-      return apiFetch<{ success: boolean; featureId: string; assignedTo: string }>(
+    async (featureId: string, agentName: string, mode: "pipeline" | "direct" = "pipeline") => {
+      return apiFetch<{ success: boolean; featureId: string; assignedTo: string; runId?: string; threadId?: string }>(
         `/api/features/${featureId}/assign`,
         {
           method: "POST",
-          body: JSON.stringify({ agentName }),
+          body: JSON.stringify({ agentName, mode }),
         },
       );
     },
