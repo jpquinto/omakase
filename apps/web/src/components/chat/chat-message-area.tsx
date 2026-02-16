@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ROLE_PALETTE, WELCOME_GLOW, formatTimestamp } from "@/lib/chat-constants";
 import type { AgentInfo } from "@/lib/chat-constants";
@@ -111,9 +112,7 @@ export function ChatMessageArea({
                   {isSpeaking && <SpeakingIndicator role={agent.role} />}
                 </div>
                 <div className="mt-1 text-sm leading-relaxed text-oma-text">
-                  <Streamdown mode="streaming" isAnimating>
-                    {streamingContent}
-                  </Streamdown>
+                  <AgentContent content={streamingContent} mode="streaming" />
                 </div>
               </div>
             </div>
@@ -226,9 +225,7 @@ function ChatMessage({ message, agent, onQuizTopicSelect, onQuizAnswer, onPlayAg
           </div>
           {message.content && (
             <div className="mt-1 text-sm leading-relaxed text-oma-text">
-              <Streamdown mode="static">
-                {message.content}
-              </Streamdown>
+              <AgentContent content={message.content} mode="static" />
             </div>
           )}
           {/* Quiz interactive components */}
@@ -274,6 +271,126 @@ function ChatMessage({ message, agent, onQuizTopicSelect, onQuizAnswer, onPlayAg
           {message.content}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// AgentContent — replaces long dash/bar lines with animated thinking verbs
+// ---------------------------------------------------------------------------
+
+/** Matches a line that is nothing but 3+ dash-like characters (and optional whitespace).
+ *  Threshold of 3 catches markdown hr syntax (---) before Streamdown renders it as <hr>. */
+const DASH_LINE_RE = /^[\s]*[-─━—–=~*_]{3,}[\s]*$/;
+
+const THINKING_VERBS = [
+  "Pondering",
+  "Pontificating",
+  "Ruminating",
+  "Cogitating",
+  "Musing",
+  "Deliberating",
+  "Contemplating",
+  "Noodling",
+  "Meditating",
+  "Brainstorming",
+  "Percolating",
+  "Scheming",
+  "Daydreaming",
+  "Concocting",
+  "Mulling",
+  "Tinkering",
+  "Brewing",
+  "Channeling",
+  "Deciphering",
+  "Untangling",
+  "Harmonizing",
+  "Orchestrating",
+  "Conjuring",
+  "Manifesting",
+  "Vibing",
+];
+
+function ThinkingPill() {
+  const [verb, setVerb] = useState(() =>
+    THINKING_VERBS[Math.floor(Math.random() * THINKING_VERBS.length)],
+  );
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setVerb(THINKING_VERBS[Math.floor(Math.random() * THINKING_VERBS.length)]);
+    }, 2400);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <span className="my-1 inline-flex items-center gap-2 rounded-oma-full bg-oma-bg-surface/60 px-3 py-1">
+      <span className="flex items-center gap-[3px]">
+        <span className="inline-block h-1 w-1 animate-[pulse_1.2s_ease-in-out_infinite] rounded-full bg-oma-text-subtle" />
+        <span className="inline-block h-1 w-1 animate-[pulse_1.2s_ease-in-out_0.2s_infinite] rounded-full bg-oma-text-subtle" />
+        <span className="inline-block h-1 w-1 animate-[pulse_1.2s_ease-in-out_0.4s_infinite] rounded-full bg-oma-text-subtle" />
+      </span>
+      <span className="text-xs italic text-oma-text-subtle transition-all duration-300">
+        {verb}...
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Renders agent message content, replacing lines of dashes (thinking bars)
+ * with animated thinking pills. Non-dash segments render through Streamdown.
+ * Also hides any <hr> elements that Streamdown produces from remaining
+ * markdown hr patterns (---, ***, ___) via CSS.
+ */
+function AgentContent({ content, mode }: { content: string; mode: "static" | "streaming" }) {
+  const lines = content.split("\n");
+  const segments: { type: "text" | "thinking"; text: string }[] = [];
+  let textBuf: string[] = [];
+
+  const flushText = () => {
+    if (textBuf.length > 0) {
+      segments.push({ type: "text", text: textBuf.join("\n") });
+      textBuf = [];
+    }
+  };
+
+  for (const line of lines) {
+    if (DASH_LINE_RE.test(line)) {
+      flushText();
+      // Collapse consecutive dash lines into one pill
+      if (segments.length === 0 || segments[segments.length - 1].type !== "thinking") {
+        segments.push({ type: "thinking", text: "" });
+      }
+    } else {
+      textBuf.push(line);
+    }
+  }
+  flushText();
+
+  // If no thinking segments found, fast-path to plain Streamdown
+  // Still wrap in agent-content to catch any <hr> Streamdown generates
+  if (segments.every((s) => s.type === "text")) {
+    return (
+      <div className="agent-content">
+        <Streamdown mode={mode} isAnimating={mode === "streaming"}>
+          {content}
+        </Streamdown>
+      </div>
+    );
+  }
+
+  return (
+    <div className="agent-content">
+      {segments.map((seg, i) =>
+        seg.type === "thinking" ? (
+          <ThinkingPill key={`t-${i}`} />
+        ) : (
+          <Streamdown key={`s-${i}`} mode={mode} isAnimating={mode === "streaming"}>
+            {seg.text}
+          </Streamdown>
+        ),
+      )}
     </div>
   );
 }

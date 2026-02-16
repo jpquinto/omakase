@@ -332,19 +332,21 @@ export function AgentChatPanel({ runId, agent, featureName: _featureName, projec
   return (
     <div className="flex h-full w-full">
       {/* Thread sidebar */}
-      <ThreadListSidebar
-        threads={threads}
-        selectedThreadId={selectedThreadId}
-        onSelectThread={setSelectedThreadId}
-        onCreateThread={handleCreateThread}
-        onRenameThread={handleRenameThread}
-        onArchiveThread={handleArchiveThread}
-        collapsed={sidebarCollapsed}
-        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-        accentBorder={palette.border}
-        hasMore={hasMore}
-        onLoadMore={loadMore}
-      />
+      <div className={cn("shrink-0", sidebarCollapsed ? "w-12" : "w-[260px]")}>
+        <ThreadListSidebar
+          threads={threads}
+          selectedThreadId={selectedThreadId}
+          onSelectThread={setSelectedThreadId}
+          onCreateThread={handleCreateThread}
+          onRenameThread={handleRenameThread}
+          onArchiveThread={handleArchiveThread}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+          accentBorder={palette.border}
+          hasMore={hasMore}
+          onLoadMore={loadMore}
+        />
+      </div>
 
       {/* Chat panel */}
       <div className="flex flex-1 flex-col">

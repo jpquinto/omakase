@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import {
   ChevronDown,
   Plus,
@@ -12,9 +13,13 @@ import {
   Tag,
   Layers,
   FileText,
+  Bot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api-client";
+import { useAgentStatus } from "@/hooks/use-agent-status";
+import { useAgentDispatch } from "@/hooks/use-agent-dispatch";
+import type { AgentName, AgentLiveStatusWorking } from "@omakase/db";
 import {
   Dialog,
   DialogContent,
@@ -418,6 +423,15 @@ export function FeatureDetailPanel({
               />
             </div>
 
+            {/* -- Section: Assign Agent -- */}
+            <div className="border-b border-oma-glass-border px-6 py-4">
+              <label className="mb-3 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-oma-text-subtle">
+                <Bot className="h-3.5 w-3.5" />
+                Assign Agent
+              </label>
+              <AssignAgentRow feature={feature} onClose={onClose} />
+            </div>
+
             {/* -- Section: Description -- */}
             <div className="border-b border-oma-glass-border px-6 py-4">
               <label className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-oma-text-subtle">
@@ -687,6 +701,73 @@ function AddDependencyDropdown({
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Assign Agent Row
+//
+// Shows the 4 agents as selectable buttons. Busy agents show a "Working"
+// badge and cannot be selected. Clicking an idle agent dispatches it with
+// the feature's context as the prompt.
+// ---------------------------------------------------------------------------
+
+const AGENT_BUTTONS = [
+  { id: "miso" as AgentName, name: "Miso", mascot: "\u{1F35C}", color: "oma-gold" },
+  { id: "nori" as AgentName, name: "Nori", mascot: "\u{1F359}", color: "oma-indigo" },
+  { id: "koji" as AgentName, name: "Koji", mascot: "\u{1F376}", color: "oma-secondary" },
+  { id: "toro" as AgentName, name: "Toro", mascot: "\u{1F363}", color: "oma-jade" },
+];
+
+function AssignAgentRow({ feature, onClose }: { feature: Feature; onClose: () => void }) {
+  const router = useRouter();
+  const { agents: agentStatuses } = useAgentStatus();
+  const { dispatch, isDispatching } = useAgentDispatch();
+
+  const handleAssign = async (agentName: AgentName) => {
+    const prompt = `Work on feature: ${feature.name}${feature.description ? `\n\nDescription: ${feature.description}` : ""}`;
+    try {
+      const result = await dispatch({
+        agentName,
+        projectId: feature.projectId,
+        prompt,
+      });
+      onClose();
+      router.push(`/agents/${agentName}/chat?thread=${result.threadId}`);
+    } catch {
+      // Error handled by hook
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {AGENT_BUTTONS.map((agent) => {
+        const status = agentStatuses[agent.id];
+        const isBusy = status?.status === "working";
+        return (
+          <button
+            key={agent.id}
+            onClick={() => !isBusy && handleAssign(agent.id)}
+            disabled={isBusy || isDispatching}
+            className={cn(
+              "glass-sm flex items-center gap-2 rounded-oma px-3 py-2 text-sm transition-all duration-200",
+              isBusy
+                ? "cursor-not-allowed opacity-50"
+                : "hover:-translate-y-0.5 hover:shadow-oma-sm hover:border-oma-glass-border-bright",
+            )}
+            title={isBusy ? `${agent.name} is busy: ${(status as AgentLiveStatusWorking).currentTask}` : `Assign to ${agent.name}`}
+          >
+            <span className="text-base">{agent.mascot}</span>
+            <span className="font-medium text-oma-text">{agent.name}</span>
+            {isBusy && (
+              <span className="rounded-oma-full bg-oma-warning/15 px-1.5 py-0.5 text-[10px] font-medium text-oma-warning">
+                Working
+              </span>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }

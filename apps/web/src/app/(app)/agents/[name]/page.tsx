@@ -9,8 +9,9 @@
 // ---------------------------------------------------------------------------
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { ArrowLeft, CheckCircle2, XCircle, Clock, Loader2, MessageSquare, ExternalLink, GitPullRequest } from "lucide-react";
+import { useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft, CheckCircle2, XCircle, Clock, Loader2, MessageSquare, ExternalLink, GitPullRequest, Play } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AgentProfileHero } from "@/components/agent-profile-hero";
 import { AgentStatsGrid } from "@/components/agent-stats-grid";
@@ -23,6 +24,9 @@ import {
   useAgentRuns,
 } from "@/hooks/use-api";
 import { useAgentThreads } from "@/hooks/use-agent-threads";
+import { useSingleAgentStatus } from "@/hooks/use-agent-status";
+import { useAgentDispatch } from "@/hooks/use-agent-dispatch";
+import type { AgentName, AgentLiveStatusWorking, AgentLiveStatusErrored } from "@omakase/db";
 
 // ---------------------------------------------------------------------------
 // Agent visual metadata (mascot, colors) — not fetched from the API since
@@ -265,12 +269,21 @@ export default function AgentProfilePage() {
   const name = params.name;
   const meta = AGENT_META[name];
 
+  const router = useRouter();
   const { data: profile, isLoading: profileLoading } = useAgentProfile(name);
   const { data: stats, isLoading: statsLoading } = useAgentStats(name);
   const { data: activity, isLoading: activityLoading } = useAgentActivity(name);
   const { data: runs, isLoading: runsLoading } = useAgentRuns(name);
+  const { status: liveStatus } = useSingleAgentStatus(name as AgentName);
+  const { dispatch, isDispatching } = useAgentDispatch();
   // Threads across all projects
   const { threads } = useAgentThreads(name, null);
+
+  const isBusy = liveStatus?.status === "working";
+  const isIdle = !liveStatus || liveStatus.status === "idle";
+
+  const [dispatchPrompt, setDispatchPrompt] = useState("");
+  const [showDispatchInput, setShowDispatchInput] = useState(false);
 
   // If the agent name is not recognized, show an error state
   if (!meta) {
@@ -314,6 +327,110 @@ export default function AgentProfilePage() {
           color={meta.color}
           accentColor={meta.accentColor}
         />
+      )}
+
+      {/* Agent status banner */}
+      {liveStatus?.status === "working" && (() => {
+        const working = liveStatus as AgentLiveStatusWorking;
+        const elapsed = Math.floor((Date.now() - new Date(working.startedAt).getTime()) / 60000);
+        return (
+          <div className={cn(
+            "glass flex items-center gap-3 rounded-oma border px-5 py-3",
+            "border-oma-success/20 bg-oma-success/[0.04]",
+          )}>
+            <span className="relative flex size-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-oma-success opacity-60" />
+              <span className="relative inline-flex size-2.5 rounded-full bg-oma-success" />
+            </span>
+            <span className="text-sm font-medium text-oma-text">Currently working</span>
+            <span className="text-sm text-oma-text-muted">&mdash; {working.currentTask}</span>
+            <span className="text-xs text-oma-text-subtle">{elapsed}m elapsed</span>
+            <Link
+              href={`/agents/${name}/chat?thread=${working.threadId}`}
+              className="ml-auto text-xs font-medium text-oma-primary transition-colors hover:text-oma-primary-bright"
+            >
+              View thread &rarr;
+            </Link>
+          </div>
+        );
+      })()}
+      {liveStatus?.status === "errored" && (() => {
+        const errored = liveStatus as AgentLiveStatusErrored;
+        return (
+          <div className={cn(
+            "glass flex items-center gap-3 rounded-oma border px-5 py-3",
+            "border-oma-error/20 bg-oma-error/[0.04]",
+          )}>
+            <XCircle className="size-4 text-oma-error" />
+            <span className="text-sm font-medium text-oma-text">Last run failed</span>
+            <span className="truncate text-sm text-oma-text-muted">&mdash; {errored.lastError}</span>
+            <span className="text-xs text-oma-text-subtle">{formatRelativeTime(errored.erroredAt)}</span>
+          </div>
+        );
+      })()}
+
+      {/* Start Work action */}
+      {isIdle && !showDispatchInput && (
+        <button
+          onClick={() => setShowDispatchInput(true)}
+          className={cn(
+            "glass inline-flex items-center gap-2 rounded-oma px-5 py-2.5 text-sm font-medium",
+            "text-oma-text transition-all duration-200",
+            "hover:-translate-y-0.5 hover:shadow-oma hover:border-oma-glass-border-bright",
+          )}
+        >
+          <Play className="size-4" />
+          Start Work
+        </button>
+      )}
+      {isIdle && showDispatchInput && (
+        <div className="glass flex items-center gap-3 rounded-oma px-4 py-3">
+          <Play className="size-4 shrink-0 text-oma-text-muted" />
+          <input
+            type="text"
+            value={dispatchPrompt}
+            onChange={(e) => setDispatchPrompt(e.target.value)}
+            onKeyDown={async (e) => {
+              if (e.key === "Enter" && dispatchPrompt.trim()) {
+                try {
+                  const result = await dispatch({ agentName: name as AgentName, prompt: dispatchPrompt.trim() });
+                  router.push(`/agents/${name}/chat?thread=${result.threadId}`);
+                } catch { /* error shown by hook */ }
+              }
+              if (e.key === "Escape") {
+                setShowDispatchInput(false);
+                setDispatchPrompt("");
+              }
+            }}
+            placeholder={`Give ${meta.displayName} a task...`}
+            className="flex-1 bg-transparent text-sm text-oma-text outline-none placeholder:text-oma-text-faint"
+            autoFocus
+          />
+          <button
+            onClick={async () => {
+              if (!dispatchPrompt.trim()) return;
+              try {
+                const result = await dispatch({ agentName: name as AgentName, prompt: dispatchPrompt.trim() });
+                router.push(`/agents/${name}/chat?thread=${result.threadId}`);
+              } catch { /* error shown by hook */ }
+            }}
+            disabled={!dispatchPrompt.trim() || isDispatching}
+            className="shrink-0 rounded-oma-sm px-3 py-1.5 text-xs font-medium text-oma-primary transition-colors hover:bg-oma-primary/10 disabled:opacity-40"
+          >
+            {isDispatching ? "Starting..." : "Send"}
+          </button>
+          <button
+            onClick={() => { setShowDispatchInput(false); setDispatchPrompt(""); }}
+            className="shrink-0 text-xs text-oma-text-subtle transition-colors hover:text-oma-text"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+      {isBusy && (
+        <span className="text-xs text-oma-text-subtle" title={`${meta.displayName} is currently busy`}>
+          {/* Start Work not shown when busy — status banner above covers it */}
+        </span>
       )}
 
       {/* Gradient separator */}

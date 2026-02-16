@@ -108,7 +108,7 @@ export function ThreadListSidebar({
   }
 
   return (
-    <div className={cn("flex h-full w-[280px] flex-col border-r bg-oma-bg-elevated", accentBorder)}>
+    <div className={cn("flex h-full w-full flex-col overflow-hidden border-r bg-oma-bg-elevated", accentBorder)}>
       {/* Header */}
       <div className={cn("flex flex-col border-b px-4 py-3 gap-2", accentBorder)}>
         {backHref && (
@@ -150,7 +150,7 @@ export function ThreadListSidebar({
       </div>
 
       {/* Thread list */}
-      <div className="flex-1 overflow-y-auto py-2">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden py-2">
         {sorted.length === 0 ? (
           <EmptyState onCreateThread={onCreateThread} />
         ) : (
@@ -274,10 +274,10 @@ function ThreadRow({
         }
       }}
       className={cn(
-        "group relative flex cursor-pointer flex-col gap-1 rounded-oma px-3 py-2.5 transition-colors",
+        "group relative flex min-w-0 cursor-pointer flex-col gap-1 overflow-hidden rounded-oma border px-3 py-2.5 transition-all duration-200",
         isSelected
-          ? "glass-primary border border-oma-primary/20 bg-oma-primary/5"
-          : "hover:bg-oma-bg-surface/60",
+          ? "glass-primary border-oma-primary/20 bg-oma-primary/5"
+          : "border-transparent hover:bg-oma-bg-surface/60 hover:translate-x-0.5",
       )}
     >
       {/* Title row */}
@@ -344,12 +344,8 @@ function ThreadRow({
       </div>
 
       {/* Metadata row */}
-      <div className="flex items-center gap-2 text-[11px] text-oma-text-subtle">
+      <div className="text-[11px] text-oma-text-subtle">
         <span>{formatRelativeTime(thread.lastMessageAt)}</span>
-        <span className="text-oma-text-faint">·</span>
-        <span>
-          {thread.messageCount} {thread.messageCount === 1 ? "msg" : "msgs"}
-        </span>
       </div>
     </div>
   );

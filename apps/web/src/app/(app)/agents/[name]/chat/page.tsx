@@ -149,6 +149,11 @@ export default function AgentChatPage() {
   useEffect(() => {
     if (threadFromUrl && threadFromUrl !== selectedThreadId) {
       setSelectedThreadId(threadFromUrl);
+    } else if (!threadFromUrl && selectedThreadId) {
+      // URL cleared (e.g. sidebar "New" button) — reset to new conversation
+      setSelectedThreadId(null);
+      setPendingNewConversation(true);
+      setWelcomeDismissed(false);
     }
   }, [threadFromUrl, selectedThreadId]);
 
@@ -282,12 +287,6 @@ export default function AgentChatPage() {
     }
   };
 
-  const handleNewConversation = useCallback(() => {
-    updateThreadUrl(null);
-    setPendingNewConversation(true);
-    setWelcomeDismissed(false);
-  }, [updateThreadUrl]);
-
   const handleRenameThread = async (threadId: string, newTitle: string) => {
     await updateThread(threadId, { title: newTitle });
   };
@@ -346,7 +345,6 @@ export default function AgentChatPage() {
         onToggleGameMenu={() => setGameMenuOpen(!gameMenuOpen)}
         onLaunchQuiz={handleLaunchQuiz}
         variant="fullscreen"
-        onNewConversation={handleNewConversation}
         explorerOpen={explorerOpen}
         onToggleExplorer={hasActiveWorkSession ? () => setExplorerOpen((v) => !v) : undefined}
         projects={projects}

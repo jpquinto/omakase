@@ -4,7 +4,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { ROLE_PALETTE } from "@/lib/chat-constants";
 import type { AgentInfo } from "@/lib/chat-constants";
-import { Square, Gamepad2, Maximize2, Plus, FolderOpen, Briefcase, ChevronDown, Check } from "lucide-react";
+import { Square, Gamepad2, Maximize2, FolderOpen, Briefcase, ChevronDown, Check } from "lucide-react";
 import type { AgentThread, Project } from "@omakase/db";
 
 // ---------------------------------------------------------------------------
@@ -35,8 +35,6 @@ interface ChatHeaderProps {
   /** URL for the full-screen chat page (shown in modal variant) */
   fullscreenHref?: string;
   onNavigateFullscreen?: () => void;
-  /** Callback to start a new conversation (fullscreen only) */
-  onNewConversation?: () => void;
   /** Whether the workspace file explorer is open */
   explorerOpen?: boolean;
   /** Toggle workspace explorer (only shown when defined) */
@@ -71,7 +69,6 @@ export function ChatHeader({
   onClose,
   fullscreenHref,
   onNavigateFullscreen,
-  onNewConversation,
   explorerOpen,
   onToggleExplorer,
   projects,
@@ -137,19 +134,6 @@ export function ChatHeader({
 
       {/* New conversation + Game menu + Thread title (editable) + end session + close */}
       <div className="relative flex items-center gap-3">
-        {/* New conversation button (fullscreen only) */}
-        {variant === "fullscreen" && onNewConversation && (
-          <button
-            onClick={onNewConversation}
-            className="glass-sm flex items-center gap-1.5 rounded-oma px-3 py-1.5 text-xs font-medium text-oma-text-muted transition-all hover:text-oma-text"
-            aria-label="New conversation"
-            title="New conversation"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            New
-          </button>
-        )}
-
         {/* Project selector */}
         {onProjectChange && (
           <div className="relative">

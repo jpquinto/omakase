@@ -50,16 +50,16 @@ export default function ProjectsPage() {
 
       {/* Loading state */}
       {isLoading && (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-6 glass rounded-oma-lg">
           {[1, 2, 3].map((i) => (
-            <ProjectCardSkeleton key={i} />
+            <ProjectRowSkeleton key={i} isLast={i === 3} />
           ))}
         </div>
       )}
 
       {/* Error state */}
       {error && !isLoading && (
-        <div className="glass rounded-oma-lg p-6 text-center">
+        <div className="mt-6 glass rounded-oma-lg p-6 text-center">
           <p className="text-sm text-oma-error">
             Failed to load projects. Please try again later.
           </p>
@@ -68,20 +68,24 @@ export default function ProjectsPage() {
 
       {/* Empty state */}
       {!isLoading && !error && projects && projects.length === 0 && (
-        <div className="glass rounded-oma-lg p-12 text-center">
+        <div className="mt-6 glass rounded-oma-lg p-12 text-center">
           <p className="text-sm text-oma-text-muted">
             No projects yet. Create your first project to get started.
           </p>
         </div>
       )}
 
-      {/* Project grid */}
+      {/* Project list */}
       {!isLoading && projects && projects.length > 0 && (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-6 glass rounded-oma-lg">
           {projects.map((project, i) => (
-            <ScrollReveal key={project.id} delay={i * 100} duration={600}>
-              <ProjectCard project={project} />
-            </ScrollReveal>
+            <div
+              key={project.id}
+              className="animate-oma-fade-up opacity-0"
+              style={{ animationDelay: `${i * 60}ms`, animationFillMode: "forwards" }}
+            >
+              <ProjectRow project={project} isLast={i === projects.length - 1} />
+            </div>
           ))}
         </div>
       )}
@@ -90,10 +94,10 @@ export default function ProjectsPage() {
 }
 
 // ---------------------------------------------------------------------------
-// ProjectCard — fetches its own stats so the list renders immediately
+// ProjectRow — list row that fetches its own stats independently
 // ---------------------------------------------------------------------------
 
-function ProjectCard({ project }: { project: Project }) {
+function ProjectRow({ project, isLast }: { project: Project; isLast: boolean }) {
   const { data: stats } = useFeatureStats(project.id);
   const { data: activeAgentRuns } = useActiveAgents(project.id);
 
@@ -109,80 +113,69 @@ function ProjectCard({ project }: { project: Project }) {
   return (
     <Link
       href={`/projects/${project.id}`}
-      className="glass glass-edge glass-hover block rounded-oma-lg p-6 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-oma-glow-primary hover:scale-[1.01]"
+      className={`flex items-center gap-4 px-5 py-4 transition-colors hover:bg-white/[0.04] ${
+        !isLast ? "border-b border-oma-glass-border" : ""
+      }`}
     >
-      {/* Card header */}
-      <div className="mb-4 flex items-start justify-between">
-        <h2 className="text-lg font-semibold tracking-tight text-oma-text">
+      {/* Name & description */}
+      <div className="min-w-0 flex-1">
+        <h2 className="truncate text-sm font-medium text-oma-text">
           {project.name}
         </h2>
+        <p className="mt-0.5 truncate text-xs text-oma-text-muted">
+          {project.description ?? "No description"}
+        </p>
+      </div>
 
-        {/* Active agents badge */}
+      {/* Active agents badge */}
+      <div className="hidden shrink-0 sm:block">
         {activeAgents > 0 ? (
           <span className="glass-primary inline-flex items-center gap-1.5 rounded-oma-full px-2.5 py-1 text-xs font-medium text-oma-primary">
-            <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-oma-progress" />
-            {activeAgents} agent
-            {activeAgents > 1 ? "s" : ""}
+            <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-oma-progress" />
+            {activeAgents} agent{activeAgents > 1 ? "s" : ""}
           </span>
         ) : (
-          <span className="glass-sm inline-flex items-center rounded-oma-full px-2.5 py-1 text-xs font-medium text-oma-text-subtle">
+          <span className="inline-flex items-center rounded-oma-full bg-oma-bg-surface px-2.5 py-1 text-xs font-medium text-oma-text-subtle">
             Idle
           </span>
         )}
       </div>
 
-      {/* Description */}
-      <p className="mb-5 text-sm leading-relaxed text-oma-text-muted">
-        {project.description ?? "No description"}
-      </p>
-
-      {/* Progress section */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between text-xs font-medium">
-          <span className="text-oma-text">
-            {featuresPassing}/{featuresTotal} passing
-          </span>
-          <span className="text-oma-text-muted">
-            {progressPercent}%
-          </span>
-        </div>
-
-        {/* Progress bar */}
-        <div className="h-2 w-full overflow-hidden rounded-oma-full bg-oma-bg-surface">
+      {/* Progress */}
+      <div className="hidden w-36 shrink-0 items-center gap-3 lg:flex">
+        <div className="h-1.5 flex-1 overflow-hidden rounded-oma-full bg-oma-bg-surface">
           <div
             className="h-full rounded-oma-full bg-gradient-to-r from-oma-jade to-oma-done transition-all duration-500 ease-out"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
+        <span className="w-16 text-right text-xs tabular-nums text-oma-text-muted">
+          {featuresPassing}/{featuresTotal}
+        </span>
       </div>
     </Link>
   );
 }
 
 // ---------------------------------------------------------------------------
-// ProjectCardSkeleton — placeholder while project list is loading
+// ProjectRowSkeleton — placeholder row while project list is loading
 // ---------------------------------------------------------------------------
 
-function ProjectCardSkeleton() {
+function ProjectRowSkeleton({ isLast }: { isLast: boolean }) {
   return (
-    <div className="glass rounded-oma-lg p-6">
-      {/* Header */}
-      <div className="mb-4 flex items-start justify-between">
-        <div className="h-5 w-40 animate-pulse rounded-oma bg-oma-bg-surface" />
-        <div className="h-6 w-16 animate-pulse rounded-oma-full bg-oma-bg-surface" />
+    <div
+      className={`flex items-center gap-4 px-5 py-4 ${
+        !isLast ? "border-b border-oma-glass-border" : ""
+      }`}
+    >
+      <div className="min-w-0 flex-1 space-y-2">
+        <div className="h-4 w-40 animate-pulse rounded bg-oma-bg-surface" />
+        <div className="h-3 w-56 animate-pulse rounded bg-oma-bg-surface" />
       </div>
-      {/* Description */}
-      <div className="mb-5 space-y-2">
-        <div className="h-3 w-full animate-pulse rounded bg-oma-bg-surface" />
-        <div className="h-3 w-2/3 animate-pulse rounded bg-oma-bg-surface" />
-      </div>
-      {/* Progress bar */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="h-3 w-20 animate-pulse rounded bg-oma-bg-surface" />
-          <div className="h-3 w-8 animate-pulse rounded bg-oma-bg-surface" />
-        </div>
-        <div className="h-2 w-full animate-pulse rounded-oma-full bg-oma-bg-surface" />
+      <div className="hidden h-6 w-16 animate-pulse rounded-oma-full bg-oma-bg-surface sm:block" />
+      <div className="hidden w-36 items-center gap-3 lg:flex">
+        <div className="h-1.5 flex-1 animate-pulse rounded-oma-full bg-oma-bg-surface" />
+        <div className="h-3 w-12 animate-pulse rounded bg-oma-bg-surface" />
       </div>
     </div>
   );

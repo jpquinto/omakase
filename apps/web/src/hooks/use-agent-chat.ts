@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AgentMessage, AgentMessageType, AgentThreadMode, QuizMetadata } from "@omakase/db";
+import type { AgentMessage, AgentMessageType, AgentThreadMode, AgentLiveStatusWorking, QuizMetadata } from "@omakase/db";
 import { apiFetch } from "@/lib/api-client";
+import { useAgentStatus } from "./use-agent-status";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_ORCHESTRATOR_URL ?? "http://localhost:8080";
 
@@ -45,7 +46,14 @@ function openStream(
     onClose: () => void;
   },
 ): () => void {
+  let didOpen = false;
+
   const es = new EventSource(url);
+
+  es.onopen = () => {
+    didOpen = true;
+    console.log("[sse-client] EventSource connected:", url);
+  };
 
   es.onmessage = (event) => {
     const msg = JSON.parse(event.data) as AgentMessage;
@@ -69,11 +77,18 @@ function openStream(
   });
 
   es.addEventListener("close", () => {
+    console.log("[sse-client] Server sent close event");
     es.close();
     callbacks.onClose();
   });
 
   es.onerror = () => {
+    console.warn(
+      "[sse-client] EventSource error — readyState:",
+      es.readyState,
+      "didOpen:", didOpen,
+      "url:", url,
+    );
     // SSE errors during a stream likely mean the connection dropped.
     // Don't auto-reconnect — the stream is transient. Just close.
     es.close();
@@ -93,20 +108,32 @@ export function useAgentChat(runId: string | null, options?: UseAgentChatOptions
   const [streamingContent, setStreamingContent] = useState("");
   const [workSessionRunId, setWorkSessionRunId] = useState<string | null>(null);
   const closeStreamRef = useRef<(() => void) | null>(null);
-  // When sendMessage creates a new thread and starts streaming, we set this
-  // flag so the threadId useEffect doesn't kill the active stream.
-  const skipNextResetRef = useRef(false);
+  // When sendMessage creates a new thread and starts streaming, we store
+  // the threadId here so the threadId useEffect doesn't kill the active
+  // stream. Using a threadId (not a boolean) is resilient to React strict
+  // mode running effects twice in development.
+  const streamingForThreadRef = useRef<string | null>(null);
+
+  const { agents: agentStatuses } = useAgentStatus();
 
   const threadId = options?.threadId;
   const mode = options?.mode ?? "chat";
   const agentName = options?.agentName;
   const projectId = options?.projectId;
 
+  // Close EventSource on unmount to prevent leaks
+  useEffect(() => {
+    return () => {
+      closeStreamRef.current?.();
+    };
+  }, []);
+
   // Fetch existing messages when threadId changes
   useEffect(() => {
-    // If sendMessage just started a stream for this threadId, don't reset
-    if (skipNextResetRef.current) {
-      skipNextResetRef.current = false;
+    // If sendMessage just started a stream for this threadId, don't reset.
+    // We compare against the threadId (not a boolean) so this survives
+    // React strict mode's double-invocation in development.
+    if (streamingForThreadRef.current === threadId) {
       return;
     }
 
@@ -179,6 +206,7 @@ export function useAgentChat(runId: string | null, options?: UseAgentChatOptions
         setIsThinking(false);
         setStreamingContent("");
         closeStreamRef.current = null;
+        streamingForThreadRef.current = null;
       },
     });
   }, []);
@@ -212,6 +240,14 @@ export function useAgentChat(runId: string | null, options?: UseAgentChatOptions
       if (mode === "work" && !workSessionRunId) {
         if (!agentName) {
           setError(new Error("Missing agentName for work session"));
+          return {};
+        }
+
+        // Busy guard: prevent dispatching if agent is already working
+        const currentStatus = agentStatuses[agentName as keyof typeof agentStatuses];
+        if (currentStatus?.status === "working") {
+          const working = currentStatus as AgentLiveStatusWorking;
+          setError(new Error(`${agentName} is currently busy: ${working.currentTask}`));
           return {};
         }
 
@@ -269,9 +305,9 @@ export function useAgentChat(runId: string | null, options?: UseAgentChatOptions
           );
 
           // Start listening for the assistant's response.
-          // Set skip flag so the threadId useEffect doesn't kill this stream
-          // when the caller updates the URL with the new threadId.
-          skipNextResetRef.current = true;
+          // Record which threadId we're streaming for so the threadId
+          // useEffect doesn't kill this stream when the URL updates.
+          streamingForThreadRef.current = resolvedThreadId ?? null;
           startListening(result.runId, resolvedThreadId);
 
           return { createdThreadId: resolvedThreadId };
@@ -321,7 +357,7 @@ export function useAgentChat(runId: string | null, options?: UseAgentChatOptions
         // Start listening for the assistant's response
         const resolvedThreadId = response.createdThread?.threadId ?? threadId;
         if (resolvedThreadId && resolvedThreadId !== threadId) {
-          skipNextResetRef.current = true;
+          streamingForThreadRef.current = resolvedThreadId;
         }
         startListening(activeRunId, resolvedThreadId);
 
@@ -332,7 +368,7 @@ export function useAgentChat(runId: string | null, options?: UseAgentChatOptions
         return {};
       }
     },
-    [runId, threadId, mode, agentName, projectId, workSessionRunId, startListening],
+    [runId, threadId, mode, agentName, projectId, workSessionRunId, startListening, agentStatuses],
   );
 
   const endWorkSession = useCallback(async () => {

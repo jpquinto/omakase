@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ROLE_PALETTE, WELCOME_GLOW } from "@/lib/chat-constants";
 import type { AgentInfo } from "@/lib/chat-constants";
@@ -62,6 +62,21 @@ export function ChatInput({
 }: ChatInputProps) {
   const palette = ROLE_PALETTE[agent.role];
   const glowRgb = WELCOME_GLOW[agent.role];
+
+  // Auto-resize textarea up to ~5 lines then scroll
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const MAX_ROWS = 5;
+  const LINE_HEIGHT = 24; // matches text-base leading
+  const PADDING_Y = 24; // py-3 = 12px * 2
+  const maxHeight = MAX_ROWS * LINE_HEIGHT + PADDING_Y;
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
+    el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
+  }, [input, maxHeight]);
 
   // Hold-to-talk timer — short press = toggle, long press = push-to-talk
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -170,7 +185,7 @@ export function ChatInput({
           </div>
         )}
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-end gap-2">
           {/* TTS toggle — left of input */}
           {voiceSupported && onToggleTalkMode && (
             <button
@@ -190,6 +205,7 @@ export function ChatInput({
 
           {/* Text input — always visible */}
           <textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={onKeyDown}
@@ -205,7 +221,7 @@ export function ChatInput({
             }
             rows={1}
             className={cn(
-              "glass-sm flex-1 resize-none rounded-oma-lg border bg-transparent px-4 py-3 text-base text-oma-text outline-none transition-colors",
+              "glass-sm flex-1 resize-none rounded-oma-lg border bg-transparent px-4 py-3 text-base leading-6 text-oma-text outline-none transition-colors",
               palette.border,
               "placeholder:text-oma-text-faint",
               "focus:border-oma-primary focus:ring-1 focus:ring-oma-primary/30",

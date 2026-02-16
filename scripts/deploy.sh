@@ -66,6 +66,71 @@ sudo git pull --ff-only
 echo "Installing dependencies..."
 sudo bun install --frozen-lockfile 2>/dev/null || sudo bun install
 
+# -- Log directory --
+sudo mkdir -p /var/log/omakase
+
+# -- CloudWatch agent config (idempotent, file-based) --
+echo "Configuring CloudWatch agent..."
+sudo mkdir -p /opt/aws/amazon-cloudwatch-agent/etc
+sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json > /dev/null << 'CWCFG'
+{
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/omakase/orchestrator.log",
+            "log_group_name": "/omakase/orchestrator",
+            "log_stream_name": "{instance_id}/orchestrator",
+            "retention_in_days": 30
+          },
+          {
+            "file_path": "/opt/omakase/workspaces/*/agent-*.log",
+            "log_group_name": "/omakase/orchestrator",
+            "log_stream_name": "{instance_id}/agents",
+            "auto_removal": true
+          }
+        ]
+      }
+    }
+  }
+}
+CWCFG
+sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+  -a fetch-config -m ec2 -s \
+  -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json 2>/dev/null \
+  && echo "CloudWatch agent configured." \
+  || echo "Warning: CloudWatch agent not installed. Logs available via journalctl only."
+
+# -- Journal-to-file export timer (idempotent) --
+if [ ! -f /etc/systemd/system/omakase-log-export.timer ]; then
+  echo "Setting up log export timer..."
+  sudo tee /etc/systemd/system/omakase-log-export.service > /dev/null << 'LOGEXPORT'
+[Unit]
+Description=Export omakase orchestrator journal to log file
+After=omakase-orchestrator.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c 'journalctl -u omakase-orchestrator --since "5 minutes ago" --no-pager >> /var/log/omakase/orchestrator.log'
+LOGEXPORT
+
+  sudo tee /etc/systemd/system/omakase-log-export.timer > /dev/null << 'LOGTIMER'
+[Unit]
+Description=Export omakase logs every 5 minutes
+
+[Timer]
+OnCalendar=*:0/5
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+LOGTIMER
+
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now omakase-log-export.timer
+fi
+
 echo "Restarting orchestrator..."
 sudo systemctl restart omakase-orchestrator
 

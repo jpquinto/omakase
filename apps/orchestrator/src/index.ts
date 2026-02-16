@@ -966,8 +966,9 @@ const app = new Elysia()
     const lastEventId = request.headers.get("Last-Event-ID");
     const url = new URL(request.url);
     const threadId = url.searchParams.get("threadId") ?? undefined;
+    const origin = request.headers.get("Origin") ?? "*";
 
-    console.log(`[sse] New SSE connection: runId=${runId} threadId=${threadId ?? "none"} lastEventId=${lastEventId ?? "none"}`);
+    console.log(`[sse] New SSE connection: runId=${runId} threadId=${threadId ?? "none"} lastEventId=${lastEventId ?? "none"} origin=${origin}`);
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -1069,6 +1070,12 @@ const app = new Elysia()
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
+        // Prevent nginx from buffering SSE events
+        "X-Accel-Buffering": "no",
+        // Explicit CORS headers — raw Response may bypass Elysia's CORS plugin
+        "Access-Control-Allow-Origin": origin,
+        "Access-Control-Allow-Methods": "GET",
+        "Access-Control-Allow-Headers": "Last-Event-ID, Cache-Control",
       },
     });
   })

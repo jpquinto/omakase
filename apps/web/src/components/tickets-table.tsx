@@ -23,9 +23,10 @@ import {
   UserPlus,
   X,
 } from "lucide-react";
-import type { Feature, FeatureStatus } from "@omakase/db";
+import type { Feature, FeatureStatus, AgentLiveStatusWorking, AgentName } from "@omakase/db";
 import { cn } from "@/lib/utils";
 import { useAssignFeature, useCreateFeature, useDeleteFeature, useSyncLinear, useUpdateFeature } from "@/hooks/use-api";
+import { useAgentStatus } from "@/hooks/use-agent-status";
 import { LinearTicketBadge } from "@/components/linear-ticket-badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -139,6 +140,14 @@ function formatDate(dateString: string): string {
     return dateString;
   }
 }
+
+/** Agent definitions used in the assignment popover. */
+const AGENT_DEFS = [
+  { name: "miso" as AgentName, label: "Miso", mascot: "\uD83C\uDF5C", role: "Architect", color: "text-oma-gold", dotColor: "bg-oma-gold" },
+  { name: "nori" as AgentName, label: "Nori", mascot: "\uD83C\uDF59", role: "Coder", color: "text-oma-indigo", dotColor: "bg-oma-indigo" },
+  { name: "koji" as AgentName, label: "Koji", mascot: "\uD83C\uDF76", role: "Reviewer", color: "text-oma-secondary", dotColor: "bg-oma-secondary" },
+  { name: "toro" as AgentName, label: "Toro", mascot: "\uD83C\uDF63", role: "Tester", color: "text-oma-jade", dotColor: "bg-oma-jade" },
+] as const;
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -359,6 +368,9 @@ export function TicketsTable({
   onBrowseLinear,
   hasLinearConnection,
 }: TicketsTableProps) {
+  // --- Agent live status ---
+  const { agents: agentStatuses } = useAgentStatus();
+
   // --- State ---
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<FeatureStatus | "all">("all");
@@ -371,6 +383,7 @@ export function TicketsTable({
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncCooldown, setSyncCooldown] = useState(0);
   const [assigningFeatureId, setAssigningFeatureId] = useState<string | null>(null);
+  const [assignError, setAssignError] = useState<string | null>(null);
 
   // --- New feature form state ---
   const [newName, setNewName] = useState("");
@@ -427,12 +440,15 @@ export function TicketsTable({
   // --- Agent assignment handler ---
   const handleAssign = useCallback(
     async (featureId: string, agentName: string) => {
+      setAssignError(null);
       try {
         await assignFeature(featureId, agentName);
         setAssigningFeatureId(null);
         onRefetch();
-      } catch {
-        // Error surfaced through the API client
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Assignment failed";
+        setAssignError(message);
+        onRefetch();
       }
     },
     [assignFeature, onRefetch],
@@ -652,6 +668,22 @@ export function TicketsTable({
           </Button>
         )}
       </div>
+
+      {/* ----------------------------------------------------------------- */}
+      {/* Assignment error toast                                            */}
+      {/* ----------------------------------------------------------------- */}
+      {assignError && (
+        <div className="glass flex items-center gap-3 rounded-oma border border-oma-fail/30 bg-oma-fail/10 px-4 py-2">
+          <span className="flex-1 text-sm text-oma-fail">{assignError}</span>
+          <button
+            type="button"
+            onClick={() => setAssignError(null)}
+            className="shrink-0 rounded-oma-sm p-1 text-oma-fail/70 hover:text-oma-fail"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* ----------------------------------------------------------------- */}
       {/* Mobile: Card view                                                 */}
@@ -882,12 +914,30 @@ export function TicketsTable({
                     />
                   </td>
 
-                  {/* Status (inline dropdown on click) */}
+                  {/* Status (inline dropdown on click) + progress indicator */}
                   <td className="px-4 py-3">
-                    <InlineStatusSelect
-                      value={feature.status}
-                      onSave={(status) => void handleInlineUpdate(feature.id, { status })}
-                    />
+                    <div className="flex items-center gap-2">
+                      <InlineStatusSelect
+                        value={feature.status}
+                        onSave={(status) => void handleInlineUpdate(feature.id, { status })}
+                      />
+                      {feature.status === "in_progress" && (() => {
+                        const assignedAgent = AGENT_DEFS.find((a) => a.name === feature.assignedAgentId);
+                        const agentLive = feature.assignedAgentId
+                          ? agentStatuses[feature.assignedAgentId as AgentName]
+                          : undefined;
+                        const isActive = agentLive?.status === "working";
+                        if (assignedAgent) {
+                          return (
+                            <span className={cn("flex items-center gap-1 text-[10px]", isActive ? "text-oma-text-muted" : "text-oma-text-subtle")}>
+                              <span>{assignedAgent.mascot}</span>
+                              {isActive && <span className={cn("inline-block size-1.5 rounded-full animate-pulse", assignedAgent.dotColor)} />}
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
                   </td>
 
                   {/* Category */}
@@ -943,6 +993,7 @@ export function TicketsTable({
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
+                              setAssignError(null);
                               setAssigningFeatureId(
                                 assigningFeatureId === feature.id ? null : feature.id,
                               );
@@ -952,32 +1003,59 @@ export function TicketsTable({
                           >
                             <UserPlus className="size-3.5" />
                           </button>
-                          {/* Agent selection popover */}
+                          {/* Agent selection popover with live status */}
                           {assigningFeatureId === feature.id && (
                             <div
-                              className="glass-lg absolute right-0 top-full z-50 mt-1 w-48 rounded-oma border border-oma-glass-border-bright p-1"
+                              className="glass-lg absolute right-0 top-full z-50 mt-1 w-56 rounded-oma border border-oma-glass-border-bright p-1"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              {[
-                                { name: "miso", label: "Miso", role: "Architect", color: "text-oma-gold" },
-                                { name: "nori", label: "Nori", role: "Coder", color: "text-oma-indigo" },
-                                { name: "koji", label: "Koji", role: "Reviewer", color: "text-oma-secondary" },
-                                { name: "toro", label: "Toro", role: "Tester", color: "text-oma-jade" },
-                              ].map((agent) => (
-                                <button
-                                  key={agent.name}
-                                  type="button"
-                                  onClick={() => void handleAssign(feature.id, agent.name)}
-                                  className="flex w-full items-center gap-2 rounded-oma-sm px-3 py-2 text-left text-sm transition-colors hover:bg-white/[0.06]"
-                                >
-                                  <span className={cn("font-medium", agent.color)}>
-                                    {agent.label}
-                                  </span>
-                                  <span className="text-xs text-oma-text-muted">
-                                    {agent.role}
-                                  </span>
-                                </button>
-                              ))}
+                              {AGENT_DEFS.map((agent) => {
+                                const live = agentStatuses[agent.name];
+                                const isBusy = live?.status === "working";
+                                const isErrored = live?.status === "errored";
+                                const working = isBusy ? (live as AgentLiveStatusWorking) : null;
+
+                                return (
+                                  <button
+                                    key={agent.name}
+                                    type="button"
+                                    disabled={isBusy}
+                                    onClick={() => void handleAssign(feature.id, agent.name)}
+                                    className={cn(
+                                      "flex w-full items-center gap-2 rounded-oma-sm px-3 py-2 text-left text-sm transition-colors",
+                                      isBusy
+                                        ? "cursor-not-allowed opacity-50"
+                                        : "hover:bg-white/[0.06]",
+                                    )}
+                                  >
+                                    {/* Status dot */}
+                                    <span
+                                      className={cn(
+                                        "inline-block size-2 shrink-0 rounded-full",
+                                        isBusy ? `${agent.dotColor} animate-pulse` : "",
+                                        isErrored ? "bg-oma-fail" : "",
+                                        !isBusy && !isErrored ? "bg-oma-text-faint" : "",
+                                      )}
+                                    />
+                                    <span className={cn("font-medium", agent.color)}>
+                                      {agent.label}
+                                    </span>
+                                    <span className="flex-1 text-xs text-oma-text-muted">
+                                      {agent.role}
+                                    </span>
+                                    {isBusy && working && (
+                                      <span className="max-w-[80px] truncate text-[10px] text-oma-text-subtle" title={working.currentTask}>
+                                        Working
+                                      </span>
+                                    )}
+                                    {isErrored && (
+                                      <span className="text-[10px] text-oma-fail">
+                                        Failed
+                                      </span>
+                                    )}
+                                  </button>
+                                );
+                              })}
                             </div>
                           )}
                         </div>

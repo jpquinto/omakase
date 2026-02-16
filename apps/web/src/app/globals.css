@@ -393,6 +393,13 @@
   }
 }
 
+/* Hide <hr> inside agent chat messages — these are thinking separators rendered
+   by Streamdown from markdown (---, ***, ___). They get replaced visually by
+   ThinkingPill components at the React level, but this catches any that slip through. */
+.agent-content hr {
+  display: none;
+}
+
 @keyframes voice-bar {
   0%, 100% { transform: scaleY(0.3); }
   50% { transform: scaleY(1); }
@@ -503,23 +510,29 @@ body {
    ============================================================================ */
 
 @layer utilities {
-  /* --- Glass Surfaces (dark mode) --- */
+  /* --- Glass Surfaces (dark mode) ---
+     Uses the dark bg base (rgb 18,19,31) at moderate opacity so surfaces
+     are readable even when backdrop-filter renders differently across
+     browsers/GPUs, plus a subtle white tint for the glass sheen. */
   .glass {
-    background: rgba(255, 255, 255, 0.03);
+    background: linear-gradient(rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.03)),
+                rgba(18, 19, 31, 0.55);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid var(--color-oma-glass-border);
   }
 
   .glass-sm {
-    background: rgba(255, 255, 255, 0.02);
+    background: linear-gradient(rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.02)),
+                rgba(18, 19, 31, 0.45);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid var(--color-oma-glass-border);
   }
 
   .glass-lg {
-    background: rgba(255, 255, 255, 0.05);
+    background: linear-gradient(rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05)),
+                rgba(18, 19, 31, 0.75);
     backdrop-filter: blur(32px);
     -webkit-backdrop-filter: blur(32px);
     border: 1px solid var(--color-oma-glass-border-bright);
@@ -541,7 +554,8 @@ body {
   }
 
   .glass-hover:hover {
-    background: rgba(255, 255, 255, 0.06);
+    background: linear-gradient(rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.06)),
+                rgba(18, 19, 31, 0.6);
     border-color: var(--color-oma-glass-border-bright);
   }
 
@@ -550,13 +564,15 @@ body {
   }
 
   .glass-active {
-    background: rgba(255, 255, 255, 0.08);
+    background: linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.08)),
+                rgba(18, 19, 31, 0.65);
     border-color: var(--color-oma-glass-border-bright);
   }
 
   /* --- Glass with Color Tints --- */
   .glass-primary {
-    background: rgba(244, 114, 182, 0.08);
+    background: linear-gradient(rgba(244, 114, 182, 0.08), rgba(244, 114, 182, 0.08)),
+                rgba(18, 19, 31, 0.5);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid rgba(244, 114, 182, 0.15);
@@ -568,14 +584,16 @@ body {
   }
 
   .glass-secondary {
-    background: rgba(248, 113, 113, 0.06);
+    background: linear-gradient(rgba(248, 113, 113, 0.06), rgba(248, 113, 113, 0.06)),
+                rgba(18, 19, 31, 0.5);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid rgba(248, 113, 113, 0.12);
   }
 
   .glass-gold {
-    background: rgba(251, 191, 36, 0.06);
+    background: linear-gradient(rgba(251, 191, 36, 0.06), rgba(251, 191, 36, 0.06)),
+                rgba(18, 19, 31, 0.5);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid rgba(251, 191, 36, 0.12);

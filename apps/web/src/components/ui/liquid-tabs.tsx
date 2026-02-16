@@ -129,7 +129,7 @@ function LiquidTabsList({
       ref={listRef}
       data-slot="liquid-tabs-list"
       className={cn(
-        "glass-sm relative inline-flex w-fit items-center overflow-x-auto rounded-oma-lg p-1",
+        "glass-sm relative inline-flex w-fit items-center overflow-x-clip rounded-oma-lg p-1",
         className,
       )}
       {...props}

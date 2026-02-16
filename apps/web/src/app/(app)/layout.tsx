@@ -31,7 +31,8 @@ import {
 } from "@/components/ui/dialog";
 import { SpotifyNowPlaying } from "@/components/spotify-now-playing";
 import { WeatherWidget } from "@/components/weather-widget";
-import type { AgentRunRole } from "@omakase/db";
+import type { AgentRunRole, AgentName } from "@omakase/db";
+import { useAgentStatus } from "@/hooks/use-agent-status";
 
 const NAV_ITEMS = [
   { href: "/projects", label: "Projects", icon: Folder },
@@ -43,10 +44,10 @@ const NAV_ITEMS = [
 ];
 
 const AGENTS = [
-  { id: "miso", name: "Miso", mascot: "\uD83C\uDF5C", role: "Architect", status: "running" as const, glow: "bg-oma-gold/40", pingColor: "bg-oma-gold/20" },
-  { id: "nori", name: "Nori", mascot: "\uD83C\uDF59", role: "Coder", status: "running" as const, glow: "bg-oma-indigo/40", pingColor: "bg-oma-indigo/20" },
-  { id: "koji", name: "Koji", mascot: "\uD83C\uDF76", role: "Reviewer", status: "idle" as const, glow: "bg-oma-secondary/40", pingColor: "bg-oma-secondary/20" },
-  { id: "toro", name: "Toro", mascot: "\uD83C\uDF63", role: "Tester", status: "running" as const, glow: "bg-oma-jade/40", pingColor: "bg-oma-jade/20" },
+  { id: "miso" as AgentName, name: "Miso", mascot: "\uD83C\uDF5C", role: "Architect", glow: "bg-oma-gold/40", pingColor: "bg-oma-gold/20", dotColor: "bg-oma-gold" },
+  { id: "nori" as AgentName, name: "Nori", mascot: "\uD83C\uDF59", role: "Coder", glow: "bg-oma-indigo/40", pingColor: "bg-oma-indigo/20", dotColor: "bg-oma-indigo" },
+  { id: "koji" as AgentName, name: "Koji", mascot: "\uD83C\uDF76", role: "Reviewer", glow: "bg-oma-secondary/40", pingColor: "bg-oma-secondary/20", dotColor: "bg-oma-secondary" },
+  { id: "toro" as AgentName, name: "Toro", mascot: "\uD83C\uDF63", role: "Tester", glow: "bg-oma-jade/40", pingColor: "bg-oma-jade/20", dotColor: "bg-oma-jade" },
 ];
 
 /** Maps sidebar role labels to AgentRunRole type */
@@ -77,13 +78,15 @@ interface ChatTarget {
   agentRole: AgentRunRole;
 }
 
-function AgentStatusCard({ agent, collapsed, index, onOpenChat }: {
+function AgentStatusCard({ agent, collapsed, index, onOpenChat, liveStatus }: {
   agent: typeof AGENTS[number];
   collapsed: boolean;
   index: number;
   onOpenChat: (target: ChatTarget) => void;
+  liveStatus: "idle" | "working" | "errored";
 }) {
-  const isRunning = agent.status === "running";
+  const isRunning = liveStatus === "working";
+  const isErrored = liveStatus === "errored";
 
   return (
     <div
@@ -146,12 +149,14 @@ function AgentStatusCard({ agent, collapsed, index, onOpenChat }: {
               <span className="truncate text-xs font-semibold text-oma-text transition-colors duration-200 group-hover/agent:text-white">
                 {agent.name}
               </span>
-              {/* Status dot */}
+              {/* Status dot — agent color when working, red when errored */}
               <span className={cn(
                 "inline-block size-1.5 rounded-full",
                 isRunning
-                  ? "bg-oma-success shadow-[0_0_6px_rgba(110,231,183,0.5)] animate-pulse"
-                  : "bg-oma-text-subtle"
+                  ? cn(agent.dotColor, "shadow-[0_0_6px_currentColor] animate-pulse")
+                  : isErrored
+                    ? "bg-oma-error shadow-[0_0_6px_rgba(248,113,113,0.5)]"
+                    : "bg-oma-text-subtle"
               )} />
             </div>
             <span className="text-[10px] font-medium text-oma-text-subtle transition-colors duration-200 group-hover/agent:text-oma-text-muted">
@@ -206,8 +211,10 @@ function AgentStatusCard({ agent, collapsed, index, onOpenChat }: {
           <span className={cn(
             "absolute -right-0.5 -top-0.5 size-2 rounded-full border border-oma-bg-elevated",
             isRunning
-              ? "bg-oma-success shadow-[0_0_6px_rgba(110,231,183,0.5)] animate-pulse"
-              : "bg-oma-text-subtle"
+              ? cn(agent.dotColor, "shadow-[0_0_6px_currentColor] animate-pulse")
+              : isErrored
+                ? "bg-oma-error shadow-[0_0_6px_rgba(248,113,113,0.5)]"
+                : "bg-oma-text-subtle"
           )} />
         )}
       </Link>
@@ -281,20 +288,15 @@ function ChatSidebar({ agentName, collapsed }: { agentName: string; collapsed: b
   const agentRole = AGENT_ROLE_MAP[agentName];
   const palette = agentRole ? ROLE_PALETTE[agentRole] : undefined;
 
-  const { threads, createThread, updateThread, hasMore, loadMore } = useAgentThreads(agentName, null);
+  const { threads, updateThread, hasMore, loadMore } = useAgentThreads(agentName, null);
 
   const handleSelectThread = useCallback((threadId: string) => {
     router.replace(`/agents/${agentName}/chat?thread=${threadId}`, { scroll: false });
   }, [agentName, router]);
 
-  const handleCreateThread = useCallback(async () => {
-    try {
-      const thread = await createThread();
-      router.replace(`/agents/${agentName}/chat?thread=${thread.threadId}`, { scroll: false });
-    } catch {
-      // Silently handle — the UI will show empty state
-    }
-  }, [createThread, agentName, router]);
+  const handleCreateThread = useCallback(() => {
+    router.replace(`/agents/${agentName}/chat`, { scroll: false });
+  }, [agentName, router]);
 
   const handleRenameThread = useCallback(async (threadId: string, newTitle: string) => {
     await updateThread(threadId, { title: newTitle });
@@ -349,6 +351,7 @@ export default function AppLayout({
   const [collapsed, setCollapsed] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [chatTarget, setChatTarget] = useState<ChatTarget | null>(null);
+  const { agents: agentStatuses } = useAgentStatus();
 
   const breadcrumbs = useBreadcrumbs(pathname);
 
@@ -520,6 +523,7 @@ export default function AppLayout({
                     collapsed={sidebarCollapsed}
                     index={i}
                     onOpenChat={handleOpenChat}
+                    liveStatus={agentStatuses[agent.id]?.status ?? "idle"}
                   />
                 ))}
               </div>

@@ -44,4 +44,11 @@ export type {
   AgentThreadMode,
   AgentThreadStatus,
   NewAgentThread,
+  AgentLiveStatus,
+  AgentLiveStatusState,
+  AgentLiveStatusIdle,
+  AgentLiveStatusWorking,
+  AgentLiveStatusErrored,
+  AgentName,
+  AllAgentStatuses,
 } from "./schema/index.js";
