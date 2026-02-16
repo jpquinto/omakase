@@ -312,6 +312,11 @@ export class WorkSessionManager {
     );
   }
 
+  /** Return all active sessions across all agents. */
+  listAllSessions(): WorkSession[] {
+    return Array.from(this.sessions.values());
+  }
+
   async cleanup(): Promise<void> {
     const promises: Promise<void>[] = [];
     for (const [runId] of this.sessions) {
