@@ -91,6 +91,9 @@ export async function dequeueJob(agentName: string): Promise<QueuedJob | null> {
  * Returns the job with the lowest position that is still "queued".
  */
 export async function peekJob(agentName: string): Promise<QueuedJob | null> {
+  // NOTE: Do NOT use Limit with FilterExpression in DynamoDB — Limit applies
+  // to items scanned, not items returned. Completed/failed items at lower
+  // positions would consume the Limit and hide the real queued item.
   const result = await docClient.send(new QueryCommand({
     TableName: TABLE(),
     KeyConditionExpression: "agentName = :agentName",
@@ -101,7 +104,6 @@ export async function peekJob(agentName: string): Promise<QueuedJob | null> {
       ":queued": "queued",
     },
     ScanIndexForward: true, // ascending — lowest position first
-    Limit: 1,
   }));
 
   if (!result.Items || result.Items.length === 0) return null;
@@ -182,47 +184,18 @@ export async function getQueueDepth(agentName: string): Promise<number> {
   return result.Count ?? 0;
 }
 
-/** Mark a job as completed with a timestamp. */
+/** Mark a job as completed by removing it from the queue. */
 export async function markJobCompleted(agentName: string, jobId: string): Promise<void> {
-  const job = await findJobById(agentName, jobId);
-  if (!job) return;
-
-  const now = new Date().toISOString();
-
-  await docClient.send(new UpdateCommand({
-    TableName: TABLE(),
-    Key: { agentName, sk: positionKey(job.position, job.jobId) },
-    UpdateExpression: "SET #status = :completed, completedAt = :now",
-    ExpressionAttributeNames: { "#status": "status" },
-    ExpressionAttributeValues: {
-      ":completed": "completed",
-      ":now": now,
-    },
-  }));
+  await removeJob(agentName, jobId);
 }
 
-/** Mark a job as failed with an error message. */
+/** Mark a job as failed by removing it from the queue. */
 export async function markJobFailed(
   agentName: string,
   jobId: string,
-  error: string,
+  _error: string,
 ): Promise<void> {
-  const job = await findJobById(agentName, jobId);
-  if (!job) return;
-
-  const now = new Date().toISOString();
-
-  await docClient.send(new UpdateCommand({
-    TableName: TABLE(),
-    Key: { agentName, sk: positionKey(job.position, job.jobId) },
-    UpdateExpression: "SET #status = :failed, completedAt = :now, errorMessage = :error",
-    ExpressionAttributeNames: { "#status": "status" },
-    ExpressionAttributeValues: {
-      ":failed": "failed",
-      ":now": now,
-      ":error": error,
-    },
-  }));
+  await removeJob(agentName, jobId);
 }
 
 // ---------------------------------------------------------------------------
