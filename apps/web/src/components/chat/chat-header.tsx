@@ -238,7 +238,7 @@ export function ChatHeader({
           <button
             onClick={onToggleExplorer}
             className={cn(
-              "flex h-9 w-9 items-center justify-center rounded-oma text-oma-text-muted transition-all hover:text-oma-text",
+              "flex h-9 w-9 cursor-pointer items-center justify-center rounded-oma text-oma-text-muted transition-all hover:bg-oma-bg-surface/60 hover:text-oma-text",
               explorerOpen && "bg-oma-bg-surface text-oma-text",
             )}
             aria-label={explorerOpen ? "Close file explorer" : "Open file explorer"}
