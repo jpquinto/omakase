@@ -18,6 +18,13 @@ issues/
 # Playwright CLI daemon artifacts
 .playwright-cli/
 .playwright/
+.playwright-mcp/
+
+# Dev screenshots in repo root
+/*.png
+
+# CDK outputs (contains infrastructure details)
+infra/cdk-outputs.json
 
 # Log files
 logs/

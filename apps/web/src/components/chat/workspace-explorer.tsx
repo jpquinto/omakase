@@ -103,7 +103,6 @@ export function WorkspaceExplorer(props: WorkspaceExplorerProps) {
       const result = await apiFetch<{ entries: FileEntry[] }>(makeFilesUrl(props, path));
       return result.entries;
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [endpointKey],
   );
 
@@ -213,7 +212,6 @@ export function WorkspaceExplorer(props: WorkspaceExplorerProps) {
         setFileLoading(false);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [endpointKey],
   );
 
