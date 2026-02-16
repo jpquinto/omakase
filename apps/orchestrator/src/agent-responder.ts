@@ -5,11 +5,11 @@
  * 1. Fetches the agent run details (role, feature context)
  * 2. Loads the agent's personality (custom or default)
  * 3. Retrieves conversation history
- * 4. Streams Claude's response token-by-token via the stream bus
+ * 4. Streams GPT-5 Nano's response token-by-token via the stream bus
  * 5. Stores the final response in DynamoDB
  */
 
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import {
   getAgentRun,
   getFeature,
@@ -27,11 +27,11 @@ const ROLE_TO_AGENT: Record<string, string> = {
   tester: "toro",
 };
 
-let client: Anthropic | null = null;
+let client: OpenAI | null = null;
 
-function getClient(): Anthropic {
+function getClient(): OpenAI {
   if (!client) {
-    client = new Anthropic();
+    client = new OpenAI();
   }
   return client;
 }
@@ -95,7 +95,7 @@ export async function generateAgentResponse(runId: string, userMessage: string, 
   const history = threadId
     ? await listMessagesByThread({ threadId, limit: 50 })
     : await listMessages({ runId });
-  const messages: Anthropic.MessageParam[] = history.map((msg) => ({
+  const messages: OpenAI.ChatCompletionMessageParam[] = history.map((msg) => ({
     role: msg.sender === "user" ? "user" as const : "assistant" as const,
     content: msg.content,
   }));
@@ -107,13 +107,13 @@ export async function generateAgentResponse(runId: string, userMessage: string, 
   }
 
   // Merge consecutive same-role messages to satisfy API constraints
-  const merged: Anthropic.MessageParam[] = [];
+  const merged: OpenAI.ChatCompletionMessageParam[] = [];
   for (const msg of messages) {
     if (merged.length > 0 && merged[merged.length - 1].role === msg.role) {
       merged[merged.length - 1] = {
         role: msg.role,
-        content: merged[merged.length - 1].content + "\n\n" + msg.content,
-      };
+        content: (merged[merged.length - 1].content as string) + "\n\n" + (msg.content as string),
+      } as OpenAI.ChatCompletionMessageParam;
     } else {
       merged.push({ ...msg });
     }
@@ -134,20 +134,23 @@ export async function generateAgentResponse(runId: string, userMessage: string, 
   try {
     let fullText = "";
 
-    const stream = getClient().messages.stream({
-      model: "claude-sonnet-4-5-20250929",
-      max_tokens: 512,
-      system: systemParts.join("\n"),
-      messages: merged,
+    const stream = await getClient().chat.completions.create({
+      model: "gpt-5-nano",
+      max_completion_tokens: 512,
+      messages: [
+        { role: "system", content: systemParts.join("\n") },
+        ...merged,
+      ],
+      stream: true,
     });
 
-    stream.on("text", (text) => {
-      fullText += text;
-      emit(runId, { type: "token", token: text });
-    });
-
-    // Wait for the stream to complete
-    await stream.finalMessage();
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content;
+      if (delta) {
+        fullText += delta;
+        emit(runId, { type: "token", token: delta });
+      }
+    }
 
     // Signal streaming is done
     emit(runId, { type: "thinking_end" });
