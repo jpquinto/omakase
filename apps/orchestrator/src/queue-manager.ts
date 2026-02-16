@@ -164,15 +164,17 @@ export class AgentQueueManager {
         console.log(`[queue-manager] Created thread ${threadId} for queued job ${job.jobId}`);
       }
 
-      // Resolve project repo URL and GitHub token for workspace setup
+      // Resolve project repo URL, GitHub token, and default branch for workspace setup
       const projectId = job.projectId !== "general" ? job.projectId : undefined;
       let repoUrl: string | undefined;
       let githubToken: string | undefined;
+      let baseBranch = "main";
 
       if (projectId) {
         const project = await getProject({ projectId });
         if (project) {
           repoUrl = project.repoUrl;
+          if (project.githubDefaultBranch) baseBranch = project.githubDefaultBranch;
           if (project.githubInstallationId && isGitHubAppConfigured()) {
             try {
               githubToken = await getInstallationToken(project.githubInstallationId);
@@ -191,6 +193,7 @@ export class AgentQueueManager {
         prompt: job.prompt,
         repoUrl,
         githubToken,
+        baseBranch,
       });
 
       console.log(`[queue-manager] Work session started: runId=${result.runId} status=${result.status}`);

@@ -70,6 +70,7 @@ export class WorkSessionManager {
     prompt: string;
     repoUrl?: string;
     githubToken?: string;
+    baseBranch?: string;
   }): Promise<{ runId: string; status: string }> {
     const role = AGENT_ROLE_MAP[params.agentName];
     if (!role) throw new Error(`Unknown agent: ${params.agentName}`);
@@ -119,7 +120,7 @@ export class WorkSessionManager {
           AGENT_ROLE: role,
           AGENT_NAME: params.agentName,
           PROJECT_ID: params.projectId,
-          BASE_BRANCH: "main",
+          BASE_BRANCH: params.baseBranch || "main",
           ...(params.githubToken ? { GITHUB_TOKEN: params.githubToken } : {}),
         },
         stdout: "inherit",

@@ -666,6 +666,7 @@ const app = new Elysia()
           prompt,
           repoUrl: project.repoUrl,
           githubToken: githubToken || undefined,
+          baseBranch: project.githubDefaultBranch || "main",
         });
 
         set.status = 202;
@@ -1280,9 +1281,10 @@ const app = new Elysia()
       set.status = 400;
       return { error: "threadId and prompt are required" };
     }
-    // Look up project to get repoUrl and GitHub token (optional)
+    // Look up project to get repoUrl, GitHub token, and default branch (optional)
     let repoUrl: string | undefined;
     let githubToken: string | undefined;
+    let baseBranch = "main";
     if (projectId) {
       const project = await getProject({ projectId });
       if (!project) {
@@ -1290,6 +1292,7 @@ const app = new Elysia()
         return { error: "Project not found" };
       }
       repoUrl = project.repoUrl;
+      if (project.githubDefaultBranch) baseBranch = project.githubDefaultBranch;
       // Generate installation token if GitHub App is configured
       if (project.githubInstallationId && isGitHubAppConfigured()) {
         try {
@@ -1325,6 +1328,7 @@ const app = new Elysia()
         prompt,
         repoUrl,
         githubToken,
+        baseBranch,
       });
       console.log(`[orchestrator] Work session result: runId=${result.runId} status=${result.status}`);
       set.status = result.status === "existing" ? 200 : 201;
