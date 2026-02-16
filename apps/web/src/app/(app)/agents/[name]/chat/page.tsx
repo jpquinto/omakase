@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useAgentChat } from "@/hooks/use-agent-chat";
 import { useAgentThreads } from "@/hooks/use-agent-threads";
 import { useVoiceChat } from "@/hooks/use-voice-chat";
@@ -39,7 +39,6 @@ const AGENTS: Record<string, AgentInfo & { agentRole: AgentRunRole }> = {
 export default function AgentChatPage() {
   const params = useParams<{ name: string }>();
   const searchParams = useSearchParams();
-  const router = useRouter();
   const name = params.name;
   const agentMeta = AGENTS[name];
 
@@ -136,17 +135,26 @@ export default function AgentChatPage() {
   const [welcomeMounted, setWelcomeMounted] = useState(false);
   const welcomeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Sync URL with selected thread
+  // Sync URL with selected thread — uses history.replaceState to avoid
+  // triggering a Next.js route transition which would remount the component
+  // tree and kill any active EventSource (SSE) connection.
   const updateThreadUrl = useCallback((threadId: string | null) => {
     setSelectedThreadId(threadId);
     const url = threadId
       ? `/agents/${name}/chat?thread=${threadId}`
       : `/agents/${name}/chat`;
-    router.replace(url, { scroll: false });
-  }, [name, router]);
+    window.history.replaceState(null, "", url);
+  }, [name]);
 
-  // Sync from URL on param change
+  // Sync from URL on param change — only reacts when threadFromUrl itself
+  // changes (e.g. sidebar navigation via router.replace). We track the
+  // previous value with a ref so that programmatic state updates via
+  // updateThreadUrl (which uses history.replaceState) don't trigger a reset.
+  const prevThreadFromUrl = useRef(threadFromUrl);
   useEffect(() => {
+    if (prevThreadFromUrl.current === threadFromUrl) return;
+    prevThreadFromUrl.current = threadFromUrl;
+
     if (threadFromUrl && threadFromUrl !== selectedThreadId) {
       setSelectedThreadId(threadFromUrl);
     } else if (!threadFromUrl && selectedThreadId) {

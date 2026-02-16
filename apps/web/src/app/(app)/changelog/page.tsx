@@ -22,6 +22,9 @@ const RELEASES = [
       ],
       fixed: [
         "Stale work session blocking new dispatches \u2014 direct mode now ends idle sessions for the same project before starting a new one",
+        "Workspace setup failing on repos with non-\u2018main\u2019 default branch (e.g. master) \u2014 now reads githubDefaultBranch from project",
+        "Claude Code CLI charging Anthropic API balance instead of plan credits \u2014 ANTHROPIC_API_KEY stripped from subprocess environments",
+        "SSE connection dropping when switching threads \u2014 thread URL sync uses history.replaceState instead of Next.js router",
       ],
     },
   },
