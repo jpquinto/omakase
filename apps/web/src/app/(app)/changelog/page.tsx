@@ -4,6 +4,28 @@ import { cn } from "@/lib/utils";
 
 const RELEASES = [
   {
+    version: "v0.0.10",
+    title: "Dispatch Modal",
+    changes: {
+      added: [
+        "Dispatch modal with Direct and Pipeline mode tabs — replaces the inline agent popover on the tickets table",
+        "Direct mode dispatches a feature to a single agent as a Claude Code work session",
+        "Pipeline mode launches the full 4-step agent pipeline (Architect \u2192 Coder \u2192 Reviewer \u2192 Tester)",
+        "Agent card grid in Direct tab with live status indicators, busy badges, and gradient styling per agent color",
+        "Pipeline flow visualization showing all 4 agents connected by arrows",
+        "Auto-navigation to the agent\u2019s chat page after a direct dispatch so users can watch the work session",
+      ],
+      changed: [
+        "Feature assign endpoint accepts mode parameter (\"direct\" or \"pipeline\") — defaults to pipeline for backward compatibility",
+        "useAssignFeature hook extended with mode parameter and optional runId/threadId in response",
+        "AGENT_DEFS constant extracted to shared dispatch-modal module and reused across tickets table",
+      ],
+      fixed: [
+        "Stale work session blocking new dispatches \u2014 direct mode now ends idle sessions for the same project before starting a new one",
+      ],
+    },
+  },
+  {
     version: "v0.0.9",
     title: "Agent Job Queues",
     changes: {
