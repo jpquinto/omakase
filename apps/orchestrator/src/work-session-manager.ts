@@ -231,9 +231,10 @@ export class WorkSessionManager {
     console.log(`[work-session] Spawning: claude -p "${prompt.slice(0, 80)}..." ${session.claudeSessionId ? `--resume ${session.claudeSessionId}` : "(new session)"}`);
     console.log(`[work-session] cwd: ${session.cwd}`);
 
-    // Clear CLAUDECODE env var
+    // Clear env vars that would interfere with Claude Code CLI plan-based billing
     const childEnv = { ...process.env };
     delete childEnv["CLAUDECODE"];
+    delete childEnv["ANTHROPIC_API_KEY"];
 
     const proc = Bun.spawn(args, {
       cwd: session.cwd,

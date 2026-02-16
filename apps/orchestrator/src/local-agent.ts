@@ -114,9 +114,13 @@ export async function startLocalAgent(
   // Resolve the entrypoint script path relative to this file
   const entrypoint = resolve(import.meta.dir, "agent-entrypoint.sh");
 
+  // Remove ANTHROPIC_API_KEY so Claude Code CLI uses plan-based billing
+  const baseEnv = { ...process.env };
+  delete baseEnv["ANTHROPIC_API_KEY"];
+
   const childProcess = spawn(["bash", entrypoint], {
     env: {
-      ...process.env,
+      ...baseEnv,
       AGENT_ROLE: role,
       REPO_URL: repoUrl,
       FEATURE_ID: featureId,
