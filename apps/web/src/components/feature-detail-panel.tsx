@@ -734,7 +734,9 @@ function AssignAgentRow({ feature, onClose }: { feature: Feature; onClose: () =>
         prompt,
       });
       onClose();
-      router.push(`/agents/${agentName}/chat?thread=${result.threadId}`);
+      if (!result.queued) {
+        router.push(`/agents/${agentName}/chat?thread=${result.threadId}`);
+      }
     } catch {
       // Error handled by hook
     }

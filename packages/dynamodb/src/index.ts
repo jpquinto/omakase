@@ -97,3 +97,15 @@ export {
   DEFAULT_PERSONALITIES,
   getDefaultPersonality,
 } from "./default-personalities.js";
+
+export {
+  enqueueJob,
+  dequeueJob,
+  peekJob,
+  removeJob,
+  reorderJob,
+  listQueue,
+  getQueueDepth,
+  markJobCompleted,
+  markJobFailed,
+} from "./agent-queues.js";

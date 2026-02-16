@@ -80,6 +80,17 @@ function roleBadgeColor(role: Agent["role"]): string {
   return colors[role];
 }
 
+/** Maps agent id to queue badge color classes (bg + text + border) */
+function queueBadgeColor(agentId: string): string {
+  const colors: Record<string, string> = {
+    miso: "bg-oma-gold/10 text-oma-gold border-oma-gold/20",
+    nori: "bg-oma-indigo/10 text-oma-indigo border-oma-indigo/20",
+    koji: "bg-oma-secondary/10 text-oma-secondary border-oma-secondary/20",
+    toro: "bg-oma-jade/10 text-oma-jade border-oma-jade/20",
+  };
+  return colors[agentId] ?? "bg-oma-text/10 text-oma-text-muted border-oma-text/20";
+}
+
 export function AgentMissionControl({ onOpenChat, activeChatRunId }: AgentMissionControlProps) {
   const router = useRouter();
   const { agents: agentStatuses } = useAgentStatus();
@@ -219,6 +230,21 @@ export function AgentMissionControl({ onOpenChat, activeChatRunId }: AgentMissio
                   <p className="text-xs font-medium text-oma-text">
                     {agent.currentFeature}
                   </p>
+                  {/* Queue depth badge — shown when jobs are waiting behind current work */}
+                  {(() => {
+                    const live = agentStatuses[agent.id as keyof typeof agentStatuses];
+                    const depth = live?.queueDepth ?? 0;
+                    if (depth > 0) {
+                      return (
+                        <span
+                          className={`mt-1.5 inline-block rounded-oma-full border px-2 py-0.5 text-[10px] font-medium ${queueBadgeColor(agent.id)}`}
+                        >
+                          +{depth} queued
+                        </span>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               ) : dispatchingAgent === agent.id ? (
                 <div className="glass-sm rounded-oma px-3 py-2">
@@ -233,7 +259,9 @@ export function AgentMissionControl({ onOpenChat, activeChatRunId }: AgentMissio
                           const result = await dispatch({ agentName: agent.id as AgentName, prompt: dispatchPrompt.trim() });
                           setDispatchingAgent(null);
                           setDispatchPrompt("");
-                          router.push(`/agents/${agent.id}/chat?thread=${result.threadId}`);
+                          if (!result.queued) {
+                            router.push(`/agents/${agent.id}/chat?thread=${result.threadId}`);
+                          }
                         } catch { /* error in hook */ }
                       }
                       if (e.key === "Escape") {

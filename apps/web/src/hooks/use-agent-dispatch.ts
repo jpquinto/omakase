@@ -3,19 +3,13 @@
 import { useCallback, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
 import { useAgentStatus } from "./use-agent-status";
-import type { AgentName, AgentLiveStatusWorking } from "@omakase/db";
+import type { AgentName, AgentLiveStatusWorking, AgentDispatchResult } from "@omakase/db";
 
 interface DispatchParams {
   agentName: AgentName;
   projectId?: string;
   prompt: string;
   threadId?: string;
-}
-
-interface DispatchResult {
-  runId: string;
-  threadId: string;
-  status: string;
 }
 
 interface DispatchError {
@@ -27,7 +21,7 @@ interface DispatchError {
 }
 
 interface UseAgentDispatchResult {
-  dispatch: (params: DispatchParams) => Promise<DispatchResult>;
+  dispatch: (params: DispatchParams) => Promise<AgentDispatchResult>;
   isDispatching: boolean;
   error: DispatchError | null;
   clearError: () => void;
@@ -39,22 +33,33 @@ export function useAgentDispatch(): UseAgentDispatchResult {
   const [error, setError] = useState<DispatchError | null>(null);
 
   const dispatch = useCallback(
-    async (params: DispatchParams): Promise<DispatchResult> => {
+    async (params: DispatchParams): Promise<AgentDispatchResult> => {
       const { agentName, projectId, prompt, threadId } = params;
 
-      // Check if agent is busy
+      // If agent is busy, enqueue the job instead of blocking
       const agentStatus = agents[agentName];
       if (agentStatus?.status === "working") {
-        const working = agentStatus as AgentLiveStatusWorking;
-        const err: DispatchError = {
-          busy: true,
-          currentTask: working.currentTask,
-          runId: working.runId,
-          startedAt: working.startedAt,
-          message: `${agentName} is currently working on: ${working.currentTask}`,
-        };
-        setError(err);
-        throw err;
+        setIsDispatching(true);
+        setError(null);
+        try {
+          const result = await apiFetch<{ jobId: string; position: number }>(
+            `/api/agents/${agentName}/queue`,
+            {
+              method: "POST",
+              body: JSON.stringify({ projectId, prompt, threadId }),
+            },
+          );
+          return { queued: true, position: result.position, jobId: result.jobId };
+        } catch (err) {
+          const dispatchErr: DispatchError = {
+            busy: true,
+            message: err instanceof Error ? err.message : String(err),
+          };
+          setError(dispatchErr);
+          throw dispatchErr;
+        } finally {
+          setIsDispatching(false);
+        }
       }
 
       setIsDispatching(true);
@@ -110,7 +115,7 @@ export function useAgentDispatch(): UseAgentDispatchResult {
           body: JSON.stringify({ content: prompt, sender: "user", threadId: resolvedThreadId }),
         });
 
-        return { runId: result.runId, threadId: resolvedThreadId, status: result.status };
+        return { queued: false, runId: result.runId, threadId: resolvedThreadId, status: result.status };
       } catch (err) {
         // Rollback optimistic update
         setOptimistic(agentName, { status: "idle" as const });

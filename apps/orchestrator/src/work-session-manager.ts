@@ -48,6 +48,13 @@ export class WorkSessionManager {
   private sessions = new Map<string, WorkSession>();
   private localWorkspaceRoot: string;
 
+  /**
+   * Optional callback invoked when a work session completes (success, failure,
+   * or timeout). The orchestrator sets this to trigger queue processing so the
+   * next queued job can start automatically.
+   */
+  onSessionComplete: ((agentName: string) => void) | null = null;
+
   constructor(localWorkspaceRoot: string) {
     this.localWorkspaceRoot = localWorkspaceRoot;
   }
@@ -276,6 +283,8 @@ export class WorkSessionManager {
       }
     }
 
+    const { agentName } = session;
+
     await completeAgentRun({
       runId,
       status: "completed",
@@ -284,6 +293,11 @@ export class WorkSessionManager {
 
     emit(runId, { type: "thinking_end" });
     this.sessions.delete(runId);
+
+    // Notify the queue manager so it can process the next queued job
+    if (this.onSessionComplete) {
+      try { this.onSessionComplete(agentName); } catch { /* logged by caller */ }
+    }
   }
 
   getSession(runId: string): WorkSession | undefined {
@@ -534,6 +548,7 @@ export class WorkSessionManager {
     const session = this.sessions.get(runId);
     if (!session) return;
 
+    const { agentName } = session;
     console.log(`[work-session] Session ${runId} timed out`);
 
     if (session.activeProcess && session.activeProcess.exitCode === null) {
@@ -548,5 +563,10 @@ export class WorkSessionManager {
 
     emit(runId, { type: "stream_error", error: "Session timed out after 30 minutes of inactivity" });
     this.sessions.delete(runId);
+
+    // Notify the queue manager so it can process the next queued job
+    if (this.onSessionComplete) {
+      try { this.onSessionComplete(agentName); } catch { /* logged by caller */ }
+    }
   }
 }

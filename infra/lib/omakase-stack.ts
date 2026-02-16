@@ -326,6 +326,7 @@ export class OmakaseStack extends cdk.Stack {
     //   omakase-agent-runs  (PK: id)
     //   omakase-users       (PK: id, GSI by_auth0Id: auth0Id, GSI by_email: email)
     //   omakase-agent-messages, omakase-agent-threads, omakase-agent-memories, omakase-agent-personalities
+    //   omakase-agent-queues  (PK: agentName, SK: sk — position-padded sort key for ordered queue)
 
     // ---------------------------------------------------------------
     // Stack Outputs

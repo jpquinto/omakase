@@ -8,4 +8,5 @@ export type { AgentMessage, AgentMessageSender, AgentMessageType, NewAgentMessag
 export type { AgentMemory, AgentMemorySource, NewAgentMemory } from "./agent-memories.js";
 export type { AgentPersonality, NewAgentPersonality } from "./agent-personalities.js";
 export type { AgentThread, AgentThreadMode, AgentThreadStatus, NewAgentThread } from "./agent-threads.js";
-export type { AgentLiveStatus, AgentLiveStatusState, AgentLiveStatusIdle, AgentLiveStatusWorking, AgentLiveStatusErrored, AgentName, AllAgentStatuses } from "./agent-status.js";
+export type { AgentLiveStatus, AgentLiveStatusState, AgentLiveStatusIdle, AgentLiveStatusWorking, AgentLiveStatusErrored, AgentQueuePreview, AgentName, AllAgentStatuses } from "./agent-status.js";
+export type { QueuedJob, QueuedJobStatus, AgentDispatchResult } from "./agent-queues.js";

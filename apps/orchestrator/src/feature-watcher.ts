@@ -236,6 +236,13 @@ export class FeatureWatcher {
   private async pollProject(project: Project): Promise<number> {
     // Check if the project has capacity for more pipelines
     if (!this.concurrency.canStart(project.id, project.maxConcurrency)) {
+      // TODO: When queue manager is injected into the watcher, enqueue skipped
+      // features instead of silently dropping them. For now the main dispatch
+      // path is manual (via the assign endpoint) which already enqueues.
+      console.log(
+        `[feature-watcher] Project "${project.name}": at capacity ` +
+          `(${this.concurrency.getActiveCount(project.id)}/${project.maxConcurrency}), skipping poll`,
+      );
       return 0;
     }
 
@@ -260,6 +267,10 @@ export class FeatureWatcher {
     for (const feature of readyFeatures) {
       // Re-check concurrency after each launch (it may have filled up)
       if (!this.concurrency.canStart(project.id, project.maxConcurrency)) {
+        console.log(
+          `[feature-watcher] Concurrency filled for project "${project.name}" — ` +
+            `${readyFeatures.length - launched} feature(s) remain unprocessed`,
+        );
         break;
       }
 

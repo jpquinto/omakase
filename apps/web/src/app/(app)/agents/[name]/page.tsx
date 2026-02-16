@@ -14,6 +14,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, CheckCircle2, XCircle, Clock, Loader2, MessageSquare, ExternalLink, GitPullRequest, Play } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AgentProfileHero } from "@/components/agent-profile-hero";
+import { AgentQueueList } from "@/components/agent-queue-list";
 import { AgentStatsGrid } from "@/components/agent-stats-grid";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { CalendarHeatmap } from "@/components/calendar-heatmap";
@@ -394,7 +395,9 @@ export default function AgentProfilePage() {
               if (e.key === "Enter" && dispatchPrompt.trim()) {
                 try {
                   const result = await dispatch({ agentName: name as AgentName, prompt: dispatchPrompt.trim() });
-                  router.push(`/agents/${name}/chat?thread=${result.threadId}`);
+                  if (!result.queued) {
+                    router.push(`/agents/${name}/chat?thread=${result.threadId}`);
+                  }
                 } catch { /* error shown by hook */ }
               }
               if (e.key === "Escape") {
@@ -411,7 +414,9 @@ export default function AgentProfilePage() {
               if (!dispatchPrompt.trim()) return;
               try {
                 const result = await dispatch({ agentName: name as AgentName, prompt: dispatchPrompt.trim() });
-                router.push(`/agents/${name}/chat?thread=${result.threadId}`);
+                if (!result.queued) {
+                  router.push(`/agents/${name}/chat?thread=${result.threadId}`);
+                }
               } catch { /* error shown by hook */ }
             }}
             disabled={!dispatchPrompt.trim() || isDispatching}
@@ -481,7 +486,20 @@ export default function AgentProfilePage() {
         </section>
       </ScrollReveal>
 
-      {/* 4. Resolved Tickets */}
+      {/* 4. Job Queue */}
+      <ScrollReveal variant="fade-up" delay={225}>
+        <section>
+          <h2 className="mb-4 font-serif text-xl font-semibold text-oma-text">
+            Job Queue
+          </h2>
+          <AgentQueueList
+            agentName={name as AgentName}
+            accentColor={meta.statsAccentColor}
+          />
+        </section>
+      </ScrollReveal>
+
+      {/* 5. Resolved Tickets */}
       <ScrollReveal variant="fade-up" delay={250}>
         <section>
           <h2 className="mb-4 font-serif text-xl font-semibold text-oma-text">

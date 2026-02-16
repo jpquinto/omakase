@@ -49,6 +49,10 @@ export type {
   AgentLiveStatusIdle,
   AgentLiveStatusWorking,
   AgentLiveStatusErrored,
+  AgentQueuePreview,
   AgentName,
   AllAgentStatuses,
+  QueuedJob,
+  QueuedJobStatus,
+  AgentDispatchResult,
 } from "./schema/index.js";

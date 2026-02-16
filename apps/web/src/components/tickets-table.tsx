@@ -26,6 +26,7 @@ import {
 import type { Feature, FeatureStatus, AgentLiveStatusWorking, AgentName } from "@omakase/db";
 import { cn } from "@/lib/utils";
 import { useAssignFeature, useCreateFeature, useDeleteFeature, useSyncLinear, useUpdateFeature } from "@/hooks/use-api";
+import { useAgentQueue } from "@/hooks/use-agent-queue";
 import { useAgentStatus } from "@/hooks/use-agent-status";
 import { LinearTicketBadge } from "@/components/linear-ticket-badge";
 import { Button } from "@/components/ui/button";
@@ -148,6 +149,15 @@ const AGENT_DEFS = [
   { name: "koji" as AgentName, label: "Koji", mascot: "\uD83C\uDF76", role: "Reviewer", color: "text-oma-secondary", dotColor: "bg-oma-secondary" },
   { name: "toro" as AgentName, label: "Toro", mascot: "\uD83C\uDF63", role: "Tester", color: "text-oma-jade", dotColor: "bg-oma-jade" },
 ] as const;
+
+/** Full Tailwind class strings for queue position badges, keyed by agent name.
+ *  Uses complete class names so Tailwind's JIT compiler can detect them. */
+const QUEUE_BADGE_STYLES: Record<AgentName, string> = {
+  miso: "text-oma-gold bg-oma-gold/10 border-oma-gold/20",
+  nori: "text-oma-indigo bg-oma-indigo/10 border-oma-indigo/20",
+  koji: "text-oma-secondary bg-oma-secondary/10 border-oma-secondary/20",
+  toro: "text-oma-jade bg-oma-jade/10 border-oma-jade/20",
+};
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -370,6 +380,32 @@ export function TicketsTable({
 }: TicketsTableProps) {
   // --- Agent live status ---
   const { agents: agentStatuses } = useAgentStatus();
+
+  // --- Agent queue data ---
+  // Fetch queue data for all agents to detect queued features
+  const { queue: misoQueue } = useAgentQueue("miso");
+  const { queue: noriQueue } = useAgentQueue("nori");
+  const { queue: kojiQueue } = useAgentQueue("koji");
+  const { queue: toroQueue } = useAgentQueue("toro");
+
+  // Build a lookup: featureId -> { position, agentName, mascot }
+  const queuedFeatureLookup = useMemo(() => {
+    const lookup = new Map<string, { position: number; agentName: AgentName; mascot: string }>();
+    const allQueues: { queue: typeof misoQueue; agentName: AgentName; mascot: string }[] = [
+      { queue: misoQueue, agentName: "miso", mascot: "\uD83C\uDF5C" },
+      { queue: noriQueue, agentName: "nori", mascot: "\uD83C\uDF59" },
+      { queue: kojiQueue, agentName: "koji", mascot: "\uD83C\uDF76" },
+      { queue: toroQueue, agentName: "toro", mascot: "\uD83C\uDF63" },
+    ];
+    for (const { queue, agentName, mascot } of allQueues) {
+      for (const job of queue) {
+        if (job.featureId) {
+          lookup.set(job.featureId, { position: job.position + 1, agentName, mascot });
+        }
+      }
+    }
+    return lookup;
+  }, [misoQueue, noriQueue, kojiQueue, toroQueue]);
 
   // --- State ---
   const [searchQuery, setSearchQuery] = useState("");
@@ -722,6 +758,19 @@ export function TicketsTable({
                   {feature.category}
                 </span>
               )}
+              {/* Queue badge (mobile) */}
+              {(() => {
+                const queueInfo = queuedFeatureLookup.get(feature.id);
+                if (!queueInfo) return null;
+                return (
+                  <span className={cn(
+                    "inline-flex items-center gap-1 rounded-oma-full border px-2 py-0.5 text-[10px] font-medium",
+                    QUEUE_BADGE_STYLES[queueInfo.agentName],
+                  )}>
+                    Queued #{queueInfo.position} for {queueInfo.mascot}
+                  </span>
+                );
+              })()}
             </div>
             {feature.linearIssueId && feature.linearIssueUrl && (
               <div className="mt-2" onClick={(e) => e.stopPropagation()}>
@@ -896,7 +945,10 @@ export function TicketsTable({
                 <tr
                   key={feature.id}
                   onClick={() => onSelectFeature(feature)}
-                  className="glass-sm cursor-pointer border-b border-oma-glass-border transition-colors hover:bg-white/[0.04]"
+                  className={cn(
+                    "glass-sm cursor-pointer border-b border-oma-glass-border transition-colors hover:bg-white/[0.04]",
+                    assigningFeatureId === feature.id && "relative z-10",
+                  )}
                 >
                   {/* Name (inline editable on double-click) */}
                   <td className="px-4 py-3">
@@ -914,7 +966,7 @@ export function TicketsTable({
                     />
                   </td>
 
-                  {/* Status (inline dropdown on click) + progress indicator */}
+                  {/* Status (inline dropdown on click) + progress/queue indicator */}
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <InlineStatusSelect
@@ -936,6 +988,19 @@ export function TicketsTable({
                           );
                         }
                         return null;
+                      })()}
+                      {/* Queue position badge — shown when this feature is waiting in an agent's queue */}
+                      {(() => {
+                        const queueInfo = queuedFeatureLookup.get(feature.id);
+                        if (!queueInfo) return null;
+                        return (
+                          <span className={cn(
+                            "inline-flex items-center gap-1 rounded-oma-full border px-2 py-0.5 text-[10px] font-medium",
+                            QUEUE_BADGE_STYLES[queueInfo.agentName],
+                          )}>
+                            Queued #{queueInfo.position} for {queueInfo.mascot}
+                          </span>
+                        );
                       })()}
                     </div>
                   </td>
@@ -1014,18 +1079,17 @@ export function TicketsTable({
                                 const isBusy = live?.status === "working";
                                 const isErrored = live?.status === "errored";
                                 const working = isBusy ? (live as AgentLiveStatusWorking) : null;
+                                // Queue depth from live status — used to show the position this job would get
+                                const queueDepth = live?.queueDepth ?? 0;
 
                                 return (
                                   <button
                                     key={agent.name}
                                     type="button"
-                                    disabled={isBusy}
                                     onClick={() => void handleAssign(feature.id, agent.name)}
                                     className={cn(
                                       "flex w-full items-center gap-2 rounded-oma-sm px-3 py-2 text-left text-sm transition-colors",
-                                      isBusy
-                                        ? "cursor-not-allowed opacity-50"
-                                        : "hover:bg-white/[0.06]",
+                                      "hover:bg-white/[0.06]",
                                     )}
                                   >
                                     {/* Status dot */}
@@ -1043,9 +1107,13 @@ export function TicketsTable({
                                     <span className="flex-1 text-xs text-oma-text-muted">
                                       {agent.role}
                                     </span>
+                                    {/* Busy agents: show queue position the job would receive */}
                                     {isBusy && working && (
-                                      <span className="max-w-[80px] truncate text-[10px] text-oma-text-subtle" title={working.currentTask}>
-                                        Working
+                                      <span className={cn(
+                                        "rounded-oma-full px-1.5 py-0.5 text-[10px] font-medium bg-white/[0.06]",
+                                        agent.color,
+                                      )}>
+                                        Queue #{queueDepth + 1}
                                       </span>
                                     )}
                                     {isErrored && (

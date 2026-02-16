@@ -80,7 +80,7 @@ import {
   getAgentActivityByName,
   getDefaultPersonality,
 } from "@omakase/dynamodb";
-import type { AgentMessageSender, AgentMessageType, AgentRunRole, AgentThreadMode, AgentThreadStatus, QuizMetadata } from "@omakase/db";
+import type { AgentMessageSender, AgentMessageType, AgentName, AgentRunRole, AgentThreadMode, AgentThreadStatus, QuizMetadata } from "@omakase/db";
 
 import { FeatureWatcher, type FeatureWatcherConfig } from "./feature-watcher.js";
 import { AgentPipeline, type EcsConfig, type ExecutionMode } from "./pipeline.js";
@@ -89,6 +89,7 @@ import { generateAgentResponse } from "./agent-responder.js";
 import { handleQuizMessage } from "./quiz-handler.js";
 import { subscribe } from "./stream-bus.js";
 import { WorkSessionManager } from "./work-session-manager.js";
+import { AgentQueueManager } from "./queue-manager.js";
 import {
   isGitHubAppConfigured,
   getInstallationToken,
@@ -152,6 +153,16 @@ const watcherConfig: FeatureWatcherConfig = {
 
 const watcher = new FeatureWatcher(ecsClient, watcherConfig);
 const workSessionManager = new WorkSessionManager(LOCAL_WORKSPACE_ROOT);
+const queueManager = new AgentQueueManager();
+queueManager.setSessionManager(workSessionManager);
+
+// When a work session completes, process the next queued job for that agent
+workSessionManager.onSessionComplete = (agentName: string) => {
+  console.log(`[orchestrator] Session completed for ${agentName} — checking queue`);
+  queueManager.processNext(agentName as AgentName).catch((err) =>
+    console.error(`[orchestrator] Queue processNext failed for ${agentName}:`, err),
+  );
+};
 
 // ---------------------------------------------------------------------------
 // Elysia HTTP server
@@ -563,14 +574,6 @@ const app = new Elysia()
       return { error: `agentName must be one of: ${KNOWN_AGENTS.join(", ")}` };
     }
 
-    // Busy guard — reject if agent already has an active work session
-    const activeSessions = workSessionManager.listAllSessions();
-    const busySession = activeSessions.find((s) => s.agentName === agentName);
-    if (busySession) {
-      set.status = 409;
-      return { error: `Agent ${agentName} is currently busy with an active work session` };
-    }
-
     const feature = await getFeature({ featureId: params.featureId });
     if (!feature) {
       set.status = 404;
@@ -591,11 +594,24 @@ const app = new Elysia()
       return { error: "Project has no repository configured" };
     }
 
-    // Check concurrency
+    // If agent is busy or concurrency limit is reached, enqueue instead of rejecting
+    const activeSessions = workSessionManager.listAllSessions();
+    const busySession = activeSessions.find((s) => s.agentName === agentName);
     const activeAgents = await listActiveAgents({ projectId: project.id });
-    if (activeAgents.length >= project.maxConcurrency) {
-      set.status = 429;
-      return { error: `Concurrency limit reached (${activeAgents.length}/${project.maxConcurrency} active pipelines)` };
+    const atCapacity = activeAgents.length >= project.maxConcurrency;
+
+    if (busySession || atCapacity) {
+      const reason = busySession ? "agent busy" : "concurrency limit reached";
+      console.log(`[orchestrator] Enqueueing feature ${feature.id} for ${agentName} (${reason})`);
+      const result = await queueManager.enqueue({
+        agentName: agentName as AgentName,
+        projectId: feature.projectId,
+        prompt: `Implement feature: ${feature.name}\n\n${feature.description ?? ""}`.trim(),
+        featureId: feature.id,
+        queuedBy: "user",
+      });
+      set.status = 202;
+      return { queued: true, position: result.position, jobId: result.jobId, featureId: feature.id };
     }
 
     // Claim the feature
@@ -1233,6 +1249,23 @@ const app = new Elysia()
         }
       }
     }
+    // If agent is busy with a different session, enqueue instead of blocking
+    const existingSessions = workSessionManager.listSessions(params.agentName);
+    const busyWithOther = existingSessions.length > 0
+      && !existingSessions.some((s) => s.threadId === threadId);
+    if (busyWithOther) {
+      console.log(`[orchestrator] Agent ${params.agentName} is busy — enqueueing job`);
+      const result = await queueManager.enqueue({
+        agentName: params.agentName as AgentName,
+        projectId: projectId ?? "general",
+        prompt,
+        threadId,
+        queuedBy: "user",
+      });
+      set.status = 202;
+      return { queued: true, position: result.position, jobId: result.jobId };
+    }
+
     try {
       console.log(`[orchestrator] Starting work session: agent=${params.agentName} project=${projectId ?? "none"} thread=${threadId} repoUrl=${repoUrl ?? "none"}`);
       const result = await workSessionManager.startSession({
@@ -1395,6 +1428,18 @@ const app = new Elysia()
     const agents: Record<string, unknown> = {};
 
     for (const name of AGENT_NAMES) {
+      // Fetch queue info for every agent status
+      const [queueDepth, nextQueuedJob] = await Promise.all([
+        queueManager.getQueueDepth(name),
+        queueManager.peek(name),
+      ]);
+      const queueInfo = {
+        queueDepth,
+        nextJob: nextQueuedJob
+          ? { jobId: nextQueuedJob.jobId, prompt: nextQueuedJob.prompt, queuedAt: nextQueuedJob.queuedAt }
+          : undefined,
+      };
+
       const session = allSessions.find((s) => s.agentName === name);
       if (session) {
         // Try to get thread title for a more useful currentTask label
@@ -1410,6 +1455,7 @@ const app = new Elysia()
           projectId: session.projectId,
           startedAt: session.startedAt,
           currentTask,
+          ...queueInfo,
         };
       } else {
         // Check most recent run for error state
@@ -1421,14 +1467,34 @@ const app = new Elysia()
             lastError: lastRun.errorMessage ?? "Unknown error",
             lastRunId: lastRun.id,
             erroredAt: lastRun.completedAt ?? lastRun.startedAt,
+            ...queueInfo,
           };
         } else {
-          agents[name] = { status: "idle" };
+          agents[name] = { status: "idle", ...queueInfo };
         }
       }
     }
 
     return { agents };
+  })
+  // Queue summary across all agents — MUST come before /api/agents/:agentName
+  // so "queues" isn't matched as an agentName param.
+  .get("/api/agents/queues", async () => {
+    const AGENT_NAMES: AgentName[] = ["miso", "nori", "koji", "toro"];
+    const summary: Record<string, { depth: number; nextJob: { jobId: string; prompt: string; queuedAt: string } | null }> = {};
+
+    for (const name of AGENT_NAMES) {
+      const [depth, next] = await Promise.all([
+        queueManager.getQueueDepth(name),
+        queueManager.peek(name),
+      ]);
+      summary[name] = {
+        depth,
+        nextJob: next ? { jobId: next.jobId, prompt: next.prompt, queuedAt: next.queuedAt } : null,
+      };
+    }
+
+    return { queues: summary };
   })
   .get("/api/agents/:agentName/status", async ({ params, set }) => {
     const VALID_AGENTS = ["miso", "nori", "koji", "toro"];
@@ -1489,6 +1555,65 @@ const app = new Elysia()
   .get("/api/agents/:agentName/runs", async ({ params, query }) => {
     const limit = query.limit ? parseInt(query.limit as string, 10) : 20;
     return await listRunsByAgentName({ agentName: params.agentName, limit });
+  })
+  // Agent job queue endpoints
+  .get("/api/agents/:agentName/queue", async ({ params, set }) => {
+    const KNOWN_AGENTS = ["miso", "nori", "koji", "toro"];
+    if (!KNOWN_AGENTS.includes(params.agentName)) {
+      set.status = 404;
+      return { error: "Agent not found" };
+    }
+    return await queueManager.getQueue(params.agentName as AgentName);
+  })
+  .post("/api/agents/:agentName/queue", async ({ params, body, set }) => {
+    const KNOWN_AGENTS = ["miso", "nori", "koji", "toro"];
+    if (!KNOWN_AGENTS.includes(params.agentName)) {
+      set.status = 404;
+      return { error: "Agent not found" };
+    }
+    const { projectId, prompt, threadId, featureId } = body as {
+      projectId: string;
+      prompt: string;
+      threadId?: string;
+      featureId?: string;
+    };
+    if (!projectId || !prompt) {
+      set.status = 400;
+      return { error: "projectId and prompt are required" };
+    }
+    const result = await queueManager.enqueue({
+      agentName: params.agentName as AgentName,
+      projectId,
+      prompt,
+      threadId,
+      featureId,
+      queuedBy: "user",
+    });
+    set.status = 201;
+    return { jobId: result.jobId, position: result.position };
+  })
+  .delete("/api/agents/:agentName/queue/:jobId", async ({ params, set }) => {
+    const KNOWN_AGENTS = ["miso", "nori", "koji", "toro"];
+    if (!KNOWN_AGENTS.includes(params.agentName)) {
+      set.status = 404;
+      return { error: "Agent not found" };
+    }
+    await queueManager.remove(params.agentName as AgentName, params.jobId);
+    return { success: true };
+  })
+  .patch("/api/agents/:agentName/queue/:jobId", async ({ params, body, set }) => {
+    const KNOWN_AGENTS = ["miso", "nori", "koji", "toro"];
+    if (!KNOWN_AGENTS.includes(params.agentName)) {
+      set.status = 404;
+      return { error: "Agent not found" };
+    }
+    const { position } = body as { position: number };
+    if (typeof position !== "number") {
+      set.status = 400;
+      return { error: "position (number) is required" };
+    }
+    await queueManager.reorder(params.agentName as AgentName, params.jobId, position);
+    return { success: true };
   })
   // Catch-all error handler
   .onError(({ set, error, code }) => {
