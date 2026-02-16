@@ -19,9 +19,12 @@ import {
   getQueueDepth,
   markJobCompleted,
   markJobFailed,
+  getProject,
+  getWorkspace,
 } from "@omakase/dynamodb";
 import type { QueuedJob, AgentName } from "@omakase/db";
 import type { WorkSessionManager } from "./work-session-manager.js";
+import { isGitHubAppConfigured, getInstallationToken } from "./github-app.js";
 
 // ---------------------------------------------------------------------------
 // AgentQueueManager
@@ -161,12 +164,33 @@ export class AgentQueueManager {
         console.log(`[queue-manager] Created thread ${threadId} for queued job ${job.jobId}`);
       }
 
+      // Resolve project repo URL and GitHub token for workspace setup
+      const projectId = job.projectId !== "general" ? job.projectId : undefined;
+      let repoUrl: string | undefined;
+      let githubToken: string | undefined;
+
+      if (projectId) {
+        const project = await getProject({ projectId });
+        if (project) {
+          repoUrl = project.repoUrl;
+          if (project.githubInstallationId && isGitHubAppConfigured()) {
+            try {
+              githubToken = await getInstallationToken(project.githubInstallationId);
+            } catch (err) {
+              console.warn(`[queue-manager] Failed to get GitHub installation token:`, err);
+            }
+          }
+        }
+      }
+
       // Start a work session
       const result = await this.sessionManager.startSession({
         agentName,
-        projectId: job.projectId !== "general" ? job.projectId : undefined,
+        projectId,
         threadId,
         prompt: job.prompt,
+        repoUrl,
+        githubToken,
       });
 
       console.log(`[queue-manager] Work session started: runId=${result.runId} status=${result.status}`);
